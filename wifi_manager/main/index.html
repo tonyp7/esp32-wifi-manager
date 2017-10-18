@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8"/>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<script src="jquery.js"></script>
+		<link rel="stylesheet" href="style.css">
+		<script src="code.js"></script>
+	</head>
+	<body>
+		<form>
+			<h2>Choose a network...</h2>
+			<div class="networks">
+			</div>
+			<script>refresh_wifi();setInterval(refresh_wifi, 3000);</script>
+			<div class="login">
+			
+				<div id="login-data">
+					<input id="pwd" type="password" name="password" placeholder="Password" value="" style="display:block">
+				</div>
+				
+				<div id="loading">
+					<div class="spinner"><div class="double-bounce1"></div><div class="double-bounce2"></div></div>
+				</div>
+				
+				<div style="border:1px solid #fff;">
+					<input id="join" type="button" value="Join" style="display:block;float:right;"/>
+					<input id="cancel" type="button" value="Cancel" style="display:block"/>
+				</div>
+				
+			</div>
+			<hr />
+		</form>
+		<div id="credits">
+			ESPWConnect
+			Open-Source Software in use in ESP Connect:
+			SpinKit, Copyright 2015 Tobias Ahlin. Licensed under the MIT License.
+			jQuery, The jQuery Foundation. Licensed under the MIT License.
+		</div>
+	</body>
+<html>
