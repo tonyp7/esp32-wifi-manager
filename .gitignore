@@ -53,3 +53,4 @@ dkms.conf
 
 # Eclipse
 .metadata/
+RemoteSystemsTempFiles/.project
