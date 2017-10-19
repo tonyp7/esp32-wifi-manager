@@ -22,6 +22,10 @@ char* wifi_scan_get_json();
 
 wifi_sta_config_t* get_wifi_sta_config();
 
+
+esp_err_t wifi_manager_event_handler(void *ctx, system_event_t *event);
+
+
 uint8_t wifi_scan_lock_ap_list();
 void wifi_scan_unlock_ap_list();
 

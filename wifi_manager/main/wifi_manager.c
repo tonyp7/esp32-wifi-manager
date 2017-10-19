@@ -15,6 +15,7 @@
 #include "esp_system.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/event_groups.h"
 #include "esp_event_loop.h"
 #include "esp_wifi.h"
 #include "esp_log.h"
@@ -31,6 +32,9 @@ SemaphoreHandle_t xSemaphoreScan = NULL;
 uint16_t ap_num = MAX_AP_NUM;
 wifi_ap_record_t *accessp_records; //[MAX_AP_NUM];
 char *accessp_json;
+
+EventGroupHandle_t wifi_manager_event_group;
+const int wifi_manager_WIFI_CONNECTED_BIT = BIT0;
 
 
 
@@ -129,14 +133,51 @@ char* wifi_scan_get_json(){
 	return accessp_json;
 }
 
+
+esp_err_t wifi_manager_event_handler(void *ctx, system_event_t *event)
+{
+    switch(event->event_id) {
+
+    case SYSTEM_EVENT_STA_START:
+        esp_wifi_connect();
+        break;
+
+	case SYSTEM_EVENT_STA_GOT_IP:
+        xEventGroupSetBits(wifi_manager_event_group, wifi_manager_WIFI_CONNECTED_BIT);
+        break;
+
+	case SYSTEM_EVENT_STA_DISCONNECTED:
+		xEventGroupClearBits(wifi_manager_event_group, wifi_manager_WIFI_CONNECTED_BIT);
+        break;
+
+	default:
+        break;
+    }
+	return ESP_OK;
+}
+
 void wifi_manager( void * pvParameters ){
 
+	//wifi scanner config
 	wifi_scan_config_t scan_config = {
-			.ssid = 0,
-			.bssid = 0,
-			.channel = 0,
-			.show_hidden = true
+				.ssid = 0,
+				.bssid = 0,
+				.channel = 0,
+				.show_hidden = true
 	};
+
+	//try to get access to previously saved wifi
+	wifi_sta_config_t* sta_config = get_wifi_sta_config();
+
+	if(sta_config){
+		printf("found a saved config\n");
+	}
+	else{
+		printf("there is no saved wifi");
+	}
+
+
+
 
 	while(true){
 

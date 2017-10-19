@@ -123,7 +123,7 @@ void http_server(void *pvParameters) {
 			http_server_netconn_serve(newconn);
 			netconn_delete(newconn);
 		}
-		vTaskDelay(2); //allow task to be preempted
+		vTaskDelay(10); //allow task to be preempted
 	} while(err == ERR_OK);
 	netconn_close(conn);
 	netconn_delete(conn);
