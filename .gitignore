@@ -57,3 +57,8 @@ RemoteSystemsTempFiles/.project
 .settings/
 wifi_manager/build/
 wifi_manager/build/*
+wifi_manager/build/app_update/
+wifi_manager/build/aws_iot/
+*.a
+*.o
+*.d
