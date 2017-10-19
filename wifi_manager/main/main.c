@@ -153,7 +153,7 @@ void app_main()
 	xTaskCreate(&wifi_manager, "wifi_manager", 2048, NULL, 4, NULL);
 
 
-	//xTaskCreatePinnedToCore(&monitoring_task, "monitoring_task", 2048, NULL, 3, NULL, 0);
+	xTaskCreatePinnedToCore(&monitoring_task, "monitoring_task", 2048, NULL, 1, NULL, 1);
 
 
 
