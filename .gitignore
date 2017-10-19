@@ -55,3 +55,4 @@ dkms.conf
 .metadata/
 RemoteSystemsTempFiles/.project
 .settings/
+wifi_manager/build/
