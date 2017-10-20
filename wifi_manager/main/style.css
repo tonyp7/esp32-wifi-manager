@@ -26,7 +26,7 @@ body{background-color:#eee;border:0;margin:0;font:1.1em tahoma, arial, sans-seri
 				outline: none;
 			}
 			
-			form{
+			#app{
 			background-color:#fff;}
 			
 			label{
