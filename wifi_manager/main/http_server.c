@@ -126,8 +126,6 @@ void http_server(void *pvParameters) {
 	uxBits = xEventGroupWaitBits(http_server_event_group, HTTP_SERVER_START_BIT_0, pdFALSE, pdTRUE, portMAX_DELAY );
 	printf("http_server received message to start server\n");
 
-	vTaskDelay(3000 / portTICK_PERIOD_MS);
-
 	struct netconn *conn, *newconn;
 	err_t err;
 	conn = netconn_new(NETCONN_TCP);

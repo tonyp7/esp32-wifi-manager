@@ -42,7 +42,7 @@ EventGroupHandle_t wifi_manager_event_group;
 const int wifi_manager_WIFI_CONNECTED_BIT = BIT0;
 const int STA_CONNECTED_BIT = BIT1;
 const int STA_DISCONNECTED_BIT = BIT2;
-
+const int AP_STARTED = BIT3;
 
 wifi_config_t wifi_config;
 
@@ -153,8 +153,7 @@ esp_err_t wifi_manager_event_handler(void *ctx, system_event_t *event)
     switch(event->event_id) {
 
     case SYSTEM_EVENT_AP_START:
-		printf("Access point started -Starting http server\n");
-		http_server_set_event_start();
+    	xEventGroupSetBits(wifi_manager_event_group, AP_STARTED);
 		break;
 
     case SYSTEM_EVENT_AP_STACONNECTED:
@@ -227,6 +226,13 @@ void wifi_manager( void * pvParameters ){
     //event handler
     ESP_ERROR_CHECK(esp_event_loop_init(wifi_manager_event_handler, NULL));
 
+    //wifi scanner config
+	wifi_scan_config_t scan_config = {
+		.ssid = 0,
+		.bssid = 0,
+		.channel = 0,
+		.show_hidden = true
+	};
 
 
 	//try to get access to previously saved wifi
@@ -259,7 +265,7 @@ void wifi_manager( void * pvParameters ){
 		wifi_init_config_t wifi_init_config = WIFI_INIT_CONFIG_DEFAULT();
 		ESP_ERROR_CHECK(esp_wifi_init(&wifi_init_config));
 		ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
-	    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
+	    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
 
 		// configure the wifi connection and start the interface
 		wifi_config_t ap_config = {
@@ -278,7 +284,28 @@ void wifi_manager( void * pvParameters ){
 		ESP_ERROR_CHECK(esp_wifi_start());
 		printf("Starting access point, SSID=%s\n", ap_config.ap.ssid);
 
+		//wait for access point to start
+		xEventGroupWaitBits(wifi_manager_event_group, AP_STARTED, pdFALSE, pdTRUE, portMAX_DELAY );
+		printf("Access point started -Starting http server\n");
+		http_server_set_event_start();
+
+
+		//keep scanning wifis
 		while(1){
+			//safe guard against overflow
+			if(ap_num > MAX_AP_NUM) ap_num = MAX_AP_NUM;
+
+			ESP_ERROR_CHECK(esp_wifi_scan_start(&scan_config, true));
+			ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&ap_num, accessp_records));
+
+			//make sure the http server isn't trying to access the list while it gets refreshed
+			if(wifi_scan_lock_ap_list()){
+				wifi_scan_generate_json();
+				wifi_scan_unlock_ap_list();
+			}
+			else{
+				printf("Could not get access to xSemaphoreScan in wifi_scan\n");
+			}
 			vTaskDelay(5000 / portTICK_PERIOD_MS);
 		}
 	}
@@ -330,12 +357,12 @@ void wifi_manager( void * pvParameters ){
 
 
 	//wifi scanner config
-	wifi_scan_config_t scan_config = {
-				.ssid = 0,
-				.bssid = 0,
-				.channel = 0,
-				.show_hidden = true
-	};
+	//wifi_scan_config_t scan_config = {
+	//			.ssid = 0,
+	//			.bssid = 0,
+	//			.channel = 0,
+	//			.show_hidden = true
+	//};
 
 
 
