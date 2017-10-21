@@ -34,15 +34,16 @@
 #include "wifi_manager.h"
 
 
+EventGroupHandle_t http_server_event_group;
+EventBits_t uxBits;
+
 // embedded binary data
 extern const uint8_t style_css_start[] asm("_binary_style_css_start");
 extern const uint8_t style_css_end[]   asm("_binary_style_css_end");
-
 //extern const uint8_t jquery_js_start[] asm("_binary_jquery_js_start");
 //extern const uint8_t jquery_js_end[] asm("_binary_jquery_js_end");
 extern const uint8_t jquery_gz_start[] asm("_binary_jquery_gz_start");
 extern const uint8_t jquery_gz_end[] asm("_binary_jquery_gz_end");
-
 extern const uint8_t code_js_start[] asm("_binary_code_js_start");
 extern const uint8_t code_js_end[] asm("_binary_code_js_end");
 extern const uint8_t index_html_start[] asm("_binary_index_html_start");
@@ -73,6 +74,9 @@ const static char http_503_hdr[] = "HTTP/1.1 503 Service Unavailable\nContent-Le
 
 
 
+void http_server_set_event_start(){
+	xEventGroupSetBits(http_server_event_group, HTTP_SERVER_START_BIT_0 );
+}
 
 //I cannot get ctype.h to compile for some weird reason...
 int  http_server_isxdigit(int c)
@@ -114,6 +118,15 @@ void http_server_url_decode(char *dst, const char *src){
 }
 
 void http_server(void *pvParameters) {
+
+	http_server_event_group = xEventGroupCreate();
+
+	//do not start the task until wifi_manager says it's safe to do so!
+	printf("http_server is waiting for notification\n");
+	uxBits = xEventGroupWaitBits(http_server_event_group, HTTP_SERVER_START_BIT_0, pdFALSE, pdTRUE, portMAX_DELAY );
+	printf("http_server received message to start server\n");
+
+	vTaskDelay(3000 / portTICK_PERIOD_MS);
 
 	struct netconn *conn, *newconn;
 	err_t err;

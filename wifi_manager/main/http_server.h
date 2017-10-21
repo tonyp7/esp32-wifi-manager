@@ -14,6 +14,9 @@
 #ifndef HTTP_SERVER_H_INCLUDED
 #define HTTP_SERVER_H_INCLUDED
 
+
+#define HTTP_SERVER_START_BIT_0	( 1 << 0 )
+
 typedef struct http_parameter http_parameter;
 struct http_parameter {
    char *key;
@@ -42,6 +45,9 @@ http_parameter* http_server_decode_parameters(char *body, int *parameter_count);
 *   \param parameters http_parameter object to be freed.
 */
 void http_server_free_parameters(http_parameter* parameters);
+
+
+void http_server_set_event_start();
 
 
 

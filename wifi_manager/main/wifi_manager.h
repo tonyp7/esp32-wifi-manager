@@ -14,11 +14,25 @@
 
 #define MAX_AP_NUM 30
 
+
+// set AP CONFIG values
+#define AP_AUTHMODE WIFI_AUTH_WPA2_PSK
+#define AP_SSID_HIDDEN 0
+#define AP_SSID "esp32"
+#define AP_PASSWORD "esp32pwd"
+#define AP_CHANNEL 8
+#define AP_MAX_CONNECTIONS 4
+#define AP_BEACON_INTERVAL 100
+
+
+
 void wifi_scan_init();
 void wifi_scan_destroy();
 void wifi_manager( void * pvParameters );
 void wifi_scan_generate_json();
+void wifi_manager_init();
 char* wifi_scan_get_json();
+
 
 wifi_sta_config_t* get_wifi_sta_config();
 

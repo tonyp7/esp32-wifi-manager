@@ -41,6 +41,10 @@
 
 
 
+static TaskHandle_t task_http_server = NULL;
+static TaskHandle_t task_wifi_manager = NULL;
+
+
 void monitoring_task(void *pvParameter)
 {
 	while(1){
@@ -120,37 +124,37 @@ void app_main()
 	nvs_flash_init();
 
 	//start wifi
-	wifi_setup();
+	//wifi_setup();
 
 
 	// wait for connection
 	//printf("Waiting for connection to the wifi network...\n ");
-	xEventGroupWaitBits(event_group, WIFI_CONNECTED_BIT, pdFALSE, pdTRUE, portMAX_DELAY);
+	//xEventGroupWaitBits(event_group, WIFI_CONNECTED_BIT, pdFALSE, pdTRUE, portMAX_DELAY);
 	//printf("Connected\n\n");
 
 	// print the local IP address
-	tcpip_adapter_ip_info_t ip_info;
-	ESP_ERROR_CHECK(tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_STA, &ip_info));
-	printf("IP Address:  %s\n", ip4addr_ntoa(&ip_info.ip));
-	printf("Subnet mask: %s\n", ip4addr_ntoa(&ip_info.netmask));
-	printf("Gateway:     %s\n", ip4addr_ntoa(&ip_info.gw));
+	//tcpip_adapter_ip_info_t ip_info;
+	//ESP_ERROR_CHECK(tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_STA, &ip_info));
+	//printf("IP Address:  %s\n", ip4addr_ntoa(&ip_info.ip));
+	//printf("Subnet mask: %s\n", ip4addr_ntoa(&ip_info.netmask));
+	//printf("Gateway:     %s\n", ip4addr_ntoa(&ip_info.gw));
 
 	// run the mDNS daemon
-	mdns_server_t* mDNS = NULL;
-	ESP_ERROR_CHECK(mdns_init(TCPIP_ADAPTER_IF_STA, &mDNS));
-	ESP_ERROR_CHECK(mdns_set_hostname(mDNS, "esp32"));
-	ESP_ERROR_CHECK(mdns_set_instance(mDNS, "Basic HTTP Server"));
-	printf("mDNS started\n");
+	//mdns_server_t* mDNS = NULL;
+	//ESP_ERROR_CHECK(mdns_init(TCPIP_ADAPTER_IF_STA, &mDNS));
+	//ESP_ERROR_CHECK(mdns_set_hostname(mDNS, "esp32"));
+	//ESP_ERROR_CHECK(mdns_set_instance(mDNS, "Basic HTTP Server"));
+	//printf("mDNS started\n");
 
 
 	wifi_scan_init();
 
 
 	// start the HTTP Server task
-	xTaskCreate(&http_server, "http_server", 2048, NULL, 5, NULL);
+	xTaskCreate(&http_server, "http_server", 4096, NULL, 5, &task_http_server);
 
 	// start the wifi Scanner task
-	xTaskCreate(&wifi_manager, "wifi_manager", 2048, NULL, 4, NULL);
+	xTaskCreate(&wifi_manager, "wifi_manager", 2048, NULL, 4, &task_wifi_manager);
 
 
 	xTaskCreatePinnedToCore(&monitoring_task, "monitoring_task", 2048, NULL, 1, NULL, 1);
