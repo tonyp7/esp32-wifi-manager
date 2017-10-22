@@ -39,10 +39,9 @@ wifi_ap_record_t *accessp_records; //[MAX_AP_NUM];
 char *accessp_json;
 
 EventGroupHandle_t wifi_manager_event_group;
-const int wifi_manager_WIFI_CONNECTED_BIT = BIT0;
-const int STA_CONNECTED_BIT = BIT1;
-const int STA_DISCONNECTED_BIT = BIT2;
-const int AP_STARTED = BIT3;
+const int WIFI_MANAGER_WIFI_CONNECTED_BIT = BIT0;
+const int WIFI_MANAGER_AP_STA_CONNECTED_BIT = BIT1;
+const int WIFI_MANAGER_AP_STARTED = BIT2;
 
 wifi_config_t wifi_config;
 
@@ -88,7 +87,7 @@ wifi_sta_config_t* get_wifi_sta_config(){
 void wifi_scan_init(){
 	xSemaphoreScan = xSemaphoreCreateMutex();
 	accessp_records = (wifi_ap_record_t*)malloc(sizeof(wifi_ap_record_t) * MAX_AP_NUM);
-	accessp_json = (char*)malloc(ap_num * 80 + 20); //80 bytes is enough for one AP and some leeway
+	accessp_json = (char*)malloc(ap_num * JSON_ONE_APP_SIZE + 4); //4 bytes for json encapsulation of "[\n" and "]\0"
 	strcpy(accessp_json, "[]\n");
 }
 
@@ -103,13 +102,15 @@ void wifi_scan_generate_json(){
 
 	strcpy(accessp_json, "[\n");
 
+
+	const char oneap_str[] = "{\"ssid\":\"%s\",\"chan\":%d,\"rssi\":%d,\"auth\":%d}%c\n";
+
 	for(int i=0; i<ap_num;i++){
 
-		//32 char (ssid) + channel (2) + rssi (3) + auth mode (1) + null char (1) + JSON fluff
-		char one_ap[80];
+		char one_ap[JSON_ONE_APP_SIZE];
 
 		wifi_ap_record_t ap = accessp_records[i];
-		sprintf(one_ap, "{\"ssid\":\"%s\",\"chan\":%d,\"rssi\":%d,\"auth\":%d}%c\n",
+		sprintf(one_ap, oneap_str,
 				json_escape_string((char*)ap.ssid),
 				ap.primary,
 				ap.rssi,
@@ -153,27 +154,27 @@ esp_err_t wifi_manager_event_handler(void *ctx, system_event_t *event)
     switch(event->event_id) {
 
     case SYSTEM_EVENT_AP_START:
-    	xEventGroupSetBits(wifi_manager_event_group, AP_STARTED);
+    	xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_AP_STARTED);
 		break;
 
     case SYSTEM_EVENT_AP_STACONNECTED:
-		xEventGroupSetBits(wifi_manager_event_group, STA_CONNECTED_BIT);
+		xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_AP_STA_CONNECTED_BIT);
 		break;
 
     case SYSTEM_EVENT_AP_STADISCONNECTED:
-		xEventGroupSetBits(wifi_manager_event_group, STA_DISCONNECTED_BIT);
+    	xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_AP_STA_CONNECTED_BIT);
 		break;
 
     case SYSTEM_EVENT_STA_START:
-        esp_wifi_connect();
+        //esp_wifi_connect();
         break;
 
 	case SYSTEM_EVENT_STA_GOT_IP:
-        xEventGroupSetBits(wifi_manager_event_group, wifi_manager_WIFI_CONNECTED_BIT);
+        xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_WIFI_CONNECTED_BIT);
         break;
 
 	case SYSTEM_EVENT_STA_DISCONNECTED:
-		xEventGroupClearBits(wifi_manager_event_group, wifi_manager_WIFI_CONNECTED_BIT);
+		xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_WIFI_CONNECTED_BIT);
         break;
 
 	default:
@@ -218,12 +219,12 @@ void wifi_manager_init(){
 
 void wifi_manager( void * pvParameters ){
 
-	wifi_manager_event_group = xEventGroupCreate();
 
 	// initialize the tcp stack
 	tcpip_adapter_init();
 
-    //event handler
+    //event handler + group
+	wifi_manager_event_group = xEventGroupCreate();
     ESP_ERROR_CHECK(esp_event_loop_init(wifi_manager_event_handler, NULL));
 
     //wifi scanner config
@@ -285,10 +286,28 @@ void wifi_manager( void * pvParameters ){
 		printf("Starting access point, SSID=%s\n", ap_config.ap.ssid);
 
 		//wait for access point to start
-		xEventGroupWaitBits(wifi_manager_event_group, AP_STARTED, pdFALSE, pdTRUE, portMAX_DELAY );
+		xEventGroupWaitBits(wifi_manager_event_group, WIFI_MANAGER_AP_STARTED, pdFALSE, pdTRUE, portMAX_DELAY );
 		printf("Access point started -Starting http server\n");
 		http_server_set_event_start();
 
+		wifi_config_t sta_config = {
+			.sta = {
+				.ssid = "a0308",
+				.password = "03080308",
+			}
+		};
+
+		printf("starting STA wifi\n");
+		ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &sta_config));
+		ESP_ERROR_CHECK(esp_wifi_connect());
+		xEventGroupWaitBits(wifi_manager_event_group, WIFI_MANAGER_WIFI_CONNECTED_BIT, pdFALSE, pdTRUE, portMAX_DELAY);
+			//printf("Connected\n\n");
+		// print the local IP address
+		tcpip_adapter_ip_info_t ip_info;
+		ESP_ERROR_CHECK(tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_STA, &ip_info));
+		printf("IP Address:  %s\n", ip4addr_ntoa(&ip_info.ip));
+		printf("Subnet mask: %s\n", ip4addr_ntoa(&ip_info.netmask));
+		printf("Gateway:     %s\n", ip4addr_ntoa(&ip_info.gw));
 
 		//keep scanning wifis
 		while(1){
@@ -310,99 +329,4 @@ void wifi_manager( void * pvParameters ){
 		}
 	}
 
-
-
-
-	wifi_init_config_t wifi_init_config = WIFI_INIT_CONFIG_DEFAULT();
-	ESP_ERROR_CHECK(esp_wifi_init(&wifi_init_config));
-	ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
-	ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-
-	wifi_config_t wifi_config = {
-        .sta = {
-            .ssid = "a0308",
-            .password = "03080308",
-        },
-		/*.ap = {
-		            .ssid = CONFIG_AP_SSID,
-		            .password = CONFIG_AP_PASSWORD,
-					.ssid_len = 0,
-					.channel = CONFIG_AP_CHANNEL,
-					.authmode = CONFIG_AP_AUTHMODE,
-					.ssid_hidden = CONFIG_AP_SSID_HIDDEN,
-					.max_connection = CONFIG_AP_MAX_CONNECTIONS,
-					.beacon_interval = CONFIG_AP_BEACON_INTERVAL,
-		},*/
-    };
-	ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config));
-    ESP_ERROR_CHECK(esp_wifi_start());
-
-
-	xEventGroupWaitBits(wifi_manager_event_group, wifi_manager_WIFI_CONNECTED_BIT, pdFALSE, pdTRUE, portMAX_DELAY);
-	//printf("Connected\n\n");
-
-	// print the local IP address
-	tcpip_adapter_ip_info_t ip_info;
-	ESP_ERROR_CHECK(tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_STA, &ip_info));
-	printf("IP Address:  %s\n", ip4addr_ntoa(&ip_info.ip));
-	printf("Subnet mask: %s\n", ip4addr_ntoa(&ip_info.netmask));
-	printf("Gateway:     %s\n", ip4addr_ntoa(&ip_info.gw));
-
-	// run the mDNS daemon
-	mdns_server_t* mDNS = NULL;
-	ESP_ERROR_CHECK(mdns_init(TCPIP_ADAPTER_IF_STA, &mDNS));
-	ESP_ERROR_CHECK(mdns_set_hostname(mDNS, "esp32"));
-	ESP_ERROR_CHECK(mdns_set_instance(mDNS, "Basic HTTP Server"));
-	printf("mDNS started\n");
-
-
-	//wifi scanner config
-	//wifi_scan_config_t scan_config = {
-	//			.ssid = 0,
-	//			.bssid = 0,
-	//			.channel = 0,
-	//			.show_hidden = true
-	//};
-
-
-
-	//it's now safe to start the HTTP server
-	printf("sending event it's ok to start the http server\n");
-	http_server_set_event_start();
-
-	while(true){
-
-		//safe guard against overflow
-		if(ap_num > MAX_AP_NUM) ap_num = MAX_AP_NUM;
-
-		ESP_ERROR_CHECK(esp_wifi_scan_start(&scan_config, true));
-		ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&ap_num, accessp_records));
-
-		/*
-		for(int i=0; i<ap_num;i++){
-			wifi_ap_record_t ap = accessp_records[i];
-
-			printf("{ssid:%s,chan:%d,rssi:%d,auth:%d}%c\n",
-					ap.ssid,
-					ap.primary,
-					ap.rssi,
-					ap.authmode,
-					i==ap_num-1?' ':',');
-		}*/
-
-
-		//make sure the http server isn't trying to access the list while it gets refreshed
-		if(wifi_scan_lock_ap_list()){
-			wifi_scan_generate_json();
-			wifi_scan_unlock_ap_list();
-		}
-		else{
-			printf("Could not get access to xSemaphoreScan in wifi_scan\n");
-		}
-
-
-		//wait between each new scan
-		//printf("free heap: %d\n",esp_get_free_heap_size());
-		vTaskDelay(5000 / portTICK_PERIOD_MS);
-	}
 }

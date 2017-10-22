@@ -62,3 +62,8 @@ wifi_manager/build/aws_iot/
 *.a
 *.o
 *.d
+
+#doxygen
+Doxyfile
+wifi_manager/doc/
+
