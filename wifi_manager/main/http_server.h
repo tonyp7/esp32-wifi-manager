@@ -40,6 +40,8 @@ int  http_server_isxdigit(int c);
 */
 http_parameter* http_server_decode_parameters(char *body, int *parameter_count);
 
+uint8_t http_server_is_valid_connection_parameter(http_parameter* parameters, int count);
+
 
 /*! \brief Free the memory dynamically allocated by a http_server_decode_parameters call.
 *   \param parameters http_parameter object to be freed.

@@ -43,9 +43,9 @@ const int WIFI_MANAGER_WIFI_CONNECTED_BIT = BIT0;
 const int WIFI_MANAGER_AP_STA_CONNECTED_BIT = BIT1;
 const int WIFI_MANAGER_AP_STARTED = BIT2;
 
-wifi_config_t wifi_config;
+//wifi_config_t wifi_config;
 
-wifi_sta_config_t* get_wifi_sta_config(){
+wifi_config_t* get_wifi_sta_config(){
 
 	nvs_handle handle;
 	esp_err_t esp_err;
@@ -65,9 +65,9 @@ wifi_sta_config_t* get_wifi_sta_config(){
 		esp_err = nvs_get_str(handle, "password", (char*)password, &sz);
 
 
-		wifi_sta_config_t* config = (wifi_sta_config_t*)malloc(sizeof(wifi_sta_config_t));
-		strcpy((char*)config->ssid, (char*)ssid);
-		strcpy((char*)config->password, (char*)ssid);
+		wifi_config_t* config = (wifi_config_t*)malloc(sizeof(wifi_config_t));
+		strcpy((char*)config->sta.ssid, (char*)ssid);
+		strcpy((char*)config->sta.password, (char*)ssid);
 
 		free(ssid);
 		free(password);
@@ -237,7 +237,7 @@ void wifi_manager( void * pvParameters ){
 
 
 	//try to get access to previously saved wifi
-	wifi_sta_config_t* sta_config = get_wifi_sta_config();
+	wifi_config_t* sta_config = get_wifi_sta_config();
 	if(sta_config){
 		printf("found a saved config\n");
 	}
@@ -287,8 +287,6 @@ void wifi_manager( void * pvParameters ){
 
 		//wait for access point to start
 		xEventGroupWaitBits(wifi_manager_event_group, WIFI_MANAGER_AP_STARTED, pdFALSE, pdTRUE, portMAX_DELAY );
-		printf("Access point started -Starting http server\n");
-		http_server_set_event_start();
 
 		wifi_config_t sta_config = {
 			.sta = {
@@ -308,6 +306,12 @@ void wifi_manager( void * pvParameters ){
 		printf("IP Address:  %s\n", ip4addr_ntoa(&ip_info.ip));
 		printf("Subnet mask: %s\n", ip4addr_ntoa(&ip_info.netmask));
 		printf("Gateway:     %s\n", ip4addr_ntoa(&ip_info.gw));
+
+
+
+		printf("Access point started -Starting http server\n");
+		http_server_set_event_start();
+
 
 		//keep scanning wifis
 		while(1){

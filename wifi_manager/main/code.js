@@ -49,7 +49,7 @@ $(function() {
 			alert(data);
 		})
 		.fail(function() {
-			//fail code
+			alert("fail");
 		});
 		
 		

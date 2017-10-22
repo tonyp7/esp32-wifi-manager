@@ -67,6 +67,7 @@ const static char http_css_hdr[] = "HTTP/1.1 200 OK\nContent-type: text/css\n\n"
 const static char http_js_hdr[] = "HTTP/1.1 200 OK\nContent-type: text/javascript\n\n";
 const static char http_jquery_gz_hdr[] = "HTTP/1.1 200 OK\nContent-type: text/javascript\nAccept-Ranges: bytes\nContent-Length: 29995\nContent-Encoding: gzip\n\n";
 const static char http_json_hdr[] = "HTTP/1.1 200 OK\nContent-type: application/json\n\n";
+const static char http_400_hdr[] = "HTTP/1.1 400 Bad Request\nContent-Length: 0\n\n";
 const static char http_404_hdr[] = "HTTP/1.1 404 Not Found\nContent-Length: 0\n\n";
 const static char http_503_hdr[] = "HTTP/1.1 503 Service Unavailable\nContent-Length: 0\n\n";
 
@@ -155,6 +156,7 @@ void http_server_free_parameters(http_parameter* parameters) {
 			if(parameters[i].raw) free(parameters[i].raw);
 		}
 		free(parameters);
+		parameters = NULL;
 	}
 }
 
@@ -253,6 +255,21 @@ http_parameter* http_server_decode_parameters(char *body, int *parameter_count) 
 	}
 }
 
+uint8_t http_server_is_valid_connection_parameter(http_parameter* parameters, int count){
+	uint8_t found = 0x00;
+
+	for(int i=0; i<count; i++){
+		if(strcmp(parameters[i].key, "ssid") == 0){
+			found |= 0x01;
+		}
+		else if(strcmp(parameters[i].key, "password") == 0){
+			found |= 0x02;
+		}
+	}
+
+	return (found == 0x03);
+}
+
 
 void http_server_netconn_serve(struct netconn *conn) {
 
@@ -261,15 +278,18 @@ void http_server_netconn_serve(struct netconn *conn) {
 	u16_t buflen;
 	err_t err;
 	const char new_line[2] = "\n";
+	char data[500];
 
 	err = netconn_recv(conn, &inbuf);
 
 	if (err == ERR_OK) {
 
 
-		netbuf_data(inbuf, (void**)&buf, &buflen);
-
+		//netbuf_data(inbuf, (void**)&buf, &buflen);
+		netbuf_copy(inbuf, data, 500);
+		buf = data;
 		//printf("%s\n",buf);
+
 		// extract the first line, with the request
 		char *line = strtok(buf, new_line);
 
@@ -333,11 +353,10 @@ void http_server_netconn_serve(struct netconn *conn) {
 				netconn_write(conn, wifi3_png_start, wifi3_png_end - wifi3_png_start, NETCONN_NOCOPY);
 			}
 			else if(strstr(line, "POST /connect ")) {
-				//ignore all other http headers
+				printf("POST /connect\n");
+				//ignore all http headers
 				while( line != NULL ) {
 					line = strtok(NULL, new_line);
-
-					//if(line != NULL) printf("HEADER: %s --- LEN:%d\n",line, strlen(line));
 
 					if(line != NULL && (strlen(line) == 0 || (strlen(line) == 1 && line[0] == '\r') )){
 						//empty line separating the HTTP headers from the body
@@ -346,7 +365,7 @@ void http_server_netconn_serve(struct netconn *conn) {
 					}
 				}
 
-				//get the body
+				//get the body of the request
 				if(line != NULL){
 					printf("BODY: %s\n",line);
 					int len = strlen(line);
@@ -356,12 +375,17 @@ void http_server_netconn_serve(struct netconn *conn) {
 					printf("\n");
 					int count = 0;
 					http_parameter* parameters = http_server_decode_parameters(line, &count);
-
+					if(http_server_is_valid_connection_parameter(parameters, count)){
+						printf("found valid request\n");
+						http_server_free_parameters(parameters);
+					}
+					else{
+						netconn_write(conn, http_400_hdr, sizeof(http_400_hdr) - 1, NETCONN_NOCOPY);
+					}
 				}
-
-
-
-
+				else{
+					netconn_write(conn, http_400_hdr, sizeof(http_400_hdr) - 1, NETCONN_NOCOPY);
+				}
 			}
 			else{
 				netconn_write(conn, http_404_hdr, sizeof(http_404_hdr) - 1, NETCONN_NOCOPY);

@@ -3,7 +3,7 @@
  * @author Tony Pottier
  * @brief Defines all functions necessary for esp32 to connect to a wifi/scan wifis
  *
- * Contains the freeRTOS task and all necessary support
+ * Contains the freeRTOS task and all necessary support.
  *
  * @see https://idyl.io
  * @see https://github.com/tonyp7/esp32-wifi-manager
@@ -13,7 +13,7 @@
 #define MAIN_WIFI_MANAGER_H_
 
 /**
- * @brief Defines the maximum number of access points that can be detected
+ * @brief Defines the maximum number of access points that can be detected.
  *
  * To save memory and avoid nasty out of memory errors,
  * we can limit the number of APs detected in a wifi scan.
@@ -27,22 +27,24 @@
  */
 #define AP_AUTHMODE 		WIFI_AUTH_WPA2_PSK
 
-/** 0: visible AP. 1: hidden */
+/** @brief Defines visibility of the access point. 0: visible AP. 1: hidden */
 #define AP_SSID_HIDDEN 		0
 
-/** Access point name */
+/** @brief Defines access point's name. */
 #define AP_SSID 			"esp32"
 
-/** Access point password. MUST be a null string if OPEN access point */
+/** @brief Defines access point's password.
+ *	@warning In the case of an open access point, the password must be a null string "" or "\0" if you want to be verbose but waste one byte.
+ */
 #define AP_PASSWORD 		"esp32pwd"
 
-/** 2.4Ghz channel to use for the wifi */
+/** @brief Defines access point's channel. */
 #define AP_CHANNEL 			8
 
-/** Max number of clients */
+/** @brief Defines access point's maximum number of clients. */
 #define AP_MAX_CONNECTIONS 	4
 
-/** Access point beacon interval. 100ms is the recommended default */
+/** @brief Defines access point's beacon interval. 100ms is the recommended default. */
 #define AP_BEACON_INTERVAL 	100
 
 
@@ -67,7 +69,7 @@ void wifi_manager_init();
 char* wifi_scan_get_json();
 
 
-wifi_sta_config_t* get_wifi_sta_config();
+wifi_config_t* get_wifi_sta_config();
 
 
 esp_err_t wifi_manager_event_handler(void *ctx, system_event_t *event);
