@@ -1,40 +1,61 @@
 /**
- * \file wifi_manager.h
- * \author Tony Pottier
- * \brief Defines all functions necessary for esp32 to connect to a wifi/scan wifis
+ * @file wifi_manager.h
+ * @author Tony Pottier
+ * @brief Defines all functions necessary for esp32 to connect to a wifi/scan wifis
  *
  * Contains the freeRTOS task and all necessary support
  *
- * \see https://idyl.io
- * \see https://github.com/tonyp7/esp32-wifi-manager
+ * @see https://idyl.io
+ * @see https://github.com/tonyp7/esp32-wifi-manager
  */
 
 #ifndef MAIN_WIFI_MANAGER_H_
 #define MAIN_WIFI_MANAGER_H_
 
-#define MAX_AP_NUM 30
+/**
+ * @brief Defines the maximum number of access points that can be detected
+ *
+ * To save memory and avoid nasty out of memory errors,
+ * we can limit the number of APs detected in a wifi scan.
+ */
+#define MAX_AP_NUM 			30
 
 
-// set AP CONFIG values
-#define AP_AUTHMODE WIFI_AUTH_WPA2_PSK
-#define AP_SSID_HIDDEN 0
-#define AP_SSID "esp32"
-#define AP_PASSWORD "esp32pwd"
-#define AP_CHANNEL 8
-#define AP_MAX_CONNECTIONS 4
-#define AP_BEACON_INTERVAL 100
+/** @brief Defines the auth mode as an access point
+ *  Value must be of type wifi_auth_mode_t
+ *  @see esp_wifi_types.h
+ */
+#define AP_AUTHMODE 		WIFI_AUTH_WPA2_PSK
+
+/** 0: visible AP. 1: hidden */
+#define AP_SSID_HIDDEN 		0
+
+/** Access point name */
+#define AP_SSID 			"esp32"
+
+/** Access point password. MUST be a null string if OPEN access point */
+#define AP_PASSWORD 		"esp32pwd"
+
+/** 2.4Ghz channel to use for the wifi */
+#define AP_CHANNEL 			8
+
+/** Max number of clients */
+#define AP_MAX_CONNECTIONS 	4
+
+/** Access point beacon interval. 100ms is the recommended default */
+#define AP_BEACON_INTERVAL 	100
 
 
 
-/*!
-* \brief define the maximum length in bytes of a JSON representation of an access point.
-*
-*  maximum ap string length with full 32 char ssid: 75 + \\n + \0 = 77\n
-*  example: {"ssid":"abcdefghijklmnopqrstuvwxyz012345","chan":12,"rssi":-100,"auth":4},\n
-*  BUT: we need to escape JSON. Imagine a ssid full of \" ? so it's 32 more bytes hence 77 + 32 = 99.\n
-*  this is an edge case but I don't think we should crash in a catastrophic manner just because
-*  someone decided to have a funny wifi name.
-*/
+/**
+ * @brief Defines the maximum length in bytes of a JSON representation of an access point.
+ *
+ *  maximum ap string length with full 32 char ssid: 75 + \\n + \0 = 77\n
+ *  example: {"ssid":"abcdefghijklmnopqrstuvwxyz012345","chan":12,"rssi":-100,"auth":4},\n
+ *  BUT: we need to escape JSON. Imagine a ssid full of \" ? so it's 32 more bytes hence 77 + 32 = 99.\n
+ *  this is an edge case but I don't think we should crash in a catastrophic manner just because
+ *  someone decided to have a funny wifi name.
+ */
 #define JSON_ONE_APP_SIZE 99
 
 
