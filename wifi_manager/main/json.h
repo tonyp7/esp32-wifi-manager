@@ -3,7 +3,8 @@
  * @brief handles very basic JSON with a minimal footprint on the system
  *
  * This code is a lightly modified version of cJSON. cJSON is licensed under the MIT license:
- * Copyright (c) 2009-2017 Dave Gamble and cJSON contributors
+ * Copyright (c) 2009-2017, Dave Gamble and cJSON contributors
+ * Copyright (c) 2013, Esoteric Software
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
