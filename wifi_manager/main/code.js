@@ -35,22 +35,36 @@ $(function() {
 		$( "h2" ).text("Choose a network...");
 	});
 	
+	
+	function performConnect(){
+		var xhr = new XMLHttpRequest();
+		
+		xhr.onload = function() {
+			if(this.status == 200){
+				alert(this.responseText);
+			}
+			else{
+				alert(this.responseText);
+			}
+		  
+		  //var myelement = document.getElementById("result");
+		  //myelement.innerHTML= this.responseText;
+		};
+		
+		var pwd = $("#pwd").val();
+		xhr.open("POST", "/connect", true);
+		xhr.setRequestHeader('Authorization', JSON.stringify({"ssid": selectedSSID, "psk":pwd}));
+		xhr.send();
+	}
+	
 	$(document).on("click", "#join", function() {
 		$("#join").prop("disabled", true);
 		$( "#login-data" ).slideUp( "fast", function() {});
 		$( "#loading" ).slideDown( "slow", function() {});
 		$( "h2" ).text("Connecting to " + selectedSSID);
 		
-		
-		var pwd = $("#pwd").val();
-		$.post( "connect", { ssid: selectedSSID, password: pwd, ok: "true" })
-		.done(function( data ) {
-			//response code
-			alert(data);
-		})
-		.fail(function() {
-			alert("fail");
-		});
+		performConnect();
+
 		
 		
 	});

@@ -17,6 +17,10 @@
 
 #define HTTP_SERVER_START_BIT_0	( 1 << 0 )
 
+
+#define HTTP_SERVER_MAX_FIRST_LINE_SIZE 20
+#define HTTP_SERVER_MAX_BODY_SIZE 100
+
 typedef struct http_parameter http_parameter;
 struct http_parameter {
    char *key;
@@ -52,6 +56,6 @@ void http_server_free_parameters(http_parameter* parameters);
 void http_server_set_event_start();
 
 
-
+void http_server_decode_request(struct netbuf *inbuf, char* first_line, char* body);
 
 #endif

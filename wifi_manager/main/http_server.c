@@ -271,27 +271,77 @@ uint8_t http_server_is_valid_connection_parameter(http_parameter* parameters, in
 }
 
 
+void http_server_decode_request(struct netbuf *inbuf, char* first_line, char* body){
+
+
+	uint8_t first = pdTRUE;
+	do {
+		char* buf;
+		u16_t buflen;
+
+		/* obtain a pointer to the data in the fragment */
+		netbuf_data(inbuf, (void**)&buf, &buflen);
+
+		buf[buflen - 1] = '\0';
+		printf("%s\n",buf);
+
+		/* process the data */
+		for(int i=0;i<buflen;i++){
+			if(first && buf[i] == '\n'){
+				//first line is found
+				memcpy(first_line, buf, i >= 18?19:i+1);
+				first = pdFALSE;
+			}
+		}
+
+
+
+	 } while(netbuf_next(inbuf) >= 0);
+
+	netbuf_delete(inbuf);
+
+	//char *ptr = request;
+	//while( *ptr != '\0'){
+	//	if( *ptr == '\n'){
+	//		*ptr = '\0';
+	//		return;
+	//	}
+	//	ptr++;
+	//}
+}
+
 void http_server_netconn_serve(struct netconn *conn) {
 
 	struct netbuf *inbuf;
-	char *buf;
-	u16_t buflen;
+	//char *buf = NULL;
+	//u16_t buflen;
 	err_t err;
 	const char new_line[2] = "\n";
-	char data[500];
+
+	char first_line[20];
+	char body[100];
 
 	err = netconn_recv(conn, &inbuf);
 
 	if (err == ERR_OK) {
 
 
+		memset(first_line, 0x00, 20);
+		memset(body, 0x00, 100);
+
 		//netbuf_data(inbuf, (void**)&buf, &buflen);
-		netbuf_copy(inbuf, data, 500);
-		buf = data;
-		//printf("%s\n",buf);
+		//netbuf_copy(inbuf, data, 500);
+		//printf("%d\n",buflen);
+		//printf("%s\n\n",buf);
 
 		// extract the first line, with the request
-		char *line = strtok(buf, new_line);
+		//printf("strtok_r");
+		//char *line = strtok_r(rest_lines, new_line, &rest_lines);
+		//char *line = buf;
+		//char *body = NULL;
+		http_server_decode_request(inbuf, first_line, body);
+		char* line = first_line;
+		//printf("FIRST LINE: %s\n", line);
 
 		if(line) {
 
@@ -355,12 +405,13 @@ void http_server_netconn_serve(struct netconn *conn) {
 			else if(strstr(line, "POST /connect ")) {
 				printf("POST /connect\n");
 				//ignore all http headers
+				/*
 				while( line != NULL ) {
-					line = strtok(NULL, new_line);
+					line = strtok_r(rest_lines, new_line, &rest_lines);
 
 					if(line != NULL && (strlen(line) == 0 || (strlen(line) == 1 && line[0] == '\r') )){
 						//empty line separating the HTTP headers from the body
-						line = strtok(NULL, new_line);
+						line = strtok_r(rest_lines, new_line, &rest_lines);
 						break;
 					}
 				}
@@ -381,11 +432,11 @@ void http_server_netconn_serve(struct netconn *conn) {
 					}
 					else{
 						netconn_write(conn, http_400_hdr, sizeof(http_400_hdr) - 1, NETCONN_NOCOPY);
-					}
-				}
-				else{
-					netconn_write(conn, http_400_hdr, sizeof(http_400_hdr) - 1, NETCONN_NOCOPY);
-				}
+					}*/
+				//}
+				//else{
+				//	netconn_write(conn, http_400_hdr, sizeof(http_400_hdr) - 1, NETCONN_NOCOPY);
+				//}
 			}
 			else{
 				netconn_write(conn, http_404_hdr, sizeof(http_404_hdr) - 1, NETCONN_NOCOPY);
@@ -396,5 +447,5 @@ void http_server_netconn_serve(struct netconn *conn) {
 
 	// close the connection and free the buffer
 	netconn_close(conn);
-	netbuf_delete(inbuf);
+
 }
