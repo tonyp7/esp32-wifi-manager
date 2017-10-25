@@ -53,8 +53,9 @@ $(function() {
 		
 		var pwd = $("#pwd").val();
 		xhr.open("POST", "/connect", true);
-		xhr.setRequestHeader('Authorization', JSON.stringify({"ssid": selectedSSID, "psk":pwd}));
+		xhr.setRequestHeader('Authorization', "\x02{0}\x03\x02{1}\x03".format(selectedSSID, pwd));
 		xhr.send();
+		//JSON.stringify({"ssid": selectedSSID, "psk":pwd})
 	}
 	
 	$(document).on("click", "#join", function() {

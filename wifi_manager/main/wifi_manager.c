@@ -37,6 +37,8 @@ SemaphoreHandle_t xSemaphoreScan = NULL;
 uint16_t ap_num = MAX_AP_NUM;
 wifi_ap_record_t *accessp_records; //[MAX_AP_NUM];
 char *accessp_json;
+wifi_config_t* wifi_manager_config_sta = NULL;
+
 
 EventGroupHandle_t wifi_manager_event_group;
 const int WIFI_MANAGER_WIFI_CONNECTED_BIT = BIT0;
@@ -45,7 +47,12 @@ const int WIFI_MANAGER_AP_STARTED = BIT2;
 
 //wifi_config_t wifi_config;
 
-wifi_config_t* get_wifi_sta_config(){
+void set_wifi_sta_config(char *ssid, char *password){
+	strcpy((char*)wifi_manager_config_sta->sta.ssid, (char*)ssid);
+	strcpy((char*)wifi_manager_config_sta->sta.password, (char*)password);
+}
+
+uint8_t wifi_manager_fetch_wifi_sta_config(){
 
 	nvs_handle handle;
 	esp_err_t esp_err;
@@ -65,20 +72,22 @@ wifi_config_t* get_wifi_sta_config(){
 		esp_err = nvs_get_str(handle, "password", (char*)password, &sz);
 
 
-		wifi_config_t* config = (wifi_config_t*)malloc(sizeof(wifi_config_t));
-		strcpy((char*)config->sta.ssid, (char*)ssid);
-		strcpy((char*)config->sta.password, (char*)ssid);
+		if(wifi_manager_config_sta == NULL)
+			wifi_manager_config_sta = (wifi_config_t*)malloc(sizeof(wifi_config_t));
+
+		strcpy((char*)wifi_manager_config_sta->sta.ssid, (char*)ssid);
+		strcpy((char*)wifi_manager_config_sta->sta.password, (char*)ssid);
 
 		free(ssid);
 		free(password);
 
 		nvs_close(handle);
 
-		return config;
+		return pdTRUE;
 
 	}
 	else{
-		return NULL;
+		return pdFALSE;
 	}
 
 }
@@ -217,6 +226,11 @@ void wifi_manager_init(){
     ESP_ERROR_CHECK(esp_wifi_start());
 }
 
+
+wifi_config_t* wifi_manager_get_wifi_sta_config(){
+	return wifi_manager_config_sta;
+}
+
 void wifi_manager( void * pvParameters ){
 
 
@@ -226,6 +240,10 @@ void wifi_manager( void * pvParameters ){
     //event handler + group
 	wifi_manager_event_group = xEventGroupCreate();
     ESP_ERROR_CHECK(esp_event_loop_init(wifi_manager_event_handler, NULL));
+
+    //allocate memory for the STA config
+    wifi_manager_config_sta = (wifi_config_t*)malloc(sizeof(wifi_config_t));
+    memset(wifi_manager_config_sta, 0x00, sizeof(wifi_config_t));
 
     //wifi scanner config
 	wifi_scan_config_t scan_config = {
@@ -237,8 +255,7 @@ void wifi_manager( void * pvParameters ){
 
 
 	//try to get access to previously saved wifi
-	wifi_config_t* sta_config = get_wifi_sta_config();
-	if(sta_config){
+	if(wifi_manager_fetch_wifi_sta_config()){
 		printf("found a saved config\n");
 	}
 	else{
@@ -287,6 +304,7 @@ void wifi_manager( void * pvParameters ){
 
 		//wait for access point to start
 		xEventGroupWaitBits(wifi_manager_event_group, WIFI_MANAGER_AP_STARTED, pdFALSE, pdTRUE, portMAX_DELAY );
+
 
 		wifi_config_t sta_config = {
 			.sta = {

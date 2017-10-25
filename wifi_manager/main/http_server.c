@@ -310,38 +310,41 @@ void http_server_decode_request(struct netbuf *inbuf, char* first_line, char* bo
 	//}
 }
 
+char* http_server_get_authorization_token(char *buffer, int *len) {
+	*len = 0;
+	char* ptr = buffer;
+	char* ret = NULL;
+	while (*ptr != '\0' && *ptr != '\n') {
+		if (*ptr == '\x02') {
+			ret = ++ptr;
+			//find the end of text char
+			while (*ptr != '\x03' && *ptr != '\n' && *ptr != '\0') {
+				(*len)++;
+				ptr++;
+			}
+			return ret;
+		}
+		ptr++;
+	}
+	return NULL;
+}
+
 void http_server_netconn_serve(struct netconn *conn) {
 
 	struct netbuf *inbuf;
-	//char *buf = NULL;
-	//u16_t buflen;
+	char *buf = NULL;
+	u16_t buflen;
 	err_t err;
 	const char new_line[2] = "\n";
 
-	char first_line[20];
-	char body[100];
-
 	err = netconn_recv(conn, &inbuf);
-
 	if (err == ERR_OK) {
 
+		netbuf_data(inbuf, (void**)&buf, &buflen);
 
-		memset(first_line, 0x00, 20);
-		memset(body, 0x00, 100);
-
-		//netbuf_data(inbuf, (void**)&buf, &buflen);
-		//netbuf_copy(inbuf, data, 500);
-		//printf("%d\n",buflen);
-		//printf("%s\n\n",buf);
-
-		// extract the first line, with the request
-		//printf("strtok_r");
-		//char *line = strtok_r(rest_lines, new_line, &rest_lines);
-		//char *line = buf;
-		//char *body = NULL;
-		http_server_decode_request(inbuf, first_line, body);
-		char* line = first_line;
-		//printf("FIRST LINE: %s\n", line);
+		// extract the first line of the request
+		char *save_ptr = buf;
+		char *line = strtok_r(save_ptr, new_line, &save_ptr);
 
 		if(line) {
 
@@ -366,7 +369,6 @@ void http_server_netconn_serve(struct netconn *conn) {
 				netconn_write(conn, code_js_start, code_js_end - code_js_start, NETCONN_NOCOPY);
 			}
 			else if(strstr(line, "GET /ap.json ")) {
-				//printf("GET /ap.json\n");
 				if(wifi_scan_lock_ap_list()){
 					netconn_write(conn, http_json_hdr, sizeof(http_json_hdr) - 1, NETCONN_NOCOPY);
 					char *buff = wifi_scan_get_json();
@@ -403,40 +405,41 @@ void http_server_netconn_serve(struct netconn *conn) {
 				netconn_write(conn, wifi3_png_start, wifi3_png_end - wifi3_png_start, NETCONN_NOCOPY);
 			}
 			else if(strstr(line, "POST /connect ")) {
-				printf("POST /connect\n");
-				//ignore all http headers
-				/*
-				while( line != NULL ) {
-					line = strtok_r(rest_lines, new_line, &rest_lines);
-
-					if(line != NULL && (strlen(line) == 0 || (strlen(line) == 1 && line[0] == '\r') )){
-						//empty line separating the HTTP headers from the body
-						line = strtok_r(rest_lines, new_line, &rest_lines);
-						break;
+				//printf("%s\n\n",buf);
+				uint8_t found = pdFALSE;
+				while((line = strtok_r(save_ptr, new_line, &save_ptr))){
+					if(strstr(line, "Authorization:")){
+						int lenS = 0, lenP = 0;
+						char *ssid = http_server_get_authorization_token(line, &lenS);
+						char *password = NULL;
+						if(ssid && lenS <= MAX_SSID_SIZE){
+							password = http_server_get_authorization_token(ssid, &lenP);
+							if(password && lenP <= MAX_PASSWORD_SIZE){
+								wifi_config_t* config = wifi_manager_get_wifi_sta_config();
+								//wifi_config_t* config = (wifi_config_t*)malloc(sizeof(wifi_config_t));
+								memset(config, 0x00, sizeof(wifi_config_t));
+								memcpy(config->sta.ssid, ssid, lenS);
+								memcpy(config->sta.password, password, lenP);
+								printf("ssid: %s\n", config->sta.ssid);
+								printf("pwd: %s\n", config->sta.password);
+								netconn_write(conn, http_html_hdr, sizeof(http_html_hdr) - 1, NETCONN_NOCOPY); //200ok
+								found = pdTRUE;
+							}
+							else{
+								break; /* no point going further, this request is bad and won't be processed */
+							}
+						}
+						else{
+							break; /* no point going further, this request is bad and won't be processed */
+						}
+						break; /* found the Authorization header, no point going further */
 					}
 				}
 
-				//get the body of the request
-				if(line != NULL){
-					printf("BODY: %s\n",line);
-					int len = strlen(line);
-					for(int i=0;i<len;i++){
-						printf("%04x ", line[i]);
-					}
-					printf("\n");
-					int count = 0;
-					http_parameter* parameters = http_server_decode_parameters(line, &count);
-					if(http_server_is_valid_connection_parameter(parameters, count)){
-						printf("found valid request\n");
-						http_server_free_parameters(parameters);
-					}
-					else{
-						netconn_write(conn, http_400_hdr, sizeof(http_400_hdr) - 1, NETCONN_NOCOPY);
-					}*/
-				//}
-				//else{
-				//	netconn_write(conn, http_400_hdr, sizeof(http_400_hdr) - 1, NETCONN_NOCOPY);
-				//}
+				if(!found){
+					//bad request
+					netconn_write(conn, http_404_hdr, sizeof(http_404_hdr) - 1, NETCONN_NOCOPY);
+				}
 			}
 			else{
 				netconn_write(conn, http_404_hdr, sizeof(http_404_hdr) - 1, NETCONN_NOCOPY);
@@ -446,6 +449,7 @@ void http_server_netconn_serve(struct netconn *conn) {
 	}
 
 	// close the connection and free the buffer
+	netbuf_delete(inbuf);
 	netconn_close(conn);
 
 }

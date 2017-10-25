@@ -12,6 +12,20 @@
 #ifndef MAIN_WIFI_MANAGER_H_
 #define MAIN_WIFI_MANAGER_H_
 
+
+/**
+ * @brief Defines the maximum size of a SSID name. 32 is IEEE standard.
+ * @warning limit is also hard coded in wifi_config_t. Never extend this value.
+ */
+#define MAX_SSID_SIZE		32
+
+/**
+ * @brief Defines the maximum size of a WPA2 passkey. 64 is IEEE standard.
+ * @warning limit is also hard coded in wifi_config_t. Never extend this value.
+ */
+#define MAX_PASSWORD_SIZE	64
+
+
 /**
  * @brief Defines the maximum number of access points that can be detected.
  *
@@ -69,7 +83,9 @@ void wifi_manager_init();
 char* wifi_scan_get_json();
 
 
-wifi_config_t* get_wifi_sta_config();
+uint8_t wifi_manager_fetch_wifi_sta_config();
+
+wifi_config_t* wifi_manager_get_wifi_sta_config();
 
 
 esp_err_t wifi_manager_event_handler(void *ctx, system_event_t *event);
