@@ -41,7 +41,8 @@ $(function() {
 		
 		xhr.onload = function() {
 			if(this.status == 200){
-				alert(this.responseText);
+				//start refreshing every now and then the IP page
+				//to see if the connection to the STA is made
 			}
 			else{
 				alert(this.responseText);

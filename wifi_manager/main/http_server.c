@@ -420,8 +420,11 @@ void http_server_netconn_serve(struct netconn *conn) {
 								memset(config, 0x00, sizeof(wifi_config_t));
 								memcpy(config->sta.ssid, ssid, lenS);
 								memcpy(config->sta.password, password, lenP);
-								printf("ssid: %s\n", config->sta.ssid);
-								printf("pwd: %s\n", config->sta.password);
+								//printf("ssid: %s\n", config->sta.ssid);
+								//printf("pwd: %s\n", config->sta.password);
+
+								//initialize connection sequence
+								wifi_manager_connect_async();
 								netconn_write(conn, http_html_hdr, sizeof(http_html_hdr) - 1, NETCONN_NOCOPY); //200ok
 								found = pdTRUE;
 							}

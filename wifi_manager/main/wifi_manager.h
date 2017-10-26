@@ -82,6 +82,8 @@ void wifi_scan_generate_json();
 void wifi_manager_init();
 char* wifi_scan_get_json();
 
+void wifi_manager_connect_async();
+
 
 uint8_t wifi_manager_fetch_wifi_sta_config();
 

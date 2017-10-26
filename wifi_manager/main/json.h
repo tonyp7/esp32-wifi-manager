@@ -1,5 +1,5 @@
 /*
- * @file json.c
+ * @file json.h
  * @brief handles very basic JSON with a minimal footprint on the system
  *
  * This code is a lightly modified version of cJSON. cJSON is licensed under the MIT license:

@@ -44,6 +44,7 @@ EventGroupHandle_t wifi_manager_event_group;
 const int WIFI_MANAGER_WIFI_CONNECTED_BIT = BIT0;
 const int WIFI_MANAGER_AP_STA_CONNECTED_BIT = BIT1;
 const int WIFI_MANAGER_AP_STARTED = BIT2;
+const int WIFI_MANAGER_REQUEST_STA_CONNECT_BIT = BIT3;
 
 //wifi_config_t wifi_config;
 
@@ -231,6 +232,11 @@ wifi_config_t* wifi_manager_get_wifi_sta_config(){
 	return wifi_manager_config_sta;
 }
 
+
+void wifi_manager_connect_async(){
+	xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_STA_CONNECT_BIT);
+}
+
 void wifi_manager( void * pvParameters ){
 
 
@@ -331,22 +337,51 @@ void wifi_manager( void * pvParameters ){
 		http_server_set_event_start();
 
 
-		//keep scanning wifis
+		//keep scanning wifis until someone tries to connect to an AP
+		EventBits_t uxBits;
+		uint8_t tick = 0;
 		while(1){
-			//safe guard against overflow
-			if(ap_num > MAX_AP_NUM) ap_num = MAX_AP_NUM;
 
-			ESP_ERROR_CHECK(esp_wifi_scan_start(&scan_config, true));
-			ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&ap_num, accessp_records));
+			/* someone tries to make a connection? if so: connect! */
+			uxBits = xEventGroupWaitBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_STA_CONNECT_BIT, pdFALSE, pdTRUE, 100 / portTICK_PERIOD_MS );
+			if( (uxBits & WIFI_MANAGER_REQUEST_STA_CONNECT_BIT) == (WIFI_MANAGER_REQUEST_STA_CONNECT_BIT) ){
+				//someone requested a connection!
 
-			//make sure the http server isn't trying to access the list while it gets refreshed
-			if(wifi_scan_lock_ap_list()){
-				wifi_scan_generate_json();
-				wifi_scan_unlock_ap_list();
+				/* first thing: if the esp32 is already connected to a access point: disconnect */
+				if( (uxBits & WIFI_MANAGER_WIFI_CONNECTED_BIT) == (WIFI_MANAGER_WIFI_CONNECTED_BIT) ){
+					ESP_ERROR_CHECK(esp_wifi_disconnect());
+				}
+				//
 			}
 			else{
-				printf("Could not get access to xSemaphoreScan in wifi_scan\n");
+
+				/* perform wifi scan */
+				if(tick == 0){
+					//safe guard against overflow
+					if(ap_num > MAX_AP_NUM) ap_num = MAX_AP_NUM;
+
+					ESP_ERROR_CHECK(esp_wifi_scan_start(&scan_config, true));
+					ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&ap_num, accessp_records));
+
+					//make sure the http server isn't trying to access the list while it gets refreshed
+					if(wifi_scan_lock_ap_list()){
+						wifi_scan_generate_json();
+						wifi_scan_unlock_ap_list();
+					}
+					else{
+						printf("Could not get access to xSemaphoreScan in wifi_scan\n");
+					}
+				}
 			}
+
+			//periodically re-do a wifi scan. Here every 5s.
+			tick++;
+			if(tick == 50) tick = 0;
+			vTaskDelay(100 / portTICK_PERIOD_MS);
+
+		}
+
+		while(1){
 			vTaskDelay(5000 / portTICK_PERIOD_MS);
 		}
 	}
