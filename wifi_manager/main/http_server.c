@@ -60,7 +60,7 @@ extern const uint8_t wifi3_png_start[] asm("_binary_wifi3_png_start");
 extern const uint8_t wifi3_png_end[] asm("_binary_wifi3_png_end");
 
 
-// HTTP headers and web pages
+/* const http headers stored in ROM */
 const static char http_html_hdr[] = "HTTP/1.1 200 OK\nContent-type: text/html\n\n";
 const static char http_png_hdr[] = "HTTP/1.1 200 OK\nContent-type: image/png\n\n";
 const static char http_css_hdr[] = "HTTP/1.1 200 OK\nContent-type: text/css\n\n";
@@ -441,14 +441,16 @@ void http_server_netconn_serve(struct netconn *conn) {
 
 				if(!found){
 					//bad request
-					netconn_write(conn, http_404_hdr, sizeof(http_404_hdr) - 1, NETCONN_NOCOPY);
+					netconn_write(conn, http_400_hdr, sizeof(http_400_hdr) - 1, NETCONN_NOCOPY);
 				}
 			}
 			else{
-				netconn_write(conn, http_404_hdr, sizeof(http_404_hdr) - 1, NETCONN_NOCOPY);
+				netconn_write(conn, http_400_hdr, sizeof(http_400_hdr) - 1, NETCONN_NOCOPY);
 			}
 		}
-		else printf("Invalid HTTP request ignored\n");
+		else{
+			netconn_write(conn, http_404_hdr, sizeof(http_404_hdr) - 1, NETCONN_NOCOPY);
+		}
 	}
 
 	// close the connection and free the buffer
