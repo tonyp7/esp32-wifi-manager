@@ -185,6 +185,7 @@ esp_err_t wifi_manager_event_handler(void *ctx, system_event_t *event)
 
 	case SYSTEM_EVENT_STA_DISCONNECTED:
 		xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_WIFI_CONNECTED_BIT);
+		printf("disconnect: %d\n", event->event_info.disconnected.reason);
         break;
 
 	default:
@@ -350,8 +351,28 @@ void wifi_manager( void * pvParameters ){
 				/* first thing: if the esp32 is already connected to a access point: disconnect */
 				if( (uxBits & WIFI_MANAGER_WIFI_CONNECTED_BIT) == (WIFI_MANAGER_WIFI_CONNECTED_BIT) ){
 					ESP_ERROR_CHECK(esp_wifi_disconnect());
+
+					/* wait until wifi disconnects. From experiments, it seems to take about 150ms to disconnect */
+					for(;;){
+						uxBits = xEventGroupGetBits(wifi_manager_event_group);
+						if(uxBits & WIFI_MANAGER_WIFI_CONNECTED_BIT){
+							vTaskDelay(10 / portTICK_PERIOD_MS);
+						}
+						else{
+							break;
+						}
+					}
 				}
-				//
+
+				/* set the new config and connect */
+				ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, wifi_manager_get_wifi_sta_config()));
+				ESP_ERROR_CHECK(esp_wifi_connect());
+
+				/* 2 scenarios here: connection is succesful and SYSTEM_EVENT_STA_GOT_IP will be posted
+				 * or it's a failure and we get a SYSTEM_EVENT_STA_DISCONNECTED with a reason code
+				 */
+
+				break;
 			}
 			else{
 
