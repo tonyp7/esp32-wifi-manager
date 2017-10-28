@@ -20,12 +20,12 @@ $(function() {
 		$( ".networks" ).slideUp( "fast", function() {});
 		$( ".login" ).slideDown( "fast", function() {});
 		$( "#login-data" ).slideDown( "fast", function() {});
-		$( "h2" ).text("Password for " + $(this).text());
+		$( "#app h2" ).text("Password for " + $(this).text());
 		selectedSSID = $(this).text();
 	});
 	
 	$( "#cancel" ).click(function() {
-		$("#join").prop("disabled", false);
+		//$("#join").prop("disabled", false);
 		
 		$( "#login-data" ).slideUp( "fast", function() {});
 		$( "#loading" ).slideUp( "slow", function() {});
@@ -33,11 +33,28 @@ $(function() {
 		
 		$( ".networks" ).slideDown( "fast", function() {});
 		$( ".login" ).slideUp( "fast", function() {});
-		$( "h2" ).text("Choose a network...");
+		$( "#app h2" ).text("Choose a network...");
+	});
+	
+	$( "#acredits").click(function(event) {
+		event.preventDefault();
+		$( "#app").slideUp( "fast", function() {});
+		$( "#credits").slideDown( "fast", function() {});
+	});
+	
+	$( "#okcredits").click(function() {
+		$( "#app").slideDown( "fast", function() {});
+		$( "#credits").slideUp( "fast", function() {});
 	});
 	
 	
+
+	
+	
 	function performConnect(){
+		
+		$("#loadingButton").prop("disabled",true);
+		
 		var xhr = new XMLHttpRequest();
 		
 		xhr.onload = function() {
@@ -46,18 +63,14 @@ $(function() {
 				//to see if the connection to the STA is made
 			}
 			else{
-				alert(this.responseText);
+				//alert(this.responseText);
 			}
-		  
-		  //var myelement = document.getElementById("result");
-		  //myelement.innerHTML= this.responseText;
 		};
 		
 		var pwd = $("#pwd").val();
 		xhr.open("POST", "/connect", true);
 		xhr.setRequestHeader('Authorization', "\x02{0}\x03\x02{1}\x03".format(selectedSSID, pwd));
 		xhr.send();
-		//JSON.stringify({"ssid": selectedSSID, "psk":pwd})
 	}
 	
 	$(document).on("click", "#join", function() {
@@ -66,10 +79,13 @@ $(function() {
 			clearInterval(refreshAPInterval);
 		}
 		
-		$("#join").prop("disabled", true);
+		//disable buttons
+		//$("#join").prop("disabled", true);
+		//$("#join").prop("disabled", true);
+		$( "#buttons" ).slideUp( "fast", function() {});
 		$( "#login-data" ).slideUp( "fast", function() {});
 		$( "#loading" ).slideDown( "slow", function() {});
-		$( "h2" ).text("Connecting to " + selectedSSID);
+		$( "#app h2" ).text("Connecting to " + selectedSSID);
 		
 		performConnect();
 

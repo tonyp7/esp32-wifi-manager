@@ -9,35 +9,43 @@
 	</head>
 	<body>
 		<div id="app">
-			<h2>Choose a network...</h2>
-			<div class="networks">
+			<div id="app-wrap">
+				<h2>Choose a network...</h2>
+				<div class="networks">
+				</div>
+				<div class="login">
+					<div id="login-data">
+						<input id="pwd" type="password" name="password" placeholder="Password" value="" style="display:block">
+					</div>
+					
+					<div id="loading">
+						<div class="spinner"><div class="double-bounce1"></div><div class="double-bounce2"></div></div>
+						<input id="loadingButton" type="button" value="OK" />
+					</div>
+					
+					<div id="buttons">
+						<input id="join" type="button" value="Join" />
+						<input id="cancel" type="button" value="Cancel"/>
+					</div>
+				</div>
 			</div>
-			<div class="login">
-			
-				<div id="login-data">
-					<input id="pwd" type="password" name="password" placeholder="Password" value="" style="display:block">
-				</div>
-				
-				<div id="loading">
-					<div class="spinner"><div class="double-bounce1"></div><div class="double-bounce2"></div></div>
-				</div>
-				
-				<div style="border:1px solid #fff;">
-					<input id="join" type="button" value="Join" style="display:block;float:right;"/>
-					<input id="cancel" type="button" value="Cancel" style="display:block"/>
-				</div>
-				
-			</div>
-			<hr />
+			<div id="pwrdby"><em>Powered by </em><a id="acredits" href="#"><strong>esp-wifi-manager</strong></a>.</div>
 		</div>
 		<div id="credits">
-			ESPWConnect
-			Open-Source Software in use in ESP Connect:
-			<ul>
-				<li>SpinKit, Copyright 2015, Tobias Ahlin. Licensed under the MIT License.</li>
-				<li>jQuery, The jQuery Foundation. Licensed under the MIT License.</li>
-				<li>cJSON, Copyright 2009-2017, Dave Gamble and cJSON contributors. Licensed under the MIT License.</li>
-			</ul>
+			<h2>About this app...</h2>
+			<div id="credits-wrap">
+				<p><strong>esp-wifi-manager</strong>, Copyright 2017, Tony Pottier.<br />Licender under the MIT License.</p>
+				<p>
+					This app would not be possible without the following libraries:
+				</p>
+				<ul>
+					<li>SpinKit, Copyright 2015, Tobias Ahlin. Licensed under the MIT License.</li>
+					<li>jQuery, The jQuery Foundation. Licensed under the MIT License.</li>
+					<li>cJSON, Copyright 2009-2017, Dave Gamble and cJSON contributors. Licensed under the MIT License.</li>
+				</ul>
+				<input id="okcredits" type="button" value="OK" />
+			</div>
+			<hr />
 		</div>
 	</body>
 <html>
