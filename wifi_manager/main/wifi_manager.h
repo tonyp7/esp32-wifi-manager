@@ -82,18 +82,17 @@
 #define JSON_IP_INFO_SIZE 77
 
 
-void wifi_scan_init();
-void wifi_scan_destroy();
+void wifi_manager_destroy();
 void wifi_manager( void * pvParameters );
-void wifi_scan_generate_json();
+
 void wifi_manager_init();
 
 char* wifi_manager_get_ap_list_json();
 char* wifi_manager_get_ip_info_json();
 
-void wifi_manager_connect_async();
 
-void wifi_manager_generate_ip_info_json();
+
+
 
 
 uint8_t wifi_manager_fetch_wifi_sta_config();
@@ -102,6 +101,12 @@ wifi_config_t* wifi_manager_get_wifi_sta_config();
 
 
 esp_err_t wifi_manager_event_handler(void *ctx, system_event_t *event);
+
+
+/**
+ * @brief requests a connection to an access point that will be process in the main task thread.
+ */
+void wifi_manager_connect_async();
 
 /**
  * @brief Tries to get access to json buffer mutex.
@@ -119,5 +124,8 @@ bool wifi_scan_lock_json_buffer();
  * @brief Releases the json buffer mutex.
  */
 void wifi_scan_unlock_json_buffer();
+
+void wifi_manager_generate_ip_info_json();
+void wifi_manager_generate_acess_points_json();
 
 #endif /* MAIN_WIFI_MANAGER_H_ */

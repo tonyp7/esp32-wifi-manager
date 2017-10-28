@@ -99,18 +99,9 @@ uint8_t wifi_manager_fetch_wifi_sta_config(){
 
 
 
-void wifi_scan_init(){
-	//wifi_manager_json_mutex = xSemaphoreCreateMutex();
-	//accessp_records = (wifi_ap_record_t*)malloc(sizeof(wifi_ap_record_t) * MAX_AP_NUM);
-	//accessp_json = (char*)malloc(ap_num * JSON_ONE_APP_SIZE + 4); //4 bytes for json encapsulation of "[\n" and "]\0"
-	//strcpy(accessp_json, "[]\n");
-}
 
-void wifi_scan_destroy(){
-	free(accessp_records);
-	free(accessp_json);
-	vSemaphoreDelete(wifi_manager_json_mutex);
-}
+
+
 
 
 
@@ -127,7 +118,7 @@ void wifi_manager_generate_ip_info_json(){
 			ip4addr_ntoa(&ip_info.gw));
 }
 
-void wifi_scan_generate_json(){
+void wifi_manager_generate_acess_points_json(){
 
 	strcpy(accessp_json, "[\n");
 
@@ -145,13 +136,10 @@ void wifi_scan_generate_json(){
 				ap.rssi,
 				ap.authmode,
 				i==ap_num-1?' ':',');
-		//printf("%d-%s\n",i,one_ap);
 		strcat (accessp_json, one_ap);
 	}
 
 	strcat(accessp_json, "]");
-
-	//printf("\n%s\n", accessp_json);
 }
 
 
@@ -260,6 +248,28 @@ void wifi_manager_connect_async(){
 
 char* wifi_manager_get_ip_info_json(){
 	return ip_info_json;
+}
+
+
+void wifi_manager_destroy(){
+
+	/* buffers */
+	free(accessp_records);
+	accessp_records = NULL;
+	free(accessp_json);
+	accessp_json = NULL;
+	free(ip_info_json);
+	ip_info_json = NULL;
+
+	/* RTOS objects */
+	vSemaphoreDelete(wifi_manager_json_mutex);
+	wifi_manager_json_mutex = NULL;
+	vEventGroupDelete(wifi_manager_event_group);
+
+	if(wifi_manager_config_sta){
+		free(wifi_manager_config_sta);
+		wifi_manager_config_sta = NULL;
+	}
 }
 
 void wifi_manager( void * pvParameters ){
@@ -426,7 +436,7 @@ void wifi_manager( void * pvParameters ){
 
 					//make sure the http server isn't trying to access the list while it gets refreshed
 					if(wifi_scan_lock_json_buffer()){
-						wifi_scan_generate_json();
+						wifi_manager_generate_acess_points_json();
 						wifi_scan_unlock_json_buffer();
 					}
 					else{
