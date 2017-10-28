@@ -1,3 +1,25 @@
+/*
+Copyright (c) 2017 Tony Pottier
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
+
 /**
  * \file http_server.c
  * \author Tony Pottier
@@ -354,13 +376,6 @@ void http_server_netconn_serve(struct netconn *conn) {
 				netconn_write(conn, index_html_start, index_html_end - index_html_start, NETCONN_NOCOPY);
 			}
 			else if(strstr(line, "GET /jquery.js ")) {
-				/*Accept-Ranges: bytes
-				Content-Length: 438
-				Connection: close
-				Content-Type: text/html; charset=UTF-8
-				Content-Encoding: gzip*/
-				//netconn_write(conn, http_js_hdr, sizeof(http_js_hdr) - 1, NETCONN_NOCOPY);
-				//netconn_write(conn, jquery_js_start, jquery_js_end - jquery_js_start, NETCONN_NOCOPY);
 				netconn_write(conn, http_jquery_gz_hdr, sizeof(http_jquery_gz_hdr) - 1, NETCONN_NOCOPY);
 				netconn_write(conn, jquery_gz_start, jquery_gz_end - jquery_gz_start, NETCONN_NOCOPY);
 			}
@@ -406,10 +421,15 @@ void http_server_netconn_serve(struct netconn *conn) {
 			}
 			else if(strstr(line, "GET /status ")){
 				if(wifi_scan_lock_json_buffer()){
-					netconn_write(conn, http_json_hdr, sizeof(http_json_hdr) - 1, NETCONN_NOCOPY);
-					char *buff = wifi_manager_get_ap_list_json();
-					netconn_write(conn, buff, strlen(buff), NETCONN_NOCOPY);
-					wifi_scan_unlock_json_buffer();
+					char *buff = wifi_manager_get_ip_info_json();
+					if(buff){
+						netconn_write(conn, http_json_hdr, sizeof(http_json_hdr) - 1, NETCONN_NOCOPY);
+						netconn_write(conn, buff, strlen(buff), NETCONN_NOCOPY);
+						wifi_scan_unlock_json_buffer();
+					}
+					else{
+						netconn_write(conn, http_503_hdr, sizeof(http_503_hdr) - 1, NETCONN_NOCOPY);
+					}
 				}
 				else{
 					netconn_write(conn, http_503_hdr, sizeof(http_503_hdr) - 1, NETCONN_NOCOPY);
