@@ -13,6 +13,7 @@ if (!String.prototype.format) {
 
 var selectedSSID = "";
 var refreshAPInterval = null; 
+var checkStatusInterval = null;
 
 $(function() {
 
@@ -55,8 +56,13 @@ $(function() {
 		
 		$("#loadingButton").prop("disabled",true);
 		
-		var xhr = new XMLHttpRequest();
+		//stop refreshing wifi list
+		if(refreshAPInterval != null){
+			clearInterval(refreshAPInterval);
+			refreshAPInterval = null;
+		}
 		
+		var xhr = new XMLHttpRequest();
 		xhr.onload = function() {
 			if(this.status == 200){
 				//start refreshing every now and then the IP page
@@ -64,7 +70,9 @@ $(function() {
 			}
 			else{
 				//alert(this.responseText);
+				
 			}
+			checkStatusInterval = setInterval(check_if_connected, 1000);
 		};
 		
 		var pwd = $("#pwd").val();
@@ -75,17 +83,13 @@ $(function() {
 	
 	$(document).on("click", "#join", function() {
 		
-		if(refreshAPInterval != null){
-			clearInterval(refreshAPInterval);
-		}
-		
 		//disable buttons
 		//$("#join").prop("disabled", true);
 		//$("#join").prop("disabled", true);
 		$( "#buttons" ).slideUp( "fast", function() {});
 		$( "#login-data" ).slideUp( "fast", function() {});
-		$( "#loading" ).slideDown( "slow", function() {});
-		$( "#app h2" ).text("Connecting to " + selectedSSID);
+		$( "#loading" ).slideDown( "fast", function() {});
+		$( "#app h2" ).text("Connecting to " + selectedSSID + "...");
 		
 		performConnect();
 
@@ -94,6 +98,7 @@ $(function() {
 	});
 	
 	
+	//first time the page loads: attempt to refresh wifis
 	refresh_wifi();
 	refreshAPInterval = setInterval(refresh_wifi, 3000);
 	
@@ -102,8 +107,14 @@ $(function() {
 
 function check_if_connected(){
 	$.getJSON( "/status", function( data ) {
-		if(data.length > 0){
-			//lol
+		if(data.ip.length > 0){
+			//alert(data.ip);
+			
+			$("#loadingButton").prop("disabled",false);
+			if(checkStatusInterval != null){
+				clearInterval(checkStatusInterval);
+				checkStatusInterval = null;
+			}
 		}
 	});
 }
