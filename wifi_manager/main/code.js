@@ -12,6 +12,7 @@ if (!String.prototype.format) {
 }
 
 var selectedSSID = "";
+var refreshAPInterval = null; 
 
 $(function() {
 
@@ -60,6 +61,11 @@ $(function() {
 	}
 	
 	$(document).on("click", "#join", function() {
+		
+		if(refreshAPInterval != null){
+			clearInterval(refreshAPInterval);
+		}
+		
 		$("#join").prop("disabled", true);
 		$( "#login-data" ).slideUp( "fast", function() {});
 		$( "#loading" ).slideDown( "slow", function() {});
@@ -72,9 +78,19 @@ $(function() {
 	});
 	
 	
+	refresh_wifi();
+	refreshAPInterval = setInterval(refresh_wifi, 3000);
 	
 });
 
+
+function check_if_connected(){
+	$.getJSON( "/status", function( data ) {
+		if(data.length > 0){
+			//lol
+		}
+	});
+}
 
 function rssi_to_icon(rssi){
 	if(rssi >= -60){
@@ -92,7 +108,7 @@ function rssi_to_icon(rssi){
 }
 
 function refresh_wifi(){
-	$.getJSON( "ap.json", function( data ) {
+	$.getJSON( "/ap.json", function( data ) {
 		if(data.length > 0){
 			//sort by wifi strength
 			data.sort(function (a, b) {

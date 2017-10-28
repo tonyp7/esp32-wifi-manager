@@ -1,20 +1,7 @@
 body{background-color:#eee;border:0;margin:0;font:1.1em tahoma, arial, sans-serif;}
-			h2{text-transform: uppercase;margin:10px;color:#888;font-size:1.2em}
+			h2{text-transform: uppercase;margin:0;padding:10px;color:#888;font-size:1.2em}
 			
-			
-			ul{
-				background-color:#fff;
-			}
-			li{
-				list-style: none;
-				padding-top:5px;
-				margin-left:20px;
-				height: 24px;
-				//border: 1px solid black;
-				margin-right: 40px;
-				background: url('wifi24.png') no-repeat right top;
-			}
-			
+
 			input{
 				display:none;
 				font:1.1em tahoma, arial, sans-serif;
@@ -34,9 +21,9 @@ body{background-color:#eee;border:0;margin:0;font:1.1em tahoma, arial, sans-seri
 				display:block;
 				list-style: none;
 				margin-top:10px;
-				margin-left:50px;
+				margin-left:30px;
 				height: 24px;
-				margin-right: 40px;
+				margin-right: 30px;
 			}
 			
 			.w0{
@@ -66,8 +53,8 @@ body{background-color:#eee;border:0;margin:0;font:1.1em tahoma, arial, sans-seri
 			}
 			#pwd{
 				border:none;
-				width:90%;
-				margin-left:45px;
+				width:80%;
+				margin-left:35px;
 			}
 				
 			

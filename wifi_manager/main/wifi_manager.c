@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 #include "esp_system.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -33,10 +34,11 @@
 
 
 
-SemaphoreHandle_t xSemaphoreScan = NULL;
+SemaphoreHandle_t wifi_manager_json_mutex = NULL;
 uint16_t ap_num = MAX_AP_NUM;
 wifi_ap_record_t *accessp_records; //[MAX_AP_NUM];
-char *accessp_json;
+char *accessp_json = NULL;
+char *ip_info_json = NULL;
 wifi_config_t* wifi_manager_config_sta = NULL;
 
 
@@ -95,19 +97,35 @@ uint8_t wifi_manager_fetch_wifi_sta_config(){
 }
 
 
+
+
 void wifi_scan_init(){
-	xSemaphoreScan = xSemaphoreCreateMutex();
-	accessp_records = (wifi_ap_record_t*)malloc(sizeof(wifi_ap_record_t) * MAX_AP_NUM);
-	accessp_json = (char*)malloc(ap_num * JSON_ONE_APP_SIZE + 4); //4 bytes for json encapsulation of "[\n" and "]\0"
-	strcpy(accessp_json, "[]\n");
+	//wifi_manager_json_mutex = xSemaphoreCreateMutex();
+	//accessp_records = (wifi_ap_record_t*)malloc(sizeof(wifi_ap_record_t) * MAX_AP_NUM);
+	//accessp_json = (char*)malloc(ap_num * JSON_ONE_APP_SIZE + 4); //4 bytes for json encapsulation of "[\n" and "]\0"
+	//strcpy(accessp_json, "[]\n");
 }
 
 void wifi_scan_destroy(){
 	free(accessp_records);
 	free(accessp_json);
-	vSemaphoreDelete(xSemaphoreScan);
+	vSemaphoreDelete(wifi_manager_json_mutex);
 }
 
+
+
+void wifi_manager_generate_ip_info_json(){
+
+
+	tcpip_adapter_ip_info_t ip_info;
+	ESP_ERROR_CHECK(tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_STA, &ip_info));
+
+	const char ip_info_json_format[] = "{\"ip\":\"%s\",\"netmask\":\"%s\",\"gw\":\"%s\"}\n";
+	sprintf(accessp_json, ip_info_json_format,
+			ip4addr_ntoa(&ip_info.ip),
+			ip4addr_ntoa(&ip_info.netmask),
+			ip4addr_ntoa(&ip_info.gw));
+}
 
 void wifi_scan_generate_json(){
 
@@ -137,25 +155,25 @@ void wifi_scan_generate_json(){
 }
 
 
-uint8_t wifi_scan_lock_ap_list(){
-	if(xSemaphoreScan){
-		if( xSemaphoreTake( xSemaphoreScan, ( TickType_t ) 10 ) == pdTRUE ) {
-			return pdTRUE;
+bool wifi_scan_lock_json_buffer(){
+	if(wifi_manager_json_mutex){
+		if( xSemaphoreTake( wifi_manager_json_mutex, ( TickType_t ) 10 ) == pdTRUE ) {
+			return true;
 		}
 		else{
-			return pdFALSE;
+			return false;
 		}
 	}
 	else{
-		return pdFALSE;
+		return false;
 	}
 
 }
-void wifi_scan_unlock_ap_list(){
-	xSemaphoreGive( xSemaphoreScan );
+void wifi_scan_unlock_json_buffer(){
+	xSemaphoreGive( wifi_manager_json_mutex );
 }
 
-char* wifi_scan_get_json(){
+char* wifi_manager_get_ap_list_json(){
 	return accessp_json;
 }
 
@@ -239,19 +257,29 @@ void wifi_manager_connect_async(){
 	xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_STA_CONNECT_BIT);
 }
 
+
+char* wifi_manager_get_ip_info_json(){
+	return ip_info_json;
+}
+
 void wifi_manager( void * pvParameters ){
 
+	/* memory allocation of objects used by the task */
+	wifi_manager_json_mutex = xSemaphoreCreateMutex();
+	accessp_records = (wifi_ap_record_t*)malloc(sizeof(wifi_ap_record_t) * MAX_AP_NUM);
+	accessp_json = (char*)malloc(ap_num * JSON_ONE_APP_SIZE + 4); //4 bytes for json encapsulation of "[\n" and "]\0"
+	strcpy(accessp_json, "[]\n");
+	ip_info_json = (char*)malloc(sizeof(char) * JSON_IP_INFO_SIZE);
+	strcpy(ip_info_json, "{}\n");
+	wifi_manager_config_sta = (wifi_config_t*)malloc(sizeof(wifi_config_t));
+	memset(wifi_manager_config_sta, 0x00, sizeof(wifi_config_t));
 
-	// initialize the tcp stack
+	/* initialize the tcp stack */
 	tcpip_adapter_init();
 
-    //event handler + group
+    /* event handler and event group for the wifi driver */
 	wifi_manager_event_group = xEventGroupCreate();
     ESP_ERROR_CHECK(esp_event_loop_init(wifi_manager_event_handler, NULL));
-
-    //allocate memory for the STA config
-    wifi_manager_config_sta = (wifi_config_t*)malloc(sizeof(wifi_config_t));
-    memset(wifi_manager_config_sta, 0x00, sizeof(wifi_config_t));
 
     //wifi scanner config
 	wifi_scan_config_t scan_config = {
@@ -346,7 +374,7 @@ void wifi_manager( void * pvParameters ){
 
 			/* someone tries to make a connection? if so: connect! */
 			uxBits = xEventGroupWaitBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_STA_CONNECT_BIT, pdFALSE, pdTRUE, 100 / portTICK_PERIOD_MS );
-			if( (uxBits & WIFI_MANAGER_REQUEST_STA_CONNECT_BIT) == (WIFI_MANAGER_REQUEST_STA_CONNECT_BIT) ){
+			if(uxBits & WIFI_MANAGER_REQUEST_STA_CONNECT_BIT){
 				//someone requested a connection!
 
 				/* first thing: if the esp32 is already connected to a access point: disconnect */
@@ -364,10 +392,26 @@ void wifi_manager( void * pvParameters ){
 				ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, wifi_manager_get_wifi_sta_config()));
 				ESP_ERROR_CHECK(esp_wifi_connect());
 
-				/* 2 scenarios here: connection is succesful and SYSTEM_EVENT_STA_GOT_IP will be posted
+				/* 2 scenarios here: connection is successful and SYSTEM_EVENT_STA_GOT_IP will be posted
 				 * or it's a failure and we get a SYSTEM_EVENT_STA_DISCONNECTED with a reason code
 				 */
+				uxBits = xEventGroupWaitBits(wifi_manager_event_group, WIFI_MANAGER_WIFI_CONNECTED_BIT | WIFI_MANAGER_STA_DISCONNECT_BIT, pdFALSE, pdFALSE, portMAX_DELAY );
+				if(uxBits & WIFI_MANAGER_WIFI_CONNECTED_BIT){
+					/* save IP address */
+					ESP_ERROR_CHECK(tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_STA, &ip_info));
+					printf("IP Address:  %s\n", ip4addr_ntoa(&ip_info.ip));
+					printf("Subnet mask: %s\n", ip4addr_ntoa(&ip_info.netmask));
+					printf("Gateway:     %s\n", ip4addr_ntoa(&ip_info.gw));
 
+				}
+				else if(uxBits & WIFI_MANAGER_STA_DISCONNECT_BIT){
+					printf("Unable to connect. Check password and make sure wifi has sufficient signal strength\n");
+
+				}
+				else{
+					/* hit portMAX_DELAY limit ? */
+					abort();
+				}
 				break;
 			}
 			else{
@@ -381,9 +425,9 @@ void wifi_manager( void * pvParameters ){
 					ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&ap_num, accessp_records));
 
 					//make sure the http server isn't trying to access the list while it gets refreshed
-					if(wifi_scan_lock_ap_list()){
+					if(wifi_scan_lock_json_buffer()){
 						wifi_scan_generate_json();
-						wifi_scan_unlock_ap_list();
+						wifi_scan_unlock_json_buffer();
 					}
 					else{
 						printf("Could not get access to xSemaphoreScan in wifi_scan\n");

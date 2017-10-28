@@ -369,15 +369,15 @@ void http_server_netconn_serve(struct netconn *conn) {
 				netconn_write(conn, code_js_start, code_js_end - code_js_start, NETCONN_NOCOPY);
 			}
 			else if(strstr(line, "GET /ap.json ")) {
-				if(wifi_scan_lock_ap_list()){
+				if(wifi_scan_lock_json_buffer()){
 					netconn_write(conn, http_json_hdr, sizeof(http_json_hdr) - 1, NETCONN_NOCOPY);
-					char *buff = wifi_scan_get_json();
+					char *buff = wifi_manager_get_ap_list_json();
 					netconn_write(conn, buff, strlen(buff), NETCONN_NOCOPY);
-					wifi_scan_unlock_ap_list();
+					wifi_scan_unlock_json_buffer();
 				}
 				else{
 					netconn_write(conn, http_503_hdr, sizeof(http_503_hdr) - 1, NETCONN_NOCOPY);
-					printf("Could not get access to xSemaphoreScan in http_server_netconn_serve\n");
+					printf("Could not get access to json mutex in http_server_netconn_serve GET /ap.json\n");
 				}
 			}
 			else if(strstr(line, "GET /style.css ")) {
@@ -403,6 +403,18 @@ void http_server_netconn_serve(struct netconn *conn) {
 			else if(strstr(line, "GET /wifi3.png ")) {
 				netconn_write(conn, http_png_hdr, sizeof(http_png_hdr) - 1, NETCONN_NOCOPY);
 				netconn_write(conn, wifi3_png_start, wifi3_png_end - wifi3_png_start, NETCONN_NOCOPY);
+			}
+			else if(strstr(line, "GET /status ")){
+				if(wifi_scan_lock_json_buffer()){
+					netconn_write(conn, http_json_hdr, sizeof(http_json_hdr) - 1, NETCONN_NOCOPY);
+					char *buff = wifi_manager_get_ap_list_json();
+					netconn_write(conn, buff, strlen(buff), NETCONN_NOCOPY);
+					wifi_scan_unlock_json_buffer();
+				}
+				else{
+					netconn_write(conn, http_503_hdr, sizeof(http_503_hdr) - 1, NETCONN_NOCOPY);
+					printf("Could not get access to json mutex in http_server_netconn_serve GET /status\n");
+				}
 			}
 			else if(strstr(line, "POST /connect ")) {
 				//printf("%s\n\n",buf);

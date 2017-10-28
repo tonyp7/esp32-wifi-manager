@@ -32,7 +32,7 @@
  * To save memory and avoid nasty out of memory errors,
  * we can limit the number of APs detected in a wifi scan.
  */
-#define MAX_AP_NUM 			30
+#define MAX_AP_NUM 			20
 
 
 /** @brief Defines the auth mode as an access point
@@ -74,15 +74,26 @@
  */
 #define JSON_ONE_APP_SIZE 99
 
+/**
+ * @brief Defines the maximum length in bytes of a JSON representation of the IP information
+ * assuming all ips are 4*3 digits, maximum string length is 77 including new line and null character.
+ * example: {"ip":"192.168.1.119","netmask":"255.255.255.0","gw":"192.168.1.1"}
+ */
+#define JSON_IP_INFO_SIZE 77
+
 
 void wifi_scan_init();
 void wifi_scan_destroy();
 void wifi_manager( void * pvParameters );
 void wifi_scan_generate_json();
 void wifi_manager_init();
-char* wifi_scan_get_json();
+
+char* wifi_manager_get_ap_list_json();
+char* wifi_manager_get_ip_info_json();
 
 void wifi_manager_connect_async();
+
+void wifi_manager_generate_ip_info_json();
 
 
 uint8_t wifi_manager_fetch_wifi_sta_config();
@@ -92,8 +103,21 @@ wifi_config_t* wifi_manager_get_wifi_sta_config();
 
 esp_err_t wifi_manager_event_handler(void *ctx, system_event_t *event);
 
+/**
+ * @brief Tries to get access to json buffer mutex.
+ *
+ * The HTTP server can try to access the json to serve clients while the wifi manager thread can try
+ * to update it. These two tasks are synchronized through a mutex.
+ *
+ * The mutex is used by both the access point list json and the connection status json.\n
+ * These two resources should technically have their own mutex but we lose some flexibility to save
+ * on memory.
+ */
+bool wifi_scan_lock_json_buffer();
 
-uint8_t wifi_scan_lock_ap_list();
-void wifi_scan_unlock_ap_list();
+/**
+ * @brief Releases the json buffer mutex.
+ */
+void wifi_scan_unlock_json_buffer();
 
 #endif /* MAIN_WIFI_MANAGER_H_ */
