@@ -128,15 +128,22 @@ uint8_t wifi_manager_fetch_wifi_sta_config(){
 
 void wifi_manager_generate_ip_info_json(){
 
+	EventBits_t uxBits = xEventGroupGetBits(wifi_manager_event_group);
+	if(uxBits & WIFI_MANAGER_WIFI_CONNECTED_BIT){
+		tcpip_adapter_ip_info_t ip_info;
+		ESP_ERROR_CHECK(tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_STA, &ip_info));
 
-	tcpip_adapter_ip_info_t ip_info;
-	ESP_ERROR_CHECK(tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_STA, &ip_info));
+		const char ip_info_json_format[] = "{\"ip\":\"%s\",\"netmask\":\"%s\",\"gw\":\"%s\"}\n";
+		sprintf(ip_info_json, ip_info_json_format,
+				ip4addr_ntoa(&ip_info.ip),
+				ip4addr_ntoa(&ip_info.netmask),
+				ip4addr_ntoa(&ip_info.gw));
+	}
+	else{
+		strcpy(ip_info_json, "{}\n");
+	}
 
-	const char ip_info_json_format[] = "{\"ip\":\"%s\",\"netmask\":\"%s\",\"gw\":\"%s\"}\n";
-	sprintf(ip_info_json, ip_info_json_format,
-			ip4addr_ntoa(&ip_info.ip),
-			ip4addr_ntoa(&ip_info.netmask),
-			ip4addr_ntoa(&ip_info.gw));
+
 }
 
 void wifi_manager_generate_acess_points_json(){
@@ -164,9 +171,9 @@ void wifi_manager_generate_acess_points_json(){
 }
 
 
-bool wifi_scan_lock_json_buffer(){
+bool wifi_manager_lock_json_buffer(TickType_t xTicksToWait){
 	if(wifi_manager_json_mutex){
-		if( xSemaphoreTake( wifi_manager_json_mutex, ( TickType_t ) 10 ) == pdTRUE ) {
+		if( xSemaphoreTake( wifi_manager_json_mutex, xTicksToWait ) == pdTRUE ) {
 			return true;
 		}
 		else{
@@ -178,7 +185,7 @@ bool wifi_scan_lock_json_buffer(){
 	}
 
 }
-void wifi_scan_unlock_json_buffer(){
+void wifi_manager_unlock_json_buffer(){
 	xSemaphoreGive( wifi_manager_json_mutex );
 }
 
@@ -214,6 +221,7 @@ esp_err_t wifi_manager_event_handler(void *ctx, system_event_t *event)
 	case SYSTEM_EVENT_STA_DISCONNECTED:
 		xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_STA_DISCONNECT_BIT);
 		xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_WIFI_CONNECTED_BIT);
+		//clear json
         break;
 
 	default:
@@ -424,26 +432,34 @@ void wifi_manager( void * pvParameters ){
 				ESP_ERROR_CHECK(esp_wifi_connect());
 
 				/* 2 scenarios here: connection is successful and SYSTEM_EVENT_STA_GOT_IP will be posted
-				 * or it's a failure and we get a SYSTEM_EVENT_STA_DISCONNECTED with a reason code
+				 * or it's a failure and we get a SYSTEM_EVENT_STA_DISCONNECTED with a reason code.
+				 * Note that the reason code is not exploited. For all intent and purposes a failure is a failure.
 				 */
 				uxBits = xEventGroupWaitBits(wifi_manager_event_group, WIFI_MANAGER_WIFI_CONNECTED_BIT | WIFI_MANAGER_STA_DISCONNECT_BIT, pdFALSE, pdFALSE, portMAX_DELAY );
-				if(uxBits & WIFI_MANAGER_WIFI_CONNECTED_BIT){
-					/* save IP address */
-					ESP_ERROR_CHECK(tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_STA, &ip_info));
-					printf("IP Address:  %s\n", ip4addr_ntoa(&ip_info.ip));
-					printf("Subnet mask: %s\n", ip4addr_ntoa(&ip_info.netmask));
-					printf("Gateway:     %s\n", ip4addr_ntoa(&ip_info.gw));
 
-				}
-				else if(uxBits & WIFI_MANAGER_STA_DISCONNECT_BIT){
-					printf("Unable to connect. Check password and make sure wifi has sufficient signal strength\n");
+				if(uxBits & (WIFI_MANAGER_WIFI_CONNECTED_BIT | WIFI_MANAGER_STA_DISCONNECT_BIT)){
 
+					/* Update the json regardless of connection status.
+					 * If connection was succesful an IP will get assigned.
+					 */
+					if(wifi_manager_lock_json_buffer( portMAX_DELAY )){
+						wifi_manager_generate_ip_info_json();
+						wifi_manager_unlock_json_buffer();
+					}
+					else{
+						/* Even if someone were to furiously refresh a web resource that needs the json mutex,
+						 * it seems impossible that this thread cannot obtain the mutex. Abort here is reasonnable.
+						 */
+						abort();
+					}
 				}
 				else{
 					/* hit portMAX_DELAY limit ? */
 					abort();
 				}
-				break;
+
+				/* finally: release the connection request bit */
+				xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_STA_CONNECT_BIT);
 			}
 			else{
 
@@ -456,9 +472,9 @@ void wifi_manager( void * pvParameters ){
 					ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&ap_num, accessp_records));
 
 					//make sure the http server isn't trying to access the list while it gets refreshed
-					if(wifi_scan_lock_json_buffer()){
+					if(wifi_manager_lock_json_buffer( ( TickType_t ) 10 )){
 						wifi_manager_generate_acess_points_json();
-						wifi_scan_unlock_json_buffer();
+						wifi_manager_unlock_json_buffer();
 					}
 					else{
 						printf("Could not get access to xSemaphoreScan in wifi_scan\n");

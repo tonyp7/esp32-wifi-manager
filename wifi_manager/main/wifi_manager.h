@@ -139,13 +139,18 @@ void wifi_manager_connect_async();
  * The mutex is used by both the access point list json and the connection status json.\n
  * These two resources should technically have their own mutex but we lose some flexibility to save
  * on memory.
+ *
+ * This is a simple wrapper around freeRTOS function xSemaphoreTake.
+ *
+ * @param xTicksToWait The time in ticks to wait for the semaphore to become available.
+ * @return true in success, false otherwise.
  */
-bool wifi_scan_lock_json_buffer();
+bool wifi_manager_lock_json_buffer(TickType_t xTicksToWait);
 
 /**
  * @brief Releases the json buffer mutex.
  */
-void wifi_scan_unlock_json_buffer();
+void wifi_manager_unlock_json_buffer();
 
 void wifi_manager_generate_ip_info_json();
 void wifi_manager_generate_acess_points_json();
