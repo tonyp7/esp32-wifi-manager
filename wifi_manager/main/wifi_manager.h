@@ -32,6 +32,10 @@ Contains the freeRTOS task and all necessary support
 #ifndef MAIN_WIFI_MANAGER_H_
 #define MAIN_WIFI_MANAGER_H_
 
+/**
+ * @brief If WIFI_MANAGER_DEBUG is defined, additional debug information will be sent to the standard output.
+ */
+#define WIFI_MANAGER_DEBUG	1
 
 /**
  * @brief Defines the maximum size of a SSID name. 32 is IEEE standard.

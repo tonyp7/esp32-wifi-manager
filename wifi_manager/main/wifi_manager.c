@@ -307,13 +307,16 @@ void wifi_manager( void * pvParameters ){
 
 	//try to get access to previously saved wifi
 	if(wifi_manager_fetch_wifi_sta_config()){
-		printf("found a saved config\n");
+#if WIFI_MANAGER_DEBUG
+		printf("wifi_manager: saved wifi found on startup\n");
+#endif
 	}
 	else{
 
 		//int i = ESP_ERR_WIFI_BASE;
-
-		printf("there is no saved wifi - Starting an access point\n");
+#if WIFI_MANAGER_DEBUG
+		printf("wifi_manager: could not find saved wifi in flash storage\n");
+#endif
 		//start the an access point
 
 		//stop dhcp
@@ -351,11 +354,17 @@ void wifi_manager( void * pvParameters ){
 		};
 		ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &ap_config));
 		ESP_ERROR_CHECK(esp_wifi_start());
-		printf("Starting access point, SSID=%s\n", ap_config.ap.ssid);
+
+#if WIFI_MANAGER_DEBUG
+		printf("wifi_mamager: starting softAP with ssid %s\n", ap_config.ap.ssid);
+#endif
 
 		//wait for access point to start
 		xEventGroupWaitBits(wifi_manager_event_group, WIFI_MANAGER_AP_STARTED, pdFALSE, pdTRUE, portMAX_DELAY );
-		printf("Access point started -Starting http server\n");
+
+#if WIFI_MANAGER_DEBUG
+		printf("wifi_mamager: softAP started, starting http_server\n");
+#endif
 		http_server_set_event_start();
 
 

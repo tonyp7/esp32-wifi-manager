@@ -144,10 +144,14 @@ void http_server(void *pvParameters) {
 
 	http_server_event_group = xEventGroupCreate();
 
-	//do not start the task until wifi_manager says it's safe to do so!
-	printf("http_server is waiting for notification\n");
+	/* do not start the task until wifi_manager says it's safe to do so! */
+#if WIFI_MANAGER_DEBUG
+	printf("http_server: waiting for start bit\n");
+#endif
 	uxBits = xEventGroupWaitBits(http_server_event_group, HTTP_SERVER_START_BIT_0, pdFALSE, pdTRUE, portMAX_DELAY );
-	printf("http_server received message to start server\n");
+#if WIFI_MANAGER_DEBUG
+	printf("http_server: received start bit, starting server\n");
+#endif
 
 	struct netconn *conn, *newconn;
 	err_t err;
@@ -229,7 +233,9 @@ void http_server_netconn_serve(struct netconn *conn) {
 				}
 				else{
 					netconn_write(conn, http_503_hdr, sizeof(http_503_hdr) - 1, NETCONN_NOCOPY);
-					printf("Could not get access to json mutex in http_server_netconn_serve GET /ap.json\n");
+#if WIFI_MANAGER_DEBUG
+					printf("http_server_netconn_serve: GET /ap.json failed to obtain mutex\n");
+#endif
 				}
 			}
 			else if(strstr(line, "GET /style.css ")) {
@@ -270,12 +276,14 @@ void http_server_netconn_serve(struct netconn *conn) {
 				}
 				else{
 					netconn_write(conn, http_503_hdr, sizeof(http_503_hdr) - 1, NETCONN_NOCOPY);
-					printf("Could not get access to json mutex in http_server_netconn_serve GET /status\n");
+#if WIFI_MANAGER_DEBUG
+					printf("http_server_netconn_serve: GET /status failed to obtain mutex\n");
+#endif
 				}
 			}
 			else if(strstr(line, "POST /connect ")) {
 				//printf("%s\n\n",buf);
-				uint8_t found = pdFALSE;
+				bool found = false;
 				while((line = strtok_r(save_ptr, new_line, &save_ptr))){
 					if(strstr(line, "Authorization:")){
 						int lenS = 0, lenP = 0;
@@ -285,17 +293,14 @@ void http_server_netconn_serve(struct netconn *conn) {
 							password = http_server_get_authorization_token(ssid, &lenP);
 							if(password && lenP <= MAX_PASSWORD_SIZE){
 								wifi_config_t* config = wifi_manager_get_wifi_sta_config();
-								//wifi_config_t* config = (wifi_config_t*)malloc(sizeof(wifi_config_t));
 								memset(config, 0x00, sizeof(wifi_config_t));
 								memcpy(config->sta.ssid, ssid, lenS);
 								memcpy(config->sta.password, password, lenP);
-								//printf("ssid: %s\n", config->sta.ssid);
-								//printf("pwd: %s\n", config->sta.password);
 
 								//initialize connection sequence
 								wifi_manager_connect_async();
 								netconn_write(conn, http_html_hdr, sizeof(http_html_hdr) - 1, NETCONN_NOCOPY); //200ok
-								found = pdTRUE;
+								found = true;
 							}
 							else{
 								break; /* no point going further, this request is bad and won't be processed */
