@@ -1,17 +1,31 @@
-/**
- * \file main.c
- * \author Tony Pottier
- * \brief Entry point for the ESP32 application
- *
- * This software and all resources attached to it are licensed under CC BY 4.0.
- * This software would not be possible to make without these open source softwares:
- *   SpinKit, Copyright 2015 Tobias Ahlin. Licensed under the MIT License.
- *   jQuery, The jQuery Foundation. Licensed under the MIT License.
- *
- * \see https://creativecommons.org/licenses/by-sa/4.0/
- * \see https://idyl.io
- * \see https://github.com/tonyp7/esp32-wifi-manager
- */
+/*
+Copyright (c) 2017 Tony Pottier
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+@file main.c
+@author Tony Pottier
+@brief Entry point for the ESP32 application.
+@see https://idyl.io
+@see https://github.com/tonyp7/esp32-wifi-manager
+*/
+
 
 
 #include <stdio.h>
@@ -44,94 +58,38 @@
 static TaskHandle_t task_http_server = NULL;
 static TaskHandle_t task_wifi_manager = NULL;
 
-
+/**
+ * @brief RTOS task that periodically prints the heap memory available.
+ * @note Pure debug information, should not be ever started on production code!
+ */
 void monitoring_task(void *pvParameter)
 {
-	while(1){
+	for(;;){
 		printf("free heap: %d\n",esp_get_free_heap_size());
-
-
 		vTaskDelay(5000 / portTICK_PERIOD_MS);
 	}
 }
 
 
-
-EventGroupHandle_t event_group;
-const int WIFI_CONNECTED_BIT = BIT0;
-// setup and start the wifi connection
-// Wifi event handler
-esp_err_t event_handler(void *ctx, system_event_t *event)
-{
-    switch(event->event_id) {
-
-    case SYSTEM_EVENT_STA_START:
-        esp_wifi_connect();
-        break;
-
-	case SYSTEM_EVENT_STA_GOT_IP:
-        xEventGroupSetBits(event_group, WIFI_CONNECTED_BIT);
-        break;
-
-	case SYSTEM_EVENT_STA_DISCONNECTED:
-		xEventGroupClearBits(event_group, WIFI_CONNECTED_BIT);
-        break;
-
-	default:
-        break;
-    }
-	return ESP_OK;
-}
-
-void wifi_setup() {
-
-	event_group = xEventGroupCreate();
-
-	tcpip_adapter_init();
-
-	ESP_ERROR_CHECK(esp_event_loop_init(event_handler, NULL));
-
-	wifi_init_config_t wifi_init_config = WIFI_INIT_CONFIG_DEFAULT();
-	ESP_ERROR_CHECK(esp_wifi_init(&wifi_init_config));
-	ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
-	ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-
-	wifi_config_t wifi_config = {
-        .sta = {
-            .ssid = "a0308",
-            .password = "03080308",
-        },
-    };
-	ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config));
-    ESP_ERROR_CHECK(esp_wifi_start());
-}
-
-
-char* getAuthModeName(wifi_auth_mode_t auth_mode) {
-
-	char *names[] = {"OPEN", "WEP", "WPA PSK", "WPA2 PSK", "WPA WPA2 PSK", "MAX"};
-	return names[auth_mode];
-}
-
 void app_main()
 {
 
 
-	// disable the default wifi logging
+	/* disable the default wifi logging */
 	esp_log_level_set("wifi", ESP_LOG_NONE);
 
-	//initialize flash memory
+	/* initialize flash memory */
 	nvs_flash_init();
 
-	// start the HTTP Server task
+	/* start the HTTP Server task */
 	xTaskCreate(&http_server, "http_server", 2048, NULL, 5, &task_http_server);
 
-	// start the wifi manager task
+	/* start the wifi manager task */
 	xTaskCreate(&wifi_manager, "wifi_manager", 2048, NULL, 4, &task_wifi_manager);
 
-
+#if WIFI_MANAGER_DEBUG
 	xTaskCreatePinnedToCore(&monitoring_task, "monitoring_task", 2048, NULL, 1, NULL, 1);
-
+#endif
 
 
     //esp_restart();
