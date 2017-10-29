@@ -43,12 +43,7 @@ SOFTWARE.
 #define HTTP_SERVER_MAX_FIRST_LINE_SIZE 20
 #define HTTP_SERVER_MAX_BODY_SIZE 100
 
-typedef struct http_parameter http_parameter;
-struct http_parameter {
-   char *key;
-   char *value;
-   char *raw;
-};
+
 
 void http_server(void *pvParameters);
 void http_server_netconn_serve(struct netconn *conn);
@@ -56,28 +51,10 @@ void http_server_url_decode(char *dst, const char *src);
 int  http_server_isxdigit(int c);
 
 
-/*! \brief Decode a HTTP request parameters.
-*   \param body raw HTTP request body.
-*   \param parameter_count returns the number of parameters found in the request.
-*   \return http_parameter object containing all parameters of the request.
-*
-*  This parses a HTTP request and returns an array of http_parameter.
-*  The memory is dynamically allocated and must be freed by a call to http_server_free_parameters.
-*/
-http_parameter* http_server_decode_parameters(char *body, int *parameter_count);
-
-uint8_t http_server_is_valid_connection_parameter(http_parameter* parameters, int count);
-
-
-/*! \brief Free the memory dynamically allocated by a http_server_decode_parameters call.
-*   \param parameters http_parameter object to be freed.
-*/
-void http_server_free_parameters(http_parameter* parameters);
 
 
 void http_server_set_event_start();
 
 
-void http_server_decode_request(struct netbuf *inbuf, char* first_line, char* body);
 
 #endif
