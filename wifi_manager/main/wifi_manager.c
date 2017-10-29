@@ -18,17 +18,16 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+@file wifi_manager.c
+@author Tony Pottier
+@brief Defines all functions necessary for esp32 to connect to a wifi/scan wifis
+
+Contains the freeRTOS task and all necessary support
+
+@see https://idyl.io
+@see https://github.com/tonyp7/esp32-wifi-manager
 */
-/**
- * \file wifi_manager.c
- * \author Tony Pottier
- * \brief Defines all functions necessary for esp32 to connect to a wifi/scan wifis
- *
- * Contains the freeRTOS task and all necessary support
- *
- * \see https://idyl.io
- * \see https://github.com/tonyp7/esp32-wifi-manager
- */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -134,11 +133,18 @@ void wifi_manager_generate_ip_info_json(){
 		ESP_ERROR_CHECK(tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_STA, &ip_info));
 
 		const char ip_info_json_format[] = "{\"ip\":\"%s\",\"netmask\":\"%s\",\"gw\":\"%s\"}\n";
+		char ip[IP4ADDR_STRLEN_MAX]; /* note: IP4ADDR_STRLEN_MAX is defined in lwip */
+		char gw[IP4ADDR_STRLEN_MAX];
+		char netmask[IP4ADDR_STRLEN_MAX];
+
+		strcpy(ip, ip4addr_ntoa(&ip_info.ip));
+		strcpy(netmask, ip4addr_ntoa(&ip_info.netmask));
+		strcpy(gw, ip4addr_ntoa(&ip_info.gw));
+
 		sprintf(ip_info_json, ip_info_json_format,
-				ip4addr_ntoa(&ip_info.ip),
-				ip4addr_ntoa(&ip_info.netmask),
-				ip4addr_ntoa(&ip_info.gw));
-		printf("%s", ip_info_json);
+				ip,
+				netmask,
+				gw);
 	}
 	else{
 		strcpy(ip_info_json, "{}\n");
@@ -222,7 +228,6 @@ esp_err_t wifi_manager_event_handler(void *ctx, system_event_t *event)
 	case SYSTEM_EVENT_STA_DISCONNECTED:
 		xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_STA_DISCONNECT_BIT);
 		xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_WIFI_CONNECTED_BIT);
-		//clear json
         break;
 
 	default:
@@ -233,37 +238,7 @@ esp_err_t wifi_manager_event_handler(void *ctx, system_event_t *event)
 
 
 
-void wifi_manager_init(){
-	wifi_manager_event_group = xEventGroupCreate();
 
-	tcpip_adapter_init();
-
-	ESP_ERROR_CHECK(esp_event_loop_init(wifi_manager_event_handler, NULL));
-
-	wifi_init_config_t wifi_init_config = WIFI_INIT_CONFIG_DEFAULT();
-	ESP_ERROR_CHECK(esp_wifi_init(&wifi_init_config));
-	ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
-	ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-
-	wifi_config_t wifi_config = {
-        .sta = {
-            .ssid = "a0308",
-            .password = "03080308",
-        },
-		/*.ap = {
-		            .ssid = CONFIG_AP_SSID,
-		            .password = CONFIG_AP_PASSWORD,
-					.ssid_len = 0,
-					.channel = CONFIG_AP_CHANNEL,
-					.authmode = CONFIG_AP_AUTHMODE,
-					.ssid_hidden = CONFIG_AP_SSID_HIDDEN,
-					.max_connection = CONFIG_AP_MAX_CONNECTIONS,
-					.beacon_interval = CONFIG_AP_BEACON_INTERVAL,
-		},*/
-    };
-	ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config));
-    ESP_ERROR_CHECK(esp_wifi_start());
-}
 
 
 wifi_config_t* wifi_manager_get_wifi_sta_config(){
@@ -380,30 +355,6 @@ void wifi_manager( void * pvParameters ){
 
 		//wait for access point to start
 		xEventGroupWaitBits(wifi_manager_event_group, WIFI_MANAGER_AP_STARTED, pdFALSE, pdTRUE, portMAX_DELAY );
-
-
-		/*
-		wifi_config_t sta_config = {
-			.sta = {
-				.ssid = "a0308",
-				.password = "03080308",
-			}
-		};
-
-		printf("starting STA wifi\n");
-		ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &sta_config));
-		ESP_ERROR_CHECK(esp_wifi_connect());
-		xEventGroupWaitBits(wifi_manager_event_group, WIFI_MANAGER_WIFI_CONNECTED_BIT, pdFALSE, pdTRUE, portMAX_DELAY);
-			//printf("Connected\n\n");
-		// print the local IP address
-		tcpip_adapter_ip_info_t ip_info;
-		ESP_ERROR_CHECK(tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_STA, &ip_info));
-		printf("IP Address:  %s\n", ip4addr_ntoa(&ip_info.ip));
-		printf("Subnet mask: %s\n", ip4addr_ntoa(&ip_info.netmask));
-		printf("Gateway:     %s\n", ip4addr_ntoa(&ip_info.gw));*/
-
-
-
 		printf("Access point started -Starting http server\n");
 		http_server_set_event_start();
 

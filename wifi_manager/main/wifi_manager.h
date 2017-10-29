@@ -18,18 +18,16 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-*/
 
-/**
- * @file wifi_manager.h
- * @author Tony Pottier
- * @brief Defines all functions necessary for esp32 to connect to a wifi/scan wifis
- *
- * Contains the freeRTOS task and all necessary support.
- *
- * @see https://idyl.io
- * @see https://github.com/tonyp7/esp32-wifi-manager
- */
+@file wifi_manager.h
+@author Tony Pottier
+@brief Defines all functions necessary for esp32 to connect to a wifi/scan wifis
+
+Contains the freeRTOS task and all necessary support
+
+@see https://idyl.io
+@see https://github.com/tonyp7/esp32-wifi-manager
+*/
 
 #ifndef MAIN_WIFI_MANAGER_H_
 #define MAIN_WIFI_MANAGER_H_
@@ -107,7 +105,6 @@ SOFTWARE.
 void wifi_manager_destroy();
 void wifi_manager( void * pvParameters );
 
-void wifi_manager_init();
 
 char* wifi_manager_get_ap_list_json();
 char* wifi_manager_get_ip_info_json();
