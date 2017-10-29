@@ -54,7 +54,11 @@ $(function() {
 	
 	function performConnect(){
 		
-		$("#loadingButton").prop("disabled",true);
+		$( "#loadingButton" ).prop("disabled",true);
+		$( "#buttons" ).slideUp( "fast", function() {});
+		$( "#login-data" ).slideUp( "fast", function() {});
+		$( "#loading" ).slideDown( "fast", function() {});
+		$( "#app h2" ).text("Connecting to " + selectedSSID + "...");
 		
 		//stop refreshing wifi list
 		if(refreshAPInterval != null){
@@ -82,19 +86,7 @@ $(function() {
 	}
 	
 	$(document).on("click", "#join", function() {
-		
-		//disable buttons
-		//$("#join").prop("disabled", true);
-		//$("#join").prop("disabled", true);
-		$( "#buttons" ).slideUp( "fast", function() {});
-		$( "#login-data" ).slideUp( "fast", function() {});
-		$( "#loading" ).slideDown( "fast", function() {});
-		$( "#app h2" ).text("Connecting to " + selectedSSID + "...");
-		
 		performConnect();
-
-		
-		
 	});
 	
 	
@@ -108,9 +100,15 @@ $(function() {
 function check_if_connected(){
 	$.getJSON( "/status", function( data ) {
 		if(data.ip.length > 0){
-			//alert(data.ip);
 			
-			$("#loadingButton").prop("disabled",false);
+			$( "#app h2" ).text("Connected to " + selectedSSID + "!");
+			$( "#ip").html(data.ip);
+			$( "#netmask").html(data.netmask);
+			$( "#gw").html(data.gw);
+			
+			$( "#status-wrap").slideDown( "fast", function() {});
+			$( "#loading" ).slideUp( "fast", function() {});
+			$( "#loadingButton").prop("disabled",false);
 			if(checkStatusInterval != null){
 				clearInterval(checkStatusInterval);
 				checkStatusInterval = null;

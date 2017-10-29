@@ -70,7 +70,6 @@ label{
 input[type="button"]{
 	width:100px;
 	padding:5px;
-	margin:15px;
 	text-align:center;
 	display:block;
 }
@@ -82,9 +81,11 @@ input[type="button"]{
 	margin: 0 auto;
 }
 
-#buttons{
+.b1w{
 	border:1px solid #fff;
+	padding:15px;
 }
+
 #join{
 	float:right;
 }
@@ -92,6 +93,11 @@ input[type="button"]{
 
 #loading{
 	display:none;
+}
+
+#status-wrap{
+	display:none;
+	text-align:center
 }
 
 #credits{

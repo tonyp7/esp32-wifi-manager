@@ -19,21 +19,23 @@
 					</div>
 					
 					<div id="status">
-						<div id="ip" style="text-align:center">
+						<div id="status-wrap">
 							<strong>
-								IP Address: 192.168.1.47<br />
-								Subnet Mask: 192.168.1.47<br />
-								Gateway: 192.168.1.47<br />
+								IP Address: <span id="ip"></span><br />
+								Subnet Mask: <span id="netmask"></span><br />
+								Gateway: <span id="gw"></span><br />
 							</strong>
+							<div class="b1w">
+								<input id="loadingButton" type="button" value="OK" />
+							</div>
 						</div>
 						<div id="loading">
 							<div class="spinner"><div class="double-bounce1"></div><div class="double-bounce2"></div></div>
 						</div>
-						<input id="loadingButton" type="button" value="OK" />
 					</div>
 					
 					
-					<div id="buttons">
+					<div id="buttons" class="b1w">
 						<input id="join" type="button" value="Join" />
 						<input id="cancel" type="button" value="Cancel"/>
 					</div>

@@ -138,6 +138,7 @@ void wifi_manager_generate_ip_info_json(){
 				ip4addr_ntoa(&ip_info.ip),
 				ip4addr_ntoa(&ip_info.netmask),
 				ip4addr_ntoa(&ip_info.gw));
+		printf("%s", ip_info_json);
 	}
 	else{
 		strcpy(ip_info_json, "{}\n");
@@ -381,6 +382,7 @@ void wifi_manager( void * pvParameters ){
 		xEventGroupWaitBits(wifi_manager_event_group, WIFI_MANAGER_AP_STARTED, pdFALSE, pdTRUE, portMAX_DELAY );
 
 
+		/*
 		wifi_config_t sta_config = {
 			.sta = {
 				.ssid = "a0308",
@@ -398,7 +400,7 @@ void wifi_manager( void * pvParameters ){
 		ESP_ERROR_CHECK(tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_STA, &ip_info));
 		printf("IP Address:  %s\n", ip4addr_ntoa(&ip_info.ip));
 		printf("Subnet mask: %s\n", ip4addr_ntoa(&ip_info.netmask));
-		printf("Gateway:     %s\n", ip4addr_ntoa(&ip_info.gw));
+		printf("Gateway:     %s\n", ip4addr_ntoa(&ip_info.gw));*/
 
 
 
@@ -409,7 +411,7 @@ void wifi_manager( void * pvParameters ){
 		//keep scanning wifis until someone tries to connect to an AP
 		EventBits_t uxBits;
 		uint8_t tick = 0;
-		while(1){
+		for(;;){
 
 			/* someone tries to make a connection? if so: connect! */
 			uxBits = xEventGroupWaitBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_STA_CONNECT_BIT, pdFALSE, pdTRUE, 100 / portTICK_PERIOD_MS );
@@ -465,13 +467,13 @@ void wifi_manager( void * pvParameters ){
 
 				/* perform wifi scan */
 				if(tick == 0){
-					//safe guard against overflow
+					/* safe guard against overflow */
 					if(ap_num > MAX_AP_NUM) ap_num = MAX_AP_NUM;
 
 					ESP_ERROR_CHECK(esp_wifi_scan_start(&scan_config, true));
 					ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&ap_num, accessp_records));
 
-					//make sure the http server isn't trying to access the list while it gets refreshed
+					/* make sure the http server isn't trying to access the list while it gets refreshed */
 					if(wifi_manager_lock_json_buffer( ( TickType_t ) 10 )){
 						wifi_manager_generate_acess_points_json();
 						wifi_manager_unlock_json_buffer();
