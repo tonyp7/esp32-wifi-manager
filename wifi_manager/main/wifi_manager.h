@@ -100,10 +100,10 @@ Contains the freeRTOS task and all necessary support
 
 /**
  * @brief Defines the maximum length in bytes of a JSON representation of the IP information
- * assuming all ips are 4*3 digits, maximum string length is 77 including new line and null character.
- * example: {"ip":"192.168.1.119","netmask":"255.255.255.0","gw":"192.168.1.1"}
+ * assuming all ips are 4*3 digits, and all characters in the ssid require to be escaped.
+ * example: {"ssid":"abcdefghijklmnopqrstuvwxyz012345","ip":"192.168.1.119","netmask":"255.255.255.0","gw":"192.168.1.1"}
  */
-#define JSON_IP_INFO_SIZE 77
+#define JSON_IP_INFO_SIZE 142
 
 
 void wifi_manager_destroy();

@@ -128,11 +128,20 @@ uint8_t wifi_manager_fetch_wifi_sta_config(){
 void wifi_manager_generate_ip_info_json(){
 
 	EventBits_t uxBits = xEventGroupGetBits(wifi_manager_event_group);
-	if(uxBits & WIFI_MANAGER_WIFI_CONNECTED_BIT){
+	wifi_config_t *config = wifi_manager_get_wifi_sta_config();
+	if( (uxBits & WIFI_MANAGER_WIFI_CONNECTED_BIT) && config){
+
+		memset(ip_info_json, 0x00, JSON_IP_INFO_SIZE);
+
 		tcpip_adapter_ip_info_t ip_info;
 		ESP_ERROR_CHECK(tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_STA, &ip_info));
 
-		const char ip_info_json_format[] = "{\"ip\":\"%s\",\"netmask\":\"%s\",\"gw\":\"%s\"}\n";
+		/* to avoid declaring a new buffer we copy the data directly into the buffer at its correct address */
+		strcpy(ip_info_json, "{\"ssid\":");
+		json_print_string(config->sta.ssid,  (unsigned char*)(ip_info_json+strlen(ip_info_json)) );
+
+		/* rest of the information is copied after the ssid */
+		const char ip_info_json_format[] = ",\"ip\":\"%s\",\"netmask\":\"%s\",\"gw\":\"%s\"}\n";
 		char ip[IP4ADDR_STRLEN_MAX]; /* note: IP4ADDR_STRLEN_MAX is defined in lwip */
 		char gw[IP4ADDR_STRLEN_MAX];
 		char netmask[IP4ADDR_STRLEN_MAX];
@@ -141,7 +150,7 @@ void wifi_manager_generate_ip_info_json(){
 		strcpy(netmask, ip4addr_ntoa(&ip_info.netmask));
 		strcpy(gw, ip4addr_ntoa(&ip_info.gw));
 
-		sprintf(ip_info_json, ip_info_json_format,
+		sprintf( (ip_info_json + strlen(ip_info_json)), ip_info_json_format,
 				ip,
 				netmask,
 				gw);
