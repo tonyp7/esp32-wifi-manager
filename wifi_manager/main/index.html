@@ -2,7 +2,7 @@
 <html lang="en">
 	<head>
 		<meta charset="utf-8"/>
-		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 		<script src="/jquery.js"></script>
 		<link rel="stylesheet" href="/style.css">
 		<script src="/code.js"></script>
@@ -10,54 +10,93 @@
 	<body>
 		<div id="app">
 			<div id="app-wrap">
-				<h2>Choose a network...</h2>
-				<div class="networks">
+				<div id="splash">
+					<header>
+						<h1>esp32-wifi-manager</h1>
+					</header>
 				</div>
-				<div class="login">
-					<div id="login-data">
-						<input id="pwd" type="password" name="password" placeholder="Password" value="" style="display:block">
+				<div id="wifi">
+					<header>
+						<h1>Wi-Fi</h1>
+					</header>
+					<div id="wifi-status">
+						<h2>Connected to:</h2>
+						<section id="connected-to">
+							<div class="ape"><div class="w0"><div class="pw"><span></span></div></div></div>
+						</section>
 					</div>
-					
-					<div id="status">
-						<div id="status-wrap">
-							<strong>
-								IP Address: <span id="ip"></span><br />
-								Subnet Mask: <span id="netmask"></span><br />
-								Gateway: <span id="gw"></span><br />
-							</strong>
-							<div class="b1w">
-								<input id="loadingButton" type="button" value="OK" />
-							</div>
-						</div>
+					<h2>Choose a network...</h2>
+					<section id="wifi-list">
+					</section>
+					<div id="pwrdby"><em>Powered by </em><a id="acredits" href="#"><strong>esp32-wifi-manager</strong></a>.</div>
+				</div>
+				<div id="connect">
+					<header>
+						<h1>Enter Password</h1>
+					</header>
+					<h2>Password for <span id="ssid-pwd"></span></h2>
+					<section>
+						<input id="pwd" type="password" placeholder="Password" value="">
+					</section>
+					<div class="buttons">
+							<input id="join" type="button" value="Join" />
+							<input id="cancel" type="button" value="Cancel"/>
+					</div>
+				</div>
+				<div id="connect-wait">
+					<header>
+						<h1>Please wait...</h1>
+					</header>
+					<h2>Connecting to <span id="ssid-wait"></span></h2>
+					<section>
 						<div id="loading">
 							<div class="spinner"><div class="double-bounce1"></div><div class="double-bounce2"></div></div>
+							<p class="tctr">You may lose wifi access while the esp32 recalibrates its radio. Please wait until your device automatically reconnects.</p>
 						</div>
-					</div>
-					
-					
-					<div id="buttons" class="b1w">
-						<input id="join" type="button" value="Join" />
-						<input id="cancel" type="button" value="Cancel"/>
+						<div id="connect-success">
+							<h3 class="gr">Success!</h3>
+						</div>
+						<div id="connect-fail">
+							<h3 class="rd">Connection failed</h3>
+							<p class="tctr">Please double-check wifi password if any and make sure the access point has good signal.</p>
+						</div>
+					</section>
+					<div class="buttons">
+						<input id="ok-connect" type="button" value="OK" class="ctr" />
 					</div>
 				</div>
+				<div id="connect-details">
+					<header>
+						<h1>Please wait...</h1>
+					</header>
+					<h2>IP Address</h2>
+					<section>
+						<div class="ape brdb">IP Address:<div style="float:right;margin-right:20px;">192.168.1.1</div></div>
+						<div class="ape brdb">Subnet Mask:</div>
+						<div class="ape">Default Gateway:</div>
+					</section>
+				</div>
 			</div>
-			<div id="pwrdby"><em>Powered by </em><a id="acredits" href="#"><strong>esp32-wifi-manager</strong></a>.</div>
 		</div>
 		<div id="credits">
-			<h2>About this app...</h2>
-			<div id="credits-wrap">
-				<p><strong>esp32-wifi-manager</strong>, Copyright 2017, Tony Pottier.<br />Licender under the MIT License.</p>
+			<header>
+				<h1>About this app...</h1>
+			</header>
+			<h2></h2>
+			<section>
+				<p><strong>esp32-wifi-manager</strong>, &copy; 2017, Tony Pottier<br />Licender under the MIT License.</p>
 				<p>
 					This app would not be possible without the following libraries:
 				</p>
 				<ul>
-					<li>SpinKit, Copyright 2015, Tobias Ahlin. Licensed under the MIT License.</li>
+					<li>SpinKit, &copy;  2015, Tobias Ahlin. Licensed under the MIT License.</li>
 					<li>jQuery, The jQuery Foundation. Licensed under the MIT License.</li>
-					<li>cJSON, Copyright 2009-2017, Dave Gamble and cJSON contributors. Licensed under the MIT License.</li>
+					<li>cJSON, &copy; 2009-2017, Dave Gamble and cJSON contributors. Licensed under the MIT License.</li>
 				</ul>
-				<input id="okcredits" type="button" value="OK" />
+			</section>
+			<div class="buttons">
+				<input id="ok-credits" type="button" value="OK" class="ctr" />
 			</div>
-			<hr />
 		</div>
 	</body>
 <html>

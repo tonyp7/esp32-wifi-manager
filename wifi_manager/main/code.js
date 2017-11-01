@@ -11,94 +11,170 @@ if (!String.prototype.format) {
   };
 }
 
+var apList = null;
 var selectedSSID = "";
 var refreshAPInterval = null; 
 var checkStatusInterval = null;
+var currentConnection = null;
 
 $(function() {
-
-	$(".networks").on("click", "label", function() {
-		$( ".networks" ).slideUp( "fast", function() {});
-		$( ".login" ).slideDown( "fast", function() {});
-		$( "#login-data" ).slideDown( "fast", function() {});
-		$( "#app h2" ).text("Password for " + $(this).text());
+	
+	
+	
+	$("#wifi-list").on("click", ".ape", function() {
 		selectedSSID = $(this).text();
+		$( "#ssid-pwd" ).text(selectedSSID);
+		$( "#wifi" ).slideUp( "fast", function() {});
+		$( "#connect" ).slideDown( "fast", function() {});
+		
 	});
 	
-	$( "#cancel" ).click(function() {
-		//$("#join").prop("disabled", false);
+	$("#cancel").on("click", function() {
+		$( "#connect" ).slideUp( "fast", function() {});
+		$( "#wifi" ).slideDown( "fast", function() {});
 		
-		$( "#login-data" ).slideUp( "fast", function() {});
-		$( "#loading" ).slideUp( "slow", function() {});
-		
-		
-		$( ".networks" ).slideDown( "fast", function() {});
-		$( ".login" ).slideUp( "fast", function() {});
-		$( "#app h2" ).text("Choose a network...");
 	});
 	
-	$( "#acredits").click(function(event) {
+	$("#ok-credits").on("click", function() {
+		$( "#credits" ).slideUp( "fast", function() {});
+		$( "#app" ).slideDown( "fast", function() {});
+		
+	});
+	
+	$("#acredits").on("click", function(event) {
 		event.preventDefault();
-		$( "#app").slideUp( "fast", function() {});
-		$( "#credits").slideDown( "fast", function() {});
+		$( "#app" ).slideUp( "fast", function() {});
+		$( "#credits" ).slideDown( "fast", function() {});
 	});
 	
-	$( "#okcredits").click(function() {
-		$( "#app").slideDown( "fast", function() {});
-		$( "#credits").slideUp( "fast", function() {});
+	$("#ok-connect").on("click", function(event) {
+		$( "#connect-wait" ).slideUp( "fast", function() {});
+		$( "#wifi" ).slideDown( "fast", function() {});
 	});
 	
-	
-
-	
-	
-	function performConnect(){
-		
-		$( "#loadingButton" ).prop("disabled",true);
-		$( "#buttons" ).slideUp( "fast", function() {});
-		$( "#login-data" ).slideUp( "fast", function() {});
-		$( "#loading" ).slideDown( "fast", function() {});
-		$( "#app h2" ).text("Connecting to " + selectedSSID + "...");
-		
-		//stop refreshing wifi list
-		if(refreshAPInterval != null){
-			clearInterval(refreshAPInterval);
-			refreshAPInterval = null;
-		}
-		
-		var xhr = new XMLHttpRequest();
-		xhr.onload = function() {
-			if(this.status == 200){
-				//start refreshing every now and then the IP page
-				//to see if the connection to the STA is made
-			}
-			else{
-				//alert(this.responseText);
-				
-			}
-			checkStatusInterval = setInterval(check_if_connected, 1000);
-		};
-		
-		var pwd = $("#pwd").val();
-		xhr.open("POST", "/connect", true);
-		xhr.setRequestHeader('Authorization', "\x02{0}\x03\x02{1}\x03".format(selectedSSID, pwd));
-		xhr.send();
-	}
 	
 	$(document).on("click", "#join", function() {
 		performConnect();
 	});
 	
 	
-	//first time the page loads: attempt to refresh wifis
-	refresh_wifi();
-	refreshAPInterval = setInterval(refresh_wifi, 3000);
+	//first time the page loads: attempt get the connection status and start the wifi scan
+	refreshAP();
+	checkStatusInterval = setInterval(checkStatus, 950);
+	refreshAPInterval = setInterval(refreshAP, 2800);
+
+
+	
 	
 });
 
 
-function check_if_connected(){
+function performConnect(){
+	
+	//reset connection 
+	$( "#loading" ).show();
+	$( "#connect-success" ).hide();
+	$( "#connect-fail" ).hide();
+	
+	$( "#ok-connect" ).prop("disabled",true);
+	$( "#ssid-wait" ).text(selectedSSID);
+	$( "#connect" ).slideUp( "fast", function() {});
+	$( "#connect-wait" ).slideDown( "fast", function() {});
+	
+	//stop refreshing wifi list
+	if(refreshAPInterval != null){
+		clearInterval(refreshAPInterval);
+		refreshAPInterval = null;
+	}
+	
+	var xhr = new XMLHttpRequest();
+	xhr.onload = function() {
+		if(this.status == 200){
+			//start refreshing every now and then the IP page
+			//to see if the connection to the STA is made
+		}
+		else{
+			//alert(this.responseText);
+		}
+	};
+	
+	var pwd = $("#pwd").val();
+	xhr.open("POST", "/connect", true);
+	xhr.setRequestHeader('Authorization', "\x02{0}\x03\x02{1}\x03".format(selectedSSID, pwd));
+	xhr.send();
+}
+
+
+
+function rssiToIcon(rssi){
+	if(rssi >= -60){
+		return 'w0';
+	}
+	else if(rssi >= -67){
+		return 'w1';
+	}
+	else if(rssi >= -75){
+		return 'w2';
+	}
+	else{
+		return 'w3';
+	}
+}
+
+
+function refreshAP(){
+	$.getJSON( "/ap.json", function( data ) {
+		if(data.length > 0){
+			//sort by signal strength
+			data.sort(function (a, b) {
+				var x = a["rssi"]; var y = b["rssi"];
+				return ((x < y) ? 1 : ((x > y) ? -1 : 0));
+			});
+			apList = data;
+			refreshAPHTML(apList);
+			
+		}
+	});
+}
+
+function refreshAPHTML(data){
+	var h = "";
+	data.forEach(function(e, idx, array) {
+		//<div class="ape brdb"><div class="w0"><div class="pw">a0308</div></div></div>
+		h += '<div class="ape{0}"><div class="{1}"><div class="{2}">{3}</div></div></div>'.format(idx === array.length - 1?'':' brdb', rssiToIcon(e.rssi), e.auth==0?'':'pw',e.ssid);
+		h += "\n";
+	});
+	
+	$( "#wifi-list" ).html(h)
+}
+
+function checkStatus(){
 	$.getJSON( "/status", function( data ) {
+		if(data["ssid"]){
+			//got connection
+			currentConnection = data;
+			$("#connected-to span").text(data["ssid"]);
+			$("#wifi-status").slideDown( "fast", function() {});
+			
+			//unlock the wait screen if needed
+			$( "#ok-connect" ).prop("disabled",false);
+			
+			//update wait screen
+			$( "#loading" ).hide();
+			$( "#connect-success" ).show();
+			$( "#connect-fail" ).hide();
+		}
+		else{
+			//disconnected
+			currentConnection = null;
+			$("#connected-to span").text('');
+			$("#wifi-status").slideUp( "fast", function() {});
+		}
+	})
+	.fail(function() {
+		//don't do anything, the server might be down
+	});
+	/*$.getJSON( "/status", function( data ) {
 		if(data.ip.length > 0){
 			
 			$( "#app h2" ).text("Connected to " + selectedSSID + "!");
@@ -114,41 +190,7 @@ function check_if_connected(){
 				checkStatusInterval = null;
 			}
 		}
-	});
+	});*/
 }
 
-function rssi_to_icon(rssi){
-	if(rssi >= -60){
-		return 'w0';
-	}
-	else if(rssi >= -67){
-		return 'w1';
-	}
-	else if(rssi >= -75){
-		return 'w2';
-	}
-	else{
-		return 'w3';
-	}
-}
 
-function refresh_wifi(){
-	$.getJSON( "/ap.json", function( data ) {
-		if(data.length > 0){
-			//sort by wifi strength
-			data.sort(function (a, b) {
-				var x = a["rssi"]; var y = b["rssi"];
-				return ((x < y) ? 1 : ((x > y) ? -1 : 0));
-			});
-			
-			var h = "";
-			var id = 1;
-			data.forEach(function(e) {
-				h += '<input id="{0}" name="wifi" type="radio" /><label class="{1}" for="{2}"><div class="{3}">{4}</div></label>'.format(id, rssi_to_icon(e.rssi), e.ssid ,e.auth==0?'':'pw',e.ssid);
-				id++;
-			});
-			
-			$( ".networks" ).html(h)
-		}
-	});
-}

@@ -1,5 +1,4 @@
 body{background-color:#eee;border:0;margin:0;font:1.1em tahoma, arial, sans-serif;}
-h2{text-transform: uppercase;margin:0;padding:10px;color:#888;font-size:1.2em}
 a{color:darkblue;transition:color .2s ease-out}
 a:hover{color:red;}
 
@@ -13,60 +12,6 @@ textarea:focus,
 button:focus {
 	outline: none;
 }
-
-#app{
-}
-#app-wrap{
-	background-color:#fff;
-	border-bottom:1px solid #888;
-}
-
-label{
-	
-	display:block;
-	list-style: none;
-	margin-top:10px;
-	margin-left:30px;
-	height: 24px;
-	margin-right: 30px;
-}
-
-.w0{
-	background: url('wifi0.png') no-repeat right top;
-}
-.w1{
-	background: url('wifi1.png') no-repeat right top;
-}
-.w2{
-	background: url('wifi2.png') no-repeat right top;
-}
-.w3{
-	background: url('wifi3.png') no-repeat right top;
-}
-.pw{
-	background: url('lock.png') no-repeat right top;
-	height:24px;
-	margin-right:30px;
-}
-
-#login-data{
-	border-left:none;
-	border-right:none;
-	border-bottom:1px solid #888;
-	border-top:1px solid #888;
-	padding:5px;
-}
-#pwd{
-	border:none;
-	width:80%;
-	margin-left:35px;
-}
-	
-
-.login{
-	display:none;
-}
-
 input[type="button"]{
 	width:100px;
 	padding:5px;
@@ -74,15 +19,87 @@ input[type="button"]{
 	display:block;
 }
 
-#loadingButton{
-	margin: 0 auto;
-}
-#okcredits{
-	margin: 0 auto;
+p{
+	padding:10px;
 }
 
-.b1w{
-	border:1px solid #fff;
+#credits{
+	display:none;
+}
+
+#app{
+
+}
+#app-wrap{
+
+}
+
+#splash{
+	display:none;
+}
+
+
+.ape{
+	margin-left:20px;padding:10px 0px 10px 10px;
+}
+.ape:hover{
+	cursor:pointer;
+}
+.brdb{
+	border-bottom:1px solid #888;
+}
+header{
+	background-color:#fff;
+	border-bottom:1px solid #888;
+}
+section{
+	background-color:#fff;
+	border-bottom:1px solid #888;
+	border-top:1px solid #888;
+}
+h1{
+	display:block;
+	text-align: center;
+	margin:0;
+	padding:15px;
+	font-size:1.4em
+}
+h2{
+	margin:0;
+	margin-top:20px;
+	padding:10px;
+	text-transform: uppercase;color:#888;
+	font-size:1.0em
+}
+h3{
+	margin:0;
+	text-align:center;
+	padding:10px;
+}
+
+.gr{
+	color:green;
+}
+.rd{
+	color:red;
+}
+
+#wifi-status{
+	display:none;
+}
+
+#connect{
+	display:none;
+}
+#pwd{
+	border:none;
+	width:80%;
+	margin-left:35px;
+	padding:10px 0px 10px 10px;
+	display:block
+}
+
+.buttons{
 	padding:15px;
 }
 
@@ -90,31 +107,46 @@ input[type="button"]{
 	float:right;
 }
 
+.ctr{
+	margin:0 auto;
+}
+.tctr{
+	text-align: center;
+}
 
-#loading{
+
+#connect-wait{
+	display:none;
+}
+#connect-success{
+	display:none;
+}
+#connect-fail{
 	display:none;
 }
 
-#status-wrap{
-	display:none;
-	text-align:center
+
+.w0{
+	background: url('wifi0.png') no-repeat right top;height:24px;margin-right:20px;
+}
+.w1{
+	background: url('wifi1.png') no-repeat right top;height:24px;margin-right:20px;
+}
+.w2{
+	background: url('wifi2.png') no-repeat right top;height:24px;margin-right:20px;
+}
+.w3{
+	background: url('wifi3.png') no-repeat right top;height:24px;margin-right:20px;
+}
+.pw{
+	background: url('lock.png') no-repeat right top;height:24px;margin-right:20px;
+	height:24px;
+	margin-right:30px;
 }
 
-#credits{
-	display:none;
-	background-color:#fff;
-}
 
-#credits-wrap{
-	margin-left:20px;
-	margin-right:20px;
-}
 
-#pwrdby{
-	margin:10px;
-	font-size:0.8em;
-}
-			
+
 
 /* SpinKit is licensed under the MIT License. Copyright (c) 2015 Tobias Ahlin */
 .spinner {
@@ -159,3 +191,5 @@ input[type="button"]{
   }
 }
 /* end of SpinKit */
+
+
