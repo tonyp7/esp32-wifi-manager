@@ -20,6 +20,11 @@ var currentConnection = null;
 $(function() {
 	
 	
+	$("#wifi-status").on("click", ".ape", function() {
+		$( "#wifi" ).slideUp( "fast", function() {});
+		$( "#connect-details" ).slideDown( "fast", function() {});
+	});
+	
 	
 	$("#wifi-list").on("click", ".ape", function() {
 		selectedSSID = $(this).text();
@@ -31,6 +36,12 @@ $(function() {
 	
 	$("#cancel").on("click", function() {
 		$( "#connect" ).slideUp( "fast", function() {});
+		$( "#wifi" ).slideDown( "fast", function() {});
+		
+	});
+	
+	$("#ok-details").on("click", function() {
+		$( "#connect-details" ).slideUp( "fast", function() {});
 		$( "#wifi" ).slideDown( "fast", function() {});
 		
 	});
@@ -154,6 +165,11 @@ function checkStatus(){
 			//got connection
 			currentConnection = data;
 			$("#connected-to span").text(data["ssid"]);
+			$("#connect-details h1").text(data["ssid"]);
+			$("#ip").text(data["ip"]);
+			$("#netmask").text(data["netmask"]);
+			$("#gw").text(data["gw"]);
+			
 			$("#wifi-status").slideDown( "fast", function() {});
 			
 			//unlock the wait screen if needed
@@ -168,6 +184,7 @@ function checkStatus(){
 			//disconnected
 			currentConnection = null;
 			$("#connected-to span").text('');
+			$("#connect-details h1").text('');
 			$("#wifi-status").slideUp( "fast", function() {});
 		}
 	})

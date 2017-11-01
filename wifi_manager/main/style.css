@@ -1,5 +1,5 @@
 body{background-color:#eee;border:0;margin:0;font:1.1em tahoma, arial, sans-serif;}
-a{color:darkblue;transition:color .2s ease-out}
+a{color:darkblue;transition:color .2s ease-out;text-decoration:none}
 a:hover{color:red;}
 
 input{
@@ -34,9 +34,6 @@ p{
 
 }
 
-#splash{
-	display:none;
-}
 
 
 .ape{
@@ -123,6 +120,13 @@ h3{
 }
 #connect-fail{
 	display:none;
+}
+#connect-details{
+	display:none;
+}
+
+.fr{
+	float:right;margin-right:20px;
 }
 
 
