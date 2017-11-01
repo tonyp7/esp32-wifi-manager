@@ -39,7 +39,7 @@ char* json_escape_string(char *str){
 
 
 //see: static unsigned char* ensure(printbuffer * const p, size_t needed, const internal_hooks * const hooks) cJSON 1.4.7
-bool json_escape_string2(const unsigned char *input, unsigned char *output_buffer)
+bool json_print_string(const unsigned char *input, unsigned char *output_buffer)
 {
 	const unsigned char *input_pointer = NULL;
 	unsigned char *output = NULL;

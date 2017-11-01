@@ -30,5 +30,6 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 
 char* json_escape_string(char *str);
+bool json_print_string(const unsigned char *input, unsigned char *output_buffer);
 
 #endif /* MAIN_JSON_H_ */
