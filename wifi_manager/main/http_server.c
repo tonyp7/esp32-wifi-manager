@@ -225,6 +225,7 @@ void http_server_netconn_serve(struct netconn *conn) {
 				netconn_write(conn, code_js_start, code_js_end - code_js_start, NETCONN_NOCOPY);
 			}
 			else if(strstr(line, "GET /ap.json ")) {
+				/* if we can get the mutex, write the last version of the AP list */
 				if(wifi_manager_lock_json_buffer(( TickType_t ) 10)){
 					netconn_write(conn, http_json_hdr, sizeof(http_json_hdr) - 1, NETCONN_NOCOPY);
 					char *buff = wifi_manager_get_ap_list_json();
@@ -237,6 +238,10 @@ void http_server_netconn_serve(struct netconn *conn) {
 					printf("http_server_netconn_serve: GET /ap.json failed to obtain mutex\n");
 #endif
 				}
+				/* request a wifi scan */
+				wifi_manager_scan_async();
+
+
 			}
 			else if(strstr(line, "GET /style.css ")) {
 				netconn_write(conn, http_css_hdr, sizeof(http_css_hdr) - 1, NETCONN_NOCOPY);

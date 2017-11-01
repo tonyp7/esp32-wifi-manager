@@ -68,8 +68,13 @@ const int WIFI_MANAGER_AP_STA_CONNECTED_BIT = BIT1;
 const int WIFI_MANAGER_AP_STARTED = BIT2;
 const int WIFI_MANAGER_REQUEST_STA_CONNECT_BIT = BIT3;
 const int WIFI_MANAGER_STA_DISCONNECT_BIT = BIT4;
+const int WIFI_MANAGER_REQUEST_WIFI_SCAN = BIT5;
 
 //wifi_config_t wifi_config;
+
+void wifi_manager_scan_async(){
+	xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_WIFI_SCAN);
+}
 
 void set_wifi_sta_config(char *ssid, char *password){
 	strcpy((char*)wifi_manager_config_sta->sta.ssid, (char*)ssid);
@@ -379,11 +384,11 @@ void wifi_manager( void * pvParameters ){
 
 		//keep scanning wifis until someone tries to connect to an AP
 		EventBits_t uxBits;
-		uint8_t tick = 0;
+		//uint8_t tick = 0;
 		for(;;){
 
 			/* someone tries to make a connection? if so: connect! */
-			uxBits = xEventGroupWaitBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_STA_CONNECT_BIT, pdFALSE, pdTRUE, 100 / portTICK_PERIOD_MS );
+			uxBits = xEventGroupWaitBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_STA_CONNECT_BIT | WIFI_MANAGER_REQUEST_WIFI_SCAN, pdFALSE, pdFALSE, portMAX_DELAY );
 			if(uxBits & WIFI_MANAGER_REQUEST_STA_CONNECT_BIT){
 				//someone requested a connection!
 
@@ -432,37 +437,37 @@ void wifi_manager( void * pvParameters ){
 				/* finally: release the connection request bit */
 				xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_STA_CONNECT_BIT);
 			}
-			else{
+			else if(uxBits & WIFI_MANAGER_REQUEST_WIFI_SCAN){
 
-				/* perform wifi scan */
-				if(tick == 0){
-					/* safe guard against overflow */
-					if(ap_num > MAX_AP_NUM) ap_num = MAX_AP_NUM;
 
-					ESP_ERROR_CHECK(esp_wifi_scan_start(&scan_config, true));
-					ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&ap_num, accessp_records));
+				/* safe guard against overflow */
+				if(ap_num > MAX_AP_NUM) ap_num = MAX_AP_NUM;
 
-					/* make sure the http server isn't trying to access the list while it gets refreshed */
-					if(wifi_manager_lock_json_buffer( ( TickType_t ) 10 )){
-						wifi_manager_generate_acess_points_json();
-						wifi_manager_unlock_json_buffer();
-					}
-					else{
-						printf("Could not get access to xSemaphoreScan in wifi_scan\n");
-					}
+				ESP_ERROR_CHECK(esp_wifi_scan_start(&scan_config, true));
+				ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&ap_num, accessp_records));
+
+				/* make sure the http server isn't trying to access the list while it gets refreshed */
+				if(wifi_manager_lock_json_buffer( ( TickType_t ) 20 )){
+					wifi_manager_generate_acess_points_json();
+					wifi_manager_unlock_json_buffer();
 				}
+				else{
+#if WIFI_MANAGER_DEBUG
+					printf("Could not get access to xSemaphoreScan in wifi_scan\n");
+#endif
+				}
+
+				/* finally: release the scan request bit */
+				xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_WIFI_SCAN);
 			}
 
 			//periodically re-do a wifi scan. Here every 5s.
-			tick++;
-			if(tick == 50) tick = 0;
-			vTaskDelay(100 / portTICK_PERIOD_MS);
+			//tick++;
+			//if(tick == 50) tick = 0;
+			//vTaskDelay(100 / portTICK_PERIOD_MS);
 
 		}
 
-		while(1){
-			vTaskDelay(5000 / portTICK_PERIOD_MS);
-		}
 	}
 
 }

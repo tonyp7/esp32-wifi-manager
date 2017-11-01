@@ -132,6 +132,11 @@ esp_err_t wifi_manager_event_handler(void *ctx, system_event_t *event);
 void wifi_manager_connect_async();
 
 /**
+ * @brief requests a wifi scan
+ */
+void wifi_manager_scan_async();
+
+/**
  * @brief Tries to get access to json buffer mutex.
  *
  * The HTTP server can try to access the json to serve clients while the wifi manager thread can try
