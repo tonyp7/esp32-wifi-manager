@@ -86,7 +86,7 @@ void set_wifi_sta_config(char *ssid, char *password){
 	strcpy((char*)wifi_manager_config_sta->sta.password, (char*)password);
 }
 
-uint8_t wifi_manager_fetch_wifi_sta_config(){
+bool wifi_manager_fetch_wifi_sta_config(){
 
 	nvs_handle handle;
 	esp_err_t esp_err;
@@ -117,11 +117,11 @@ uint8_t wifi_manager_fetch_wifi_sta_config(){
 
 		nvs_close(handle);
 
-		return pdTRUE;
+		return true;
 
 	}
 	else{
-		return pdFALSE;
+		return false;
 	}
 
 }
