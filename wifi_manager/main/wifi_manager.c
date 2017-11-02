@@ -61,6 +61,7 @@ char *accessp_json = NULL;
 char *ip_info_json = NULL;
 wifi_config_t* wifi_manager_config_sta = NULL;
 
+const char wifi_manager_nvs_namespace[] = "espwifimgr";
 
 EventGroupHandle_t wifi_manager_event_group;
 const int WIFI_MANAGER_WIFI_CONNECTED_BIT = BIT0;
@@ -86,11 +87,36 @@ void set_wifi_sta_config(char *ssid, char *password){
 	strcpy((char*)wifi_manager_config_sta->sta.password, (char*)password);
 }
 
+
+esp_err_t wifi_manager_save_sta_config(){
+
+	nvs_handle handle;
+	esp_err_t esp_err;
+	if(wifi_manager_config_sta){
+
+		esp_err = nvs_open(wifi_manager_nvs_namespace, NVS_READWRITE, &handle);
+		if (esp_err != ESP_OK) return esp_err;
+
+		esp_err = nvs_set_blob(handle, "ssid", wifi_manager_config_sta->sta.ssid, 32);
+		if (esp_err != ESP_OK) return esp_err;
+
+		esp_err = nvs_set_blob(handle, "password", wifi_manager_config_sta->sta.password, 64);
+		if (esp_err != ESP_OK) return esp_err;
+
+		esp_err = nvs_commit(handle);
+		if (esp_err != ESP_OK) return esp_err;
+
+		nvs_close(handle);
+	}
+
+	return ESP_OK;
+}
+
 bool wifi_manager_fetch_wifi_sta_config(){
 
 	nvs_handle handle;
 	esp_err_t esp_err;
-	if(nvs_open("espwifimgr", NVS_READONLY, &handle) == ESP_OK){
+	if(nvs_open(wifi_manager_nvs_namespace, NVS_READONLY, &handle) == ESP_OK){
 		size_t sz;
 
 		//ssid
