@@ -286,11 +286,18 @@ void http_server_netconn_serve(struct netconn *conn) {
 #endif
 				}
 			}
+			else if(strstr(line, "DELETE /connect ")) {
+#if WIFI_MANAGER_DEBUG
+				printf("http_server_netconn_serve: DELETE /connect\n");
+#endif
+				/* request a disconnection from wifi and forget about it */
+				wifi_manager_disconnect_async();
+				netconn_write(conn, http_html_hdr, sizeof(http_html_hdr) - 1, NETCONN_NOCOPY); /* 200 ok */
+			}
 			else if(strstr(line, "POST /connect ")) {
 #if WIFI_MANAGER_DEBUG
 				printf("http_server_netconn_serve: POST /connect\n");
 #endif
-				//printf("%s\n\n",buf);
 				bool found = false;
 				while((line = strtok_r(save_ptr, new_line, &save_ptr))){
 					if(strstr(line, "Authorization:")){

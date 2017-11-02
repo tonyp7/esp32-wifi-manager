@@ -69,11 +69,16 @@ const int WIFI_MANAGER_AP_STARTED = BIT2;
 const int WIFI_MANAGER_REQUEST_STA_CONNECT_BIT = BIT3;
 const int WIFI_MANAGER_STA_DISCONNECT_BIT = BIT4;
 const int WIFI_MANAGER_REQUEST_WIFI_SCAN = BIT5;
+const int WIFI_MANAGER_REQUEST_WIFI_DISCONNECT = BIT6;
 
 //wifi_config_t wifi_config;
 
 void wifi_manager_scan_async(){
 	xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_WIFI_SCAN);
+}
+
+void wifi_manager_disconnect_async(){
+	xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_WIFI_DISCONNECT);
 }
 
 void set_wifi_sta_config(char *ssid, char *password){
@@ -296,7 +301,7 @@ void wifi_manager( void * pvParameters ){
 	/* memory allocation of objects used by the task */
 	wifi_manager_json_mutex = xSemaphoreCreateMutex();
 	accessp_records = (wifi_ap_record_t*)malloc(sizeof(wifi_ap_record_t) * MAX_AP_NUM);
-	accessp_json = (char*)malloc(ap_num * JSON_ONE_APP_SIZE + 4); //4 bytes for json encapsulation of "[\n" and "]\0"
+	accessp_json = (char*)malloc(MAX_AP_NUM * JSON_ONE_APP_SIZE + 4); //4 bytes for json encapsulation of "[\n" and "]\0"
 	strcpy(accessp_json, "[]\n");
 	ip_info_json = (char*)malloc(sizeof(char) * JSON_IP_INFO_SIZE);
 	strcpy(ip_info_json, "{}\n");
@@ -388,7 +393,7 @@ void wifi_manager( void * pvParameters ){
 		for(;;){
 
 			/* someone tries to make a connection? if so: connect! */
-			uxBits = xEventGroupWaitBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_STA_CONNECT_BIT | WIFI_MANAGER_REQUEST_WIFI_SCAN, pdFALSE, pdFALSE, portMAX_DELAY );
+			uxBits = xEventGroupWaitBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_STA_CONNECT_BIT | WIFI_MANAGER_REQUEST_WIFI_SCAN | WIFI_MANAGER_REQUEST_WIFI_DISCONNECT, pdFALSE, pdFALSE, portMAX_DELAY );
 			if(uxBits & WIFI_MANAGER_REQUEST_STA_CONNECT_BIT){
 				//someone requested a connection!
 
@@ -439,7 +444,6 @@ void wifi_manager( void * pvParameters ){
 			}
 			else if(uxBits & WIFI_MANAGER_REQUEST_WIFI_SCAN){
 
-
 				/* safe guard against overflow */
 				if(ap_num > MAX_AP_NUM) ap_num = MAX_AP_NUM;
 
@@ -460,12 +464,13 @@ void wifi_manager( void * pvParameters ){
 				/* finally: release the scan request bit */
 				xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_WIFI_SCAN);
 			}
+			else if(uxBits & WIFI_MANAGER_REQUEST_WIFI_DISCONNECT){
+				/* user requested a disconnect, this will in effect disconnect the wifi but also erase NVS memory*/
 
-			//periodically re-do a wifi scan. Here every 5s.
-			//tick++;
-			//if(tick == 50) tick = 0;
-			//vTaskDelay(100 / portTICK_PERIOD_MS);
 
+				/* finally: release the scan request bit */
+				xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_WIFI_DISCONNECT);
+			}
 		}
 
 	}

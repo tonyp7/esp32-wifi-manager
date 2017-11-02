@@ -137,6 +137,11 @@ void wifi_manager_connect_async();
 void wifi_manager_scan_async();
 
 /**
+ * @brief requests to disconnect and forget about the access point.
+ */
+void wifi_manager_disconnect_async();
+
+/**
  * @brief Tries to get access to json buffer mutex.
  *
  * The HTTP server can try to access the json to serve clients while the wifi manager thread can try
