@@ -84,6 +84,9 @@ $(function() {
 				
 			}
 		});
+		
+		$( "#connect-details" ).slideUp( "fast", function() {});
+		$( "#wifi" ).slideDown( "fast", function() {})
 	});
 	
 	
