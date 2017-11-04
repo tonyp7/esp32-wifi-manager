@@ -64,12 +64,25 @@ wifi_config_t* wifi_manager_config_sta = NULL;
 const char wifi_manager_nvs_namespace[] = "espwifimgr";
 
 EventGroupHandle_t wifi_manager_event_group;
+
+/* @brief indicate that the ESP32 is currently connected. */
 const int WIFI_MANAGER_WIFI_CONNECTED_BIT = BIT0;
+
+
 const int WIFI_MANAGER_AP_STA_CONNECTED_BIT = BIT1;
 const int WIFI_MANAGER_AP_STARTED = BIT2;
+
+
+/* @brief When set, means a client requested to connect to an access point.*/
 const int WIFI_MANAGER_REQUEST_STA_CONNECT_BIT = BIT3;
+
+/* @brief This bit is set automatically as soon as a connection was lost */
 const int WIFI_MANAGER_STA_DISCONNECT_BIT = BIT4;
+
+/* @brief When set, means a client requested to scan wireless networks. */
 const int WIFI_MANAGER_REQUEST_WIFI_SCAN = BIT5;
+
+/* @brief When set, means a client requested to disconnect from currently connected AP. */
 const int WIFI_MANAGER_REQUEST_WIFI_DISCONNECT = BIT6;
 
 //wifi_config_t wifi_config;
@@ -418,8 +431,44 @@ void wifi_manager( void * pvParameters ){
 		//uint8_t tick = 0;
 		for(;;){
 
-			/* someone tries to make a connection? if so: connect! */
+			/* actions that can trigger: request a connection, a scan, or a disconnection */
 			uxBits = xEventGroupWaitBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_STA_CONNECT_BIT | WIFI_MANAGER_REQUEST_WIFI_SCAN | WIFI_MANAGER_REQUEST_WIFI_DISCONNECT, pdFALSE, pdFALSE, portMAX_DELAY );
+			if(uxBits & WIFI_MANAGER_REQUEST_WIFI_DISCONNECT){
+				/* user requested a disconnect, this will in effect disconnect the wifi but also erase NVS memory*/
+
+				/*disconnect only if it was connected to begin with! */
+				if( uxBits & WIFI_MANAGER_WIFI_CONNECTED_BIT ){
+					xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_STA_DISCONNECT_BIT);
+					ESP_ERROR_CHECK(esp_wifi_disconnect());
+
+					/* wait until wifi disconnects. From experiments, it seems to take about 150ms to disconnect */
+					xEventGroupWaitBits(wifi_manager_event_group, WIFI_MANAGER_STA_DISCONNECT_BIT, pdFALSE, pdTRUE, portMAX_DELAY );
+				}
+				xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_STA_DISCONNECT_BIT);
+
+				/* erase configuration */
+				if(wifi_manager_config_sta){
+					memset(wifi_manager_config_sta, 0x00, sizeof(wifi_config_t));
+				}
+
+				/* save NVS memory */
+				wifi_manager_save_sta_config();
+
+				/* update JSON status */
+				if(wifi_manager_lock_json_buffer( portMAX_DELAY )){
+					wifi_manager_generate_ip_info_json();
+					wifi_manager_unlock_json_buffer();
+				}
+				else{
+					/* Even if someone were to furiously refresh a web resource that needs the json mutex,
+					 * it seems impossible that this thread cannot obtain the mutex. Abort here is reasonnable.
+					 */
+					abort();
+				}
+
+				/* finally: release the scan request bit */
+				xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_WIFI_DISCONNECT);
+			}
 			if(uxBits & WIFI_MANAGER_REQUEST_STA_CONNECT_BIT){
 				//someone requested a connection!
 
@@ -489,13 +538,6 @@ void wifi_manager( void * pvParameters ){
 
 				/* finally: release the scan request bit */
 				xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_WIFI_SCAN);
-			}
-			else if(uxBits & WIFI_MANAGER_REQUEST_WIFI_DISCONNECT){
-				/* user requested a disconnect, this will in effect disconnect the wifi but also erase NVS memory*/
-
-
-				/* finally: release the scan request bit */
-				xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_WIFI_DISCONNECT);
 			}
 		}
 
