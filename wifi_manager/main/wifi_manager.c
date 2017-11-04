@@ -70,8 +70,9 @@ const int WIFI_MANAGER_WIFI_CONNECTED_BIT = BIT0;
 
 
 const int WIFI_MANAGER_AP_STA_CONNECTED_BIT = BIT1;
-const int WIFI_MANAGER_AP_STARTED = BIT2;
 
+/* @brief Set automatically once the SoftAP is started */
+const int WIFI_MANAGER_AP_STARTED = BIT2;
 
 /* @brief When set, means a client requested to connect to an access point.*/
 const int WIFI_MANAGER_REQUEST_STA_CONNECT_BIT = BIT3;
@@ -130,33 +131,43 @@ bool wifi_manager_fetch_wifi_sta_config(){
 	nvs_handle handle;
 	esp_err_t esp_err;
 	if(nvs_open(wifi_manager_nvs_namespace, NVS_READONLY, &handle) == ESP_OK){
-		size_t sz;
 
-		//ssid
-		esp_err = nvs_get_str(handle, "ssid", NULL, &sz);
-		if(esp_err != ESP_OK) return NULL;
-		uint8_t* ssid = malloc(sz);
-		esp_err = nvs_get_str(handle, "ssid", (char*)ssid, &sz);
-
-		//password
-		esp_err = nvs_get_str(handle, "password", NULL, &sz);
-		if(esp_err != ESP_OK) {free(ssid); return NULL;}
-		uint8_t* password = malloc(sz);
-		esp_err = nvs_get_str(handle, "password", (char*)password, &sz);
-
-
-		if(wifi_manager_config_sta == NULL)
+		if(wifi_manager_config_sta == NULL){
 			wifi_manager_config_sta = (wifi_config_t*)malloc(sizeof(wifi_config_t));
+		}
+		memset(wifi_manager_config_sta, 0x00, sizeof(wifi_config_t));
 
-		strcpy((char*)wifi_manager_config_sta->sta.ssid, (char*)ssid);
-		strcpy((char*)wifi_manager_config_sta->sta.password, (char*)ssid);
+		/* allocate 64 bytes of buffer */
+		size_t sz = sizeof(wifi_manager_config_sta->sta.password);
+		uint8_t *buff = (uint8_t*)malloc(sizeof(uint8_t) * sz);
+		memset(buff, 0x00, sizeof(sz));
 
-		free(ssid);
-		free(password);
+		/* ssid */
+		sz = sizeof(wifi_manager_config_sta->sta.ssid);
+		esp_err = nvs_get_blob(handle, "ssid", buff, &sz);
+		if(esp_err != ESP_OK){
+			free(buff);
+			return false;
+		}
+		memcpy(wifi_manager_config_sta->sta.ssid, buff, sz);
 
+		/* password */
+		sz = sizeof(wifi_manager_config_sta->sta.password);
+		esp_err = nvs_get_blob(handle, "password", buff, &sz);
+		if(esp_err != ESP_OK){
+			free(buff);
+			return false;
+		}
+		memcpy(wifi_manager_config_sta->sta.password, buff, sz);
+
+
+		free(buff);
 		nvs_close(handle);
 
-		return true;
+#if WIFI_MANAGER_DEBUG
+		printf("wifi_manager_fetch_wifi_sta_config: ssid:%s password:%s\n",wifi_manager_config_sta->sta.ssid,wifi_manager_config_sta->sta.password);
+#endif
+		return wifi_manager_config_sta->sta.ssid[0] != '\0';
 
 	}
 	else{
@@ -276,7 +287,6 @@ esp_err_t wifi_manager_event_handler(void *ctx, system_event_t *event)
 		break;
 
     case SYSTEM_EVENT_STA_START:
-        //esp_wifi_connect();
         break;
 
 	case SYSTEM_EVENT_STA_GOT_IP:
@@ -354,7 +364,7 @@ void wifi_manager( void * pvParameters ){
 	wifi_manager_event_group = xEventGroupCreate();
     ESP_ERROR_CHECK(esp_event_loop_init(wifi_manager_event_handler, NULL));
 
-    //wifi scanner config
+    /* wifi scanner config */
 	wifi_scan_config_t scan_config = {
 		.ssid = 0,
 		.bssid = 0,
@@ -363,98 +373,135 @@ void wifi_manager( void * pvParameters ){
 	};
 
 
-	//try to get access to previously saved wifi
+	/* try to get access to previously saved wifi */
 	if(wifi_manager_fetch_wifi_sta_config()){
 #if WIFI_MANAGER_DEBUG
 		printf("wifi_manager: saved wifi found on startup\n");
+		/* request a connection */
+		xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_STA_CONNECT_BIT);
 #endif
 	}
-	else{
 
-		//int i = ESP_ERR_WIFI_BASE;
-#if WIFI_MANAGER_DEBUG
-		printf("wifi_manager: could not find saved wifi in flash storage\n");
-#endif
-		//start the an access point
+	/* start the softAP access point */
+	/* stop DHCP */
+	ESP_ERROR_CHECK(tcpip_adapter_dhcps_stop(TCPIP_ADAPTER_IF_AP));
 
-		//stop dhcp
-		ESP_ERROR_CHECK(tcpip_adapter_dhcps_stop(TCPIP_ADAPTER_IF_AP));
+	/* assign a static IP to the network interface */
+	tcpip_adapter_ip_info_t info;
+	memset(&info, 0x00, sizeof(info));
+	IP4_ADDR(&info.ip, 192, 168, 1, 1);
+	IP4_ADDR(&info.gw, 192, 168, 1, 1);
+	IP4_ADDR(&info.netmask, 255, 255, 255, 0);
+	ESP_ERROR_CHECK(tcpip_adapter_set_ip_info(TCPIP_ADAPTER_IF_AP, &info));
 
-		// assign a static IP to the network interface
-		tcpip_adapter_ip_info_t info;
-	    memset(&info, 0x00, sizeof(info));
-		IP4_ADDR(&info.ip, 192, 168, 1, 1);
-	    IP4_ADDR(&info.gw, 192, 168, 1, 1);
-	    IP4_ADDR(&info.netmask, 255, 255, 255, 0);
-	    ESP_ERROR_CHECK(tcpip_adapter_set_ip_info(TCPIP_ADAPTER_IF_AP, &info));
+	/* start dhcp */
+	ESP_ERROR_CHECK(tcpip_adapter_dhcps_start(TCPIP_ADAPTER_IF_AP));
 
-	    //start dhcp
-	    ESP_ERROR_CHECK(tcpip_adapter_dhcps_start(TCPIP_ADAPTER_IF_AP));
+	/* init wifi as station + access point */
+	wifi_init_config_t wifi_init_config = WIFI_INIT_CONFIG_DEFAULT();
+	ESP_ERROR_CHECK(esp_wifi_init(&wifi_init_config));
+	ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
+	ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
 
-	    //init wifi as access point
-		wifi_init_config_t wifi_init_config = WIFI_INIT_CONFIG_DEFAULT();
-		ESP_ERROR_CHECK(esp_wifi_init(&wifi_init_config));
-		ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
-	    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
-
-		// configure the wifi connection and start the interface
-		wifi_config_t ap_config = {
-			.ap = {
-				.ssid = AP_SSID,
-				.password = AP_PASSWORD,
-				.ssid_len = 0,
-				.channel = AP_CHANNEL,
-				.authmode = WIFI_AUTH_WPA2_PSK,//WIFI_AUTH_OPEN, //CONFIG_AP_AUTHMODE,
-				.ssid_hidden = AP_SSID_HIDDEN,
-				.max_connection = AP_MAX_CONNECTIONS,
-				.beacon_interval = AP_BEACON_INTERVAL,
-			},
-		};
-		ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &ap_config));
-		ESP_ERROR_CHECK(esp_wifi_start());
+	// configure the softAP and start it */
+	wifi_config_t ap_config = {
+		.ap = {
+			.ssid = AP_SSID,
+			.password = AP_PASSWORD,
+			.ssid_len = 0,
+			.channel = AP_CHANNEL,
+			.authmode = WIFI_AUTH_WPA2_PSK,
+			.ssid_hidden = AP_SSID_HIDDEN,
+			.max_connection = AP_MAX_CONNECTIONS,
+			.beacon_interval = AP_BEACON_INTERVAL,
+		},
+	};
+	ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &ap_config));
+	ESP_ERROR_CHECK(esp_wifi_start());
 
 #if WIFI_MANAGER_DEBUG
-		printf("wifi_mamager: starting softAP with ssid %s\n", ap_config.ap.ssid);
+	printf("wifi_mamager: starting softAP with ssid %s\n", ap_config.ap.ssid);
 #endif
 
-		//wait for access point to start
-		xEventGroupWaitBits(wifi_manager_event_group, WIFI_MANAGER_AP_STARTED, pdFALSE, pdTRUE, portMAX_DELAY );
+	/* wait for access point to start */
+	xEventGroupWaitBits(wifi_manager_event_group, WIFI_MANAGER_AP_STARTED, pdFALSE, pdTRUE, portMAX_DELAY );
 
 #if WIFI_MANAGER_DEBUG
-		printf("wifi_mamager: softAP started, starting http_server\n");
+	printf("wifi_mamager: softAP started, starting http_server\n");
 #endif
-		http_server_set_event_start();
+	http_server_set_event_start();
 
 
-		//keep scanning wifis until someone tries to connect to an AP
-		EventBits_t uxBits;
-		//uint8_t tick = 0;
-		for(;;){
+	EventBits_t uxBits;
+	for(;;){
 
-			/* actions that can trigger: request a connection, a scan, or a disconnection */
-			uxBits = xEventGroupWaitBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_STA_CONNECT_BIT | WIFI_MANAGER_REQUEST_WIFI_SCAN | WIFI_MANAGER_REQUEST_WIFI_DISCONNECT, pdFALSE, pdFALSE, portMAX_DELAY );
-			if(uxBits & WIFI_MANAGER_REQUEST_WIFI_DISCONNECT){
-				/* user requested a disconnect, this will in effect disconnect the wifi but also erase NVS memory*/
+		/* actions that can trigger: request a connection, a scan, or a disconnection */
+		uxBits = xEventGroupWaitBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_STA_CONNECT_BIT | WIFI_MANAGER_REQUEST_WIFI_SCAN | WIFI_MANAGER_REQUEST_WIFI_DISCONNECT, pdFALSE, pdFALSE, portMAX_DELAY );
+		if(uxBits & WIFI_MANAGER_REQUEST_WIFI_DISCONNECT){
+			/* user requested a disconnect, this will in effect disconnect the wifi but also erase NVS memory*/
 
-				/*disconnect only if it was connected to begin with! */
-				if( uxBits & WIFI_MANAGER_WIFI_CONNECTED_BIT ){
-					xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_STA_DISCONNECT_BIT);
-					ESP_ERROR_CHECK(esp_wifi_disconnect());
-
-					/* wait until wifi disconnects. From experiments, it seems to take about 150ms to disconnect */
-					xEventGroupWaitBits(wifi_manager_event_group, WIFI_MANAGER_STA_DISCONNECT_BIT, pdFALSE, pdTRUE, portMAX_DELAY );
-				}
+			/*disconnect only if it was connected to begin with! */
+			if( uxBits & WIFI_MANAGER_WIFI_CONNECTED_BIT ){
 				xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_STA_DISCONNECT_BIT);
+				ESP_ERROR_CHECK(esp_wifi_disconnect());
 
-				/* erase configuration */
-				if(wifi_manager_config_sta){
-					memset(wifi_manager_config_sta, 0x00, sizeof(wifi_config_t));
-				}
+				/* wait until wifi disconnects. From experiments, it seems to take about 150ms to disconnect */
+				xEventGroupWaitBits(wifi_manager_event_group, WIFI_MANAGER_STA_DISCONNECT_BIT, pdFALSE, pdTRUE, portMAX_DELAY );
+			}
+			xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_STA_DISCONNECT_BIT);
 
-				/* save NVS memory */
-				wifi_manager_save_sta_config();
+			/* erase configuration */
+			if(wifi_manager_config_sta){
+				memset(wifi_manager_config_sta, 0x00, sizeof(wifi_config_t));
+			}
 
-				/* update JSON status */
+			/* save NVS memory */
+			wifi_manager_save_sta_config();
+
+			/* update JSON status */
+			if(wifi_manager_lock_json_buffer( portMAX_DELAY )){
+				wifi_manager_generate_ip_info_json();
+				wifi_manager_unlock_json_buffer();
+			}
+			else{
+				/* Even if someone were to furiously refresh a web resource that needs the json mutex,
+				 * it seems impossible that this thread cannot obtain the mutex. Abort here is reasonnable.
+				 */
+				abort();
+			}
+
+			/* finally: release the scan request bit */
+			xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_WIFI_DISCONNECT);
+		}
+		if(uxBits & WIFI_MANAGER_REQUEST_STA_CONNECT_BIT){
+			//someone requested a connection!
+
+			/* first thing: if the esp32 is already connected to a access point: disconnect */
+			if( (uxBits & WIFI_MANAGER_WIFI_CONNECTED_BIT) == (WIFI_MANAGER_WIFI_CONNECTED_BIT) ){
+
+				xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_STA_DISCONNECT_BIT);
+				ESP_ERROR_CHECK(esp_wifi_disconnect());
+
+				/* wait until wifi disconnects. From experiments, it seems to take about 150ms to disconnect */
+				xEventGroupWaitBits(wifi_manager_event_group, WIFI_MANAGER_STA_DISCONNECT_BIT, pdFALSE, pdTRUE, portMAX_DELAY );
+			}
+
+			/* set the new config and connect - reset the disconnect bit first as it is later tested */
+			xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_STA_DISCONNECT_BIT);
+			ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, wifi_manager_get_wifi_sta_config()));
+			ESP_ERROR_CHECK(esp_wifi_connect());
+
+			/* 2 scenarios here: connection is successful and SYSTEM_EVENT_STA_GOT_IP will be posted
+			 * or it's a failure and we get a SYSTEM_EVENT_STA_DISCONNECTED with a reason code.
+			 * Note that the reason code is not exploited. For all intent and purposes a failure is a failure.
+			 */
+			uxBits = xEventGroupWaitBits(wifi_manager_event_group, WIFI_MANAGER_WIFI_CONNECTED_BIT | WIFI_MANAGER_STA_DISCONNECT_BIT, pdFALSE, pdFALSE, portMAX_DELAY );
+
+			if(uxBits & (WIFI_MANAGER_WIFI_CONNECTED_BIT | WIFI_MANAGER_STA_DISCONNECT_BIT)){
+
+				/* Update the json regardless of connection status.
+				 * If connection was succesful an IP will get assigned.
+				 */
 				if(wifi_manager_lock_json_buffer( portMAX_DELAY )){
 					wifi_manager_generate_ip_info_json();
 					wifi_manager_unlock_json_buffer();
@@ -466,81 +513,38 @@ void wifi_manager( void * pvParameters ){
 					abort();
 				}
 
-				/* finally: release the scan request bit */
-				xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_WIFI_DISCONNECT);
+				/* save wifi config in NVS */
+				wifi_manager_save_sta_config();
 			}
-			if(uxBits & WIFI_MANAGER_REQUEST_STA_CONNECT_BIT){
-				//someone requested a connection!
-
-				/* first thing: if the esp32 is already connected to a access point: disconnect */
-				if( (uxBits & WIFI_MANAGER_WIFI_CONNECTED_BIT) == (WIFI_MANAGER_WIFI_CONNECTED_BIT) ){
-
-					xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_STA_DISCONNECT_BIT);
-					ESP_ERROR_CHECK(esp_wifi_disconnect());
-
-					/* wait until wifi disconnects. From experiments, it seems to take about 150ms to disconnect */
-					xEventGroupWaitBits(wifi_manager_event_group, WIFI_MANAGER_STA_DISCONNECT_BIT, pdFALSE, pdTRUE, portMAX_DELAY );
-				}
-
-				/* set the new config and connect - reset the disconnect bit first as it is later tested */
-				xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_STA_DISCONNECT_BIT);
-				ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, wifi_manager_get_wifi_sta_config()));
-				ESP_ERROR_CHECK(esp_wifi_connect());
-
-				/* 2 scenarios here: connection is successful and SYSTEM_EVENT_STA_GOT_IP will be posted
-				 * or it's a failure and we get a SYSTEM_EVENT_STA_DISCONNECTED with a reason code.
-				 * Note that the reason code is not exploited. For all intent and purposes a failure is a failure.
-				 */
-				uxBits = xEventGroupWaitBits(wifi_manager_event_group, WIFI_MANAGER_WIFI_CONNECTED_BIT | WIFI_MANAGER_STA_DISCONNECT_BIT, pdFALSE, pdFALSE, portMAX_DELAY );
-
-				if(uxBits & (WIFI_MANAGER_WIFI_CONNECTED_BIT | WIFI_MANAGER_STA_DISCONNECT_BIT)){
-
-					/* Update the json regardless of connection status.
-					 * If connection was succesful an IP will get assigned.
-					 */
-					if(wifi_manager_lock_json_buffer( portMAX_DELAY )){
-						wifi_manager_generate_ip_info_json();
-						wifi_manager_unlock_json_buffer();
-					}
-					else{
-						/* Even if someone were to furiously refresh a web resource that needs the json mutex,
-						 * it seems impossible that this thread cannot obtain the mutex. Abort here is reasonnable.
-						 */
-						abort();
-					}
-				}
-				else{
-					/* hit portMAX_DELAY limit ? */
-					abort();
-				}
-
-				/* finally: release the connection request bit */
-				xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_STA_CONNECT_BIT);
+			else{
+				/* hit portMAX_DELAY limit ? */
+				abort();
 			}
-			else if(uxBits & WIFI_MANAGER_REQUEST_WIFI_SCAN){
 
-				/* safe guard against overflow */
-				if(ap_num > MAX_AP_NUM) ap_num = MAX_AP_NUM;
-
-				ESP_ERROR_CHECK(esp_wifi_scan_start(&scan_config, true));
-				ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&ap_num, accessp_records));
-
-				/* make sure the http server isn't trying to access the list while it gets refreshed */
-				if(wifi_manager_lock_json_buffer( ( TickType_t ) 20 )){
-					wifi_manager_generate_acess_points_json();
-					wifi_manager_unlock_json_buffer();
-				}
-				else{
-#if WIFI_MANAGER_DEBUG
-					printf("Could not get access to xSemaphoreScan in wifi_scan\n");
-#endif
-				}
-
-				/* finally: release the scan request bit */
-				xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_WIFI_SCAN);
-			}
+			/* finally: release the connection request bit */
+			xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_STA_CONNECT_BIT);
 		}
+		else if(uxBits & WIFI_MANAGER_REQUEST_WIFI_SCAN){
 
-	}
+			/* safe guard against overflow */
+			if(ap_num > MAX_AP_NUM) ap_num = MAX_AP_NUM;
 
-}
+			ESP_ERROR_CHECK(esp_wifi_scan_start(&scan_config, true));
+			ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&ap_num, accessp_records));
+
+			/* make sure the http server isn't trying to access the list while it gets refreshed */
+			if(wifi_manager_lock_json_buffer( ( TickType_t ) 20 )){
+				wifi_manager_generate_acess_points_json();
+				wifi_manager_unlock_json_buffer();
+			}
+			else{
+#if WIFI_MANAGER_DEBUG
+				printf("wifi_manager: could not get access to json mutex in wifi_scan\n");
+#endif
+			}
+
+			/* finally: release the scan request bit */
+			xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_WIFI_SCAN);
+		}
+	} /* for(;;) */
+} /*void wifi_manager*/
