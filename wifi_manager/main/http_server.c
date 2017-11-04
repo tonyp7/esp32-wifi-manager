@@ -59,11 +59,11 @@ SOFTWARE.
 EventGroupHandle_t http_server_event_group;
 EventBits_t uxBits;
 
-// embedded binary data
+/* embedded binary data */
 extern const uint8_t style_css_start[] asm("_binary_style_css_start");
 extern const uint8_t style_css_end[]   asm("_binary_style_css_end");
-//extern const uint8_t jquery_js_start[] asm("_binary_jquery_js_start");
-//extern const uint8_t jquery_js_end[] asm("_binary_jquery_js_end");
+/*extern const uint8_t jquery_js_start[] asm("_binary_jquery_js_start");
+extern const uint8_t jquery_js_end[] asm("_binary_jquery_js_end");*/
 extern const uint8_t jquery_gz_start[] asm("_binary_jquery_gz_start");
 extern const uint8_t jquery_gz_end[] asm("_binary_jquery_gz_end");
 extern const uint8_t code_js_start[] asm("_binary_code_js_start");
@@ -101,44 +101,8 @@ void http_server_set_event_start(){
 	xEventGroupSetBits(http_server_event_group, HTTP_SERVER_START_BIT_0 );
 }
 
-//I cannot get ctype.h to compile for some weird reason...
-int  http_server_isxdigit(int c)
-{
-    if (c >= '0' && c <= '9') return(true);
-    if (c >= 'A' && c <= 'F') return(true);
-    if (c >= 'a' && c <= 'f') return(true);
-    return(false);
-}
 
-void http_server_url_decode(char *dst, const char *src){
-    char a, b;
-    while (*src) {
-            if ((*src == '%') &&
-                ((a = src[1]) && (b = src[2])) &&
-                ( http_server_isxdigit(a) &&  http_server_isxdigit(b))) {
-                    if (a >= 'a')
-                            a -= 'a'-'A';
-                    if (a >= 'A')
-                            a -= ('A' - 10);
-                    else
-                            a -= '0';
-                    if (b >= 'a')
-                            b -= 'a'-'A';
-                    if (b >= 'A')
-                            b -= ('A' - 10);
-                    else
-                            b -= '0';
-                    *dst++ = 16*a+b;
-                    src+=3;
-            } else if (*src == '+') {
-                    *dst++ = ' ';
-                    src++;
-            } else {
-                    *dst++ = *src++;
-            }
-    }
-    *dst++ = '\0';
-}
+
 
 void http_server(void *pvParameters) {
 
@@ -161,12 +125,11 @@ void http_server(void *pvParameters) {
 	printf("HTTP Server listening...\n");
 	do {
 		err = netconn_accept(conn, &newconn);
-		//printf("New client connected\n");
 		if (err == ERR_OK) {
 			http_server_netconn_serve(newconn);
 			netconn_delete(newconn);
 		}
-		vTaskDelay(10); //allow task to be preempted
+		vTaskDelay( (TickType_t)10 ); /* allows the freeRTOS scheduler clean up stack without impacting performances of the server */
 	} while(err == ERR_OK);
 	netconn_close(conn);
 	netconn_delete(conn);

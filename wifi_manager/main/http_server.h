@@ -40,19 +40,8 @@ SOFTWARE.
 #define HTTP_SERVER_START_BIT_0	( 1 << 0 )
 
 
-#define HTTP_SERVER_MAX_FIRST_LINE_SIZE 20
-#define HTTP_SERVER_MAX_BODY_SIZE 100
-
-
-
 void http_server(void *pvParameters);
 void http_server_netconn_serve(struct netconn *conn);
-void http_server_url_decode(char *dst, const char *src);
-int  http_server_isxdigit(int c);
-
-
-
-
 void http_server_set_event_start();
 
 
