@@ -58,10 +58,36 @@ $(function() {
 		$( "#credits" ).slideDown( "fast", function() {});
 	});
 	
-	$("#ok-connect").on("click", function(event) {
+	$("#ok-connect").on("click", function() {
 		$( "#connect-wait" ).slideUp( "fast", function() {});
 		$( "#wifi" ).slideDown( "fast", function() {});
 	});
+	
+	$("#disconnect").on("click", function() {
+		$( "#connect-details-wrap" ).addClass('blur');
+		$( "#diag-disconnect" ).slideDown( "fast", function() {});
+	});
+	
+	$("#no-disconnect").on("click", function() {
+		$( "#diag-disconnect" ).slideUp( "fast", function() {});
+		$( "#connect-details-wrap" ).removeClass('blur');
+	});
+	
+	$("#yes-disconnect").on("click", function() {
+		$( "#diag-disconnect" ).slideUp( "fast", function() {});
+		$( "#connect-details-wrap" ).removeClass('blur');
+		
+		$.ajax({
+			url: '/connect',
+			type: 'DELETE',
+			success: function(result) {
+				
+			}
+		});
+	});
+	
+	
+	
 	
 	
 	$(document).on("click", "#join", function() {
@@ -191,23 +217,8 @@ function checkStatus(){
 	.fail(function() {
 		//don't do anything, the server might be down
 	});
-	/*$.getJSON( "/status", function( data ) {
-		if(data.ip.length > 0){
-			
-			$( "#app h2" ).text("Connected to " + selectedSSID + "!");
-			$( "#ip").html(data.ip);
-			$( "#netmask").html(data.netmask);
-			$( "#gw").html(data.gw);
-			
-			$( "#status-wrap").slideDown( "fast", function() {});
-			$( "#loading" ).slideUp( "fast", function() {});
-			$( "#loadingButton").prop("disabled",false);
-			if(checkStatusInterval != null){
-				clearInterval(checkStatusInterval);
-				checkStatusInterval = null;
-			}
-		}
-	});*/
+
+
 }
 
 

@@ -63,21 +63,34 @@
 					</div>
 				</div>
 				<div id="connect-details">
-					<header>
-						<h1></h1>
-					</header>
-					<h2>IP Address</h2>
-					<section>
-						<div class="ape brdb">IP Address:<div id="ip" class="fr"></div></div>
-						<div class="ape brdb">Subnet Mask:<div id="netmask" class="fr"></div></div>
-						<div class="ape">Default Gateway:<div id="gw" class="fr"></div></div>
-					</section>
-					<h2></h2>
-					<section>
-						<a href="">Forget this network</a>
-					</section>
-					<div class="buttons">
-						<input id="ok-details" type="button" value="OK" class="ctr" />
+					<div id="connect-details-wrap">
+						<header>
+							<h1></h1>
+						</header>
+						<h2></h2>
+						<section>
+							<div class="buttons">
+								<input id="disconnect" type="button" value="Disconnect" class="ctr"/>
+							</div>
+						</section>
+						<h2>IP Address</h2>
+						<section>
+							<div class="ape brdb">IP Address:<div id="ip" class="fr"></div></div>
+							<div class="ape brdb">Subnet Mask:<div id="netmask" class="fr"></div></div>
+							<div class="ape">Default Gateway:<div id="gw" class="fr"></div></div>
+						</section>
+						<div class="buttons">
+							<input id="ok-details" type="button" value="OK" class="ctr" />
+						</div>
+					</div>					
+					<div id="diag-disconnect" class="diag-box">
+						<div class="diag-box-win">
+							<p>Are you sure you would like to disconnect from this wifi?</p>
+							<div class="buttons">
+								<input id="no-disconnect" type="button" value="No" />
+								<input id="yes-disconnect" type="button" value="Yes" />
+							</div>
+						</div>
 					</div>
 				</div>
 			</div>
