@@ -182,7 +182,9 @@ bool wifi_manager_fetch_wifi_sta_config(){
 
 
 
-
+void wifi_manager_clear_ip_info_json(){
+	strcpy(ip_info_json, "{}\n");
+}
 
 
 void wifi_manager_generate_ip_info_json(){
@@ -216,15 +218,19 @@ void wifi_manager_generate_ip_info_json(){
 				gw);
 	}
 	else{
-		strcpy(ip_info_json, "{}\n");
+		wifi_manager_clear_ip_info_json();
 	}
 
 
 }
 
+
+void wifi_manager_clear_access_points_json(){
+	strcpy(accessp_json, "[]\n");
+}
 void wifi_manager_generate_acess_points_json(){
 
-	strcpy(accessp_json, "[\n");
+	strcpy(accessp_json, "[");
 
 
 	const char oneap_str[] = "{\"ssid\":\"%s\",\"chan\":%d,\"rssi\":%d,\"auth\":%d}%c\n";
@@ -243,7 +249,7 @@ void wifi_manager_generate_acess_points_json(){
 		strcat (accessp_json, one_ap);
 	}
 
-	strcat(accessp_json, "]");
+	strcat(accessp_json, "]\n");
 }
 
 
@@ -345,15 +351,17 @@ void wifi_manager_destroy(){
 	}
 }
 
+
+
 void wifi_manager( void * pvParameters ){
 
 	/* memory allocation of objects used by the task */
 	wifi_manager_json_mutex = xSemaphoreCreateMutex();
 	accessp_records = (wifi_ap_record_t*)malloc(sizeof(wifi_ap_record_t) * MAX_AP_NUM);
 	accessp_json = (char*)malloc(MAX_AP_NUM * JSON_ONE_APP_SIZE + 4); //4 bytes for json encapsulation of "[\n" and "]\0"
-	strcpy(accessp_json, "[]\n");
+	wifi_manager_clear_access_points_json();
 	ip_info_json = (char*)malloc(sizeof(char) * JSON_IP_INFO_SIZE);
-	strcpy(ip_info_json, "{}\n");
+	wifi_manager_clear_ip_info_json();
 	wifi_manager_config_sta = (wifi_config_t*)malloc(sizeof(wifi_config_t));
 	memset(wifi_manager_config_sta, 0x00, sizeof(wifi_config_t));
 
@@ -478,6 +486,15 @@ void wifi_manager( void * pvParameters ){
 
 			/* first thing: if the esp32 is already connected to a access point: disconnect */
 			if( (uxBits & WIFI_MANAGER_WIFI_CONNECTED_BIT) == (WIFI_MANAGER_WIFI_CONNECTED_BIT) ){
+
+				/* in order to avoid a false positive on the front end app we need to quickly flush the ip json
+				 * There'se a risk the front end sees an IP and think the esp32 is connected when in fact
+				 * it's a remnant from a previous connection
+				 */
+				if(wifi_manager_lock_json_buffer( portMAX_DELAY )){
+					wifi_manager_clear_ip_info_json();
+					wifi_manager_unlock_json_buffer();
+				}
 
 				xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_STA_DISCONNECT_BIT);
 				ESP_ERROR_CHECK(esp_wifi_disconnect());

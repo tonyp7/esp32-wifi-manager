@@ -171,6 +171,9 @@ bool wifi_manager_lock_json_buffer(TickType_t xTicksToWait);
 void wifi_manager_unlock_json_buffer();
 
 void wifi_manager_generate_ip_info_json();
+void wifi_manager_clear_ip_info_json();
+
 void wifi_manager_generate_acess_points_json();
+void wifi_manager_clear_access_points_json();
 
 #endif /* MAIN_WIFI_MANAGER_H_ */
