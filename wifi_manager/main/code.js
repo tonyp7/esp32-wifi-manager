@@ -17,6 +17,29 @@ var refreshAPInterval = null;
 var checkStatusInterval = null;
 var currentConnection = null;
 
+
+function stopCheckStatusInterval(){
+	if(checkStatusInterval != null){
+		clearInterval(checkStatusInterval);
+		checkStatusInterval = null;
+	}
+}
+
+function stopRefreshAPInterval(){
+	if(refreshAPInterval != null){
+		clearInterval(refreshAPInterval);
+		refreshAPInterval = null;
+	}
+}
+
+function startCheckStatusInterval(){
+	checkStatusInterval = setInterval(checkStatus, 950);
+}
+
+function startRefreshAPInterval(){
+	refreshAPInterval = setInterval(refreshAP, 2800);
+}
+
 $(function() {
 	
 	
@@ -100,8 +123,8 @@ $(function() {
 	
 	//first time the page loads: attempt get the connection status and start the wifi scan
 	refreshAP();
-	checkStatusInterval = setInterval(checkStatus, 950);
-	refreshAPInterval = setInterval(refreshAP, 2800);
+	startCheckStatusInterval();
+	startRefreshAPInterval();
 
 
 	
@@ -109,7 +132,17 @@ $(function() {
 });
 
 
+
+
 function performConnect(){
+	
+	//stop the status refresh. This prevents a race condition where a status 
+	//request would be refreshed with wrong ip info from a previous connection
+	//and the request would automatically shows as succesful.
+	stopCheckStatusInterval();
+	
+	//stop refreshing wifi list
+	stopRefreshAPInterval();
 	
 	//reset connection 
 	$( "#loading" ).show();
@@ -121,11 +154,7 @@ function performConnect(){
 	$( "#connect" ).slideUp( "fast", function() {});
 	$( "#connect-wait" ).slideDown( "fast", function() {});
 	
-	//stop refreshing wifi list
-	if(refreshAPInterval != null){
-		clearInterval(refreshAPInterval);
-		refreshAPInterval = null;
-	}
+	
 	
 	var xhr = new XMLHttpRequest();
 	xhr.onload = function() {
@@ -142,6 +171,11 @@ function performConnect(){
 	xhr.open("POST", "/connect", true);
 	xhr.setRequestHeader('Authorization', "\x02{0}\x03\x02{1}\x03".format(selectedSSID, pwd));
 	xhr.send();
+	
+	//now we can re-set the intervals regardless of result
+	startCheckStatusInterval();
+	startRefreshAPInterval();
+	
 }
 
 
@@ -190,35 +224,54 @@ function refreshAPHTML(data){
 
 function checkStatus(){
 	$.getJSON( "/status", function( data ) {
-		if(data["ssid"]){
-			//got connection
-			currentConnection = data;
-			$("#connected-to span").text(data["ssid"]);
-			$("#connect-details h1").text(data["ssid"]);
-			$("#ip").text(data["ip"]);
-			$("#netmask").text(data["netmask"]);
-			$("#gw").text(data["gw"]);
-			
-			$("#wifi-status").slideDown( "fast", function() {});
-			
-			//unlock the wait screen if needed
-			$( "#ok-connect" ).prop("disabled",false);
-			
-			//update wait screen
-			$( "#loading" ).hide();
-			$( "#connect-success" ).show();
-			$( "#connect-fail" ).hide();
+		if(data["ssid"] && (data["ssid"] === selectedSSID)){
+			if(data["ip"]){
+				//got connection
+				currentConnection = data;
+				$("#connected-to span").text(data["ssid"]);
+				$("#connect-details h1").text(data["ssid"]);
+				$("#ip").text(data["ip"]);
+				$("#netmask").text(data["netmask"]);
+				$("#gw").text(data["gw"]);
+				
+				$("#wifi-status").slideDown( "fast", function() {});
+				
+				//unlock the wait screen if needed
+				$( "#ok-connect" ).prop("disabled",false);
+				
+				//update wait screen
+				$( "#loading" ).hide();
+				$( "#connect-success" ).show();
+				$( "#connect-fail" ).hide();
+			}
+			else{
+				//disconnected
+				currentConnection = null;
+				$("#connected-to span").text('');
+				$("#connect-details h1").text('');
+				$("#ip").text('0.0.0.0');
+				$("#netmask").text('0.0.0.0');
+				$("#gw").text('0.0.0.0');
+				
+				//don't show any connection
+				$("#wifi-status").slideUp( "fast", function() {});
+				
+				//unlock the wait screen
+				$( "#ok-connect" ).prop("disabled",false);
+				
+				//update wait screen
+				$( "#loading" ).hide();
+				$( "#connect-fail" ).show();
+				$( "#connect-success" ).hide();
+			}
+
 		}
 		else{
-			//disconnected
-			currentConnection = null;
-			$("#connected-to span").text('');
-			$("#connect-details h1").text('');
-			$("#wifi-status").slideUp( "fast", function() {});
+			//empty json: connection info is not available yet
 		}
 	})
 	.fail(function() {
-		//don't do anything, the server might be down
+		//don't do anything, the server might be down while esp32 recalibrates radio
 	});
 
 
