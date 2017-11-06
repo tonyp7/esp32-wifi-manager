@@ -87,10 +87,9 @@ void app_main()
 	/* start the wifi manager task */
 	xTaskCreate(&wifi_manager, "wifi_manager", 2048, NULL, 4, &task_wifi_manager);
 
+	/* your code should go here. In debug mode we create a simple task on core 2 that monitors free heap memory */
 #if WIFI_MANAGER_DEBUG
 	xTaskCreatePinnedToCore(&monitoring_task, "monitoring_task", 2048, NULL, 1, NULL, 1);
 #endif
 
-
-    //esp_restart();
 }
