@@ -191,31 +191,38 @@ void wifi_manager_generate_ip_info_json(){
 
 	EventBits_t uxBits = xEventGroupGetBits(wifi_manager_event_group);
 	wifi_config_t *config = wifi_manager_get_wifi_sta_config();
-	if( (uxBits & WIFI_MANAGER_WIFI_CONNECTED_BIT) && config){
+	if(config){
+
+		const char ip_info_json_format[] = ",\"ip\":\"%s\",\"netmask\":\"%s\",\"gw\":\"%s\"}\n";
 
 		memset(ip_info_json, 0x00, JSON_IP_INFO_SIZE);
 
-		tcpip_adapter_ip_info_t ip_info;
-		ESP_ERROR_CHECK(tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_STA, &ip_info));
+
 
 		/* to avoid declaring a new buffer we copy the data directly into the buffer at its correct address */
 		strcpy(ip_info_json, "{\"ssid\":");
 		json_print_string(config->sta.ssid,  (unsigned char*)(ip_info_json+strlen(ip_info_json)) );
 
-		/* rest of the information is copied after the ssid */
-		const char ip_info_json_format[] = ",\"ip\":\"%s\",\"netmask\":\"%s\",\"gw\":\"%s\"}\n";
-		char ip[IP4ADDR_STRLEN_MAX]; /* note: IP4ADDR_STRLEN_MAX is defined in lwip */
-		char gw[IP4ADDR_STRLEN_MAX];
-		char netmask[IP4ADDR_STRLEN_MAX];
+		if((uxBits & WIFI_MANAGER_WIFI_CONNECTED_BIT)){
+			/* rest of the information is copied after the ssid */
+			tcpip_adapter_ip_info_t ip_info;
+			ESP_ERROR_CHECK(tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_STA, &ip_info));
+			char ip[IP4ADDR_STRLEN_MAX]; /* note: IP4ADDR_STRLEN_MAX is defined in lwip */
+			char gw[IP4ADDR_STRLEN_MAX];
+			char netmask[IP4ADDR_STRLEN_MAX];
+			strcpy(ip, ip4addr_ntoa(&ip_info.ip));
+			strcpy(netmask, ip4addr_ntoa(&ip_info.netmask));
+			strcpy(gw, ip4addr_ntoa(&ip_info.gw));
+			sprintf( (ip_info_json + strlen(ip_info_json)), ip_info_json_format,
+					ip,
+					netmask,
+					gw);
+		}
+		else{
+			/* if we are not connected we simply empty and close info for the json */
+			strcpy( (ip_info_json + strlen(ip_info_json)), "}\n");
+		}
 
-		strcpy(ip, ip4addr_ntoa(&ip_info.ip));
-		strcpy(netmask, ip4addr_ntoa(&ip_info.netmask));
-		strcpy(gw, ip4addr_ntoa(&ip_info.gw));
-
-		sprintf( (ip_info_json + strlen(ip_info_json)), ip_info_json_format,
-				ip,
-				netmask,
-				gw);
 	}
 	else{
 		wifi_manager_clear_ip_info_json();
@@ -530,8 +537,16 @@ void wifi_manager( void * pvParameters ){
 					abort();
 				}
 
-				/* save wifi config in NVS */
-				wifi_manager_save_sta_config();
+				/* only save the config if the connection was successful! */
+				if(uxBits & WIFI_MANAGER_WIFI_CONNECTED_BIT){
+					/* save wifi config in NVS */
+					wifi_manager_save_sta_config();
+				}
+				else{
+					/* otherwise: reset the config */
+					memset(wifi_manager_config_sta, 0x00, sizeof(wifi_config_t));
+				}
+
 			}
 			else{
 				/* hit portMAX_DELAY limit ? */
@@ -564,4 +579,5 @@ void wifi_manager( void * pvParameters ){
 			xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_WIFI_SCAN);
 		}
 	} /* for(;;) */
+	vTaskDelay( (TickType_t)10 );
 } /*void wifi_manager*/
