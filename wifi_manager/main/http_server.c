@@ -143,7 +143,7 @@ char* http_server_get_authorization_token(char *buffer, int *len) {
 	while (*ptr != '\0' && *ptr != '\n') {
 		if (*ptr == '\x02') {
 			ret = ++ptr;
-			//find the end of text char
+			/* find the end of text char. To avoid out of bounds, new lines and 0x00 are considered showstoppers as well. */
 			while (*ptr != '\x03' && *ptr != '\n' && *ptr != '\0') {
 				(*len)++;
 				ptr++;
