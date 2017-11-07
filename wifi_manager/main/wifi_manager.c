@@ -39,6 +39,7 @@ Contains the freeRTOS task and all necessary support
 #include "freertos/event_groups.h"
 #include "esp_event_loop.h"
 #include "esp_wifi.h"
+#include "esp_wifi_types.h"
 #include "esp_log.h"
 #include "nvs.h"
 #include "nvs_flash.h"
@@ -247,7 +248,7 @@ void wifi_manager_generate_acess_points_json(){
 		char one_ap[JSON_ONE_APP_SIZE];
 
 		wifi_ap_record_t ap = accessp_records[i];
-		sprintf(one_ap, oneap_str,
+		snprintf(one_ap, (size_t)JSON_ONE_APP_SIZE, oneap_str,
 				json_escape_string((char*)ap.ssid),
 				ap.primary,
 				ap.rssi,
