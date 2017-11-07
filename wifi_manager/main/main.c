@@ -85,11 +85,12 @@ void app_main()
 	xTaskCreate(&http_server, "http_server", 2048, NULL, 5, &task_http_server);
 
 	/* start the wifi manager task */
-	xTaskCreate(&wifi_manager, "wifi_manager", 2048, NULL, 4, &task_wifi_manager);
+	xTaskCreate(&wifi_manager, "wifi_manager", 4096, NULL, 4, &task_wifi_manager);
 
 	/* your code should go here. In debug mode we create a simple task on core 2 that monitors free heap memory */
 #if WIFI_MANAGER_DEBUG
 	xTaskCreatePinnedToCore(&monitoring_task, "monitoring_task", 2048, NULL, 1, NULL, 1);
 #endif
+
 
 }
