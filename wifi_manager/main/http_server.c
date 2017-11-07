@@ -51,9 +51,24 @@ SOFTWARE.
 #include "lwip/api.h"
 #include "lwip/err.h"
 #include "lwip/netdb.h"
+#include "lwip/opt.h"
+#include "lwip/memp.h"
+#include "lwip/ip.h"
+#include "lwip/raw.h"
+#include "lwip/udp.h"
+#include "lwip/priv/api_msg.h"
+#include "lwip/priv/tcp_priv.h"
+#include "lwip/priv/tcpip_priv.h"
+
+
+
 
 #include "http_server.h"
 #include "wifi_manager.h"
+
+
+
+
 
 
 EventGroupHandle_t http_server_event_group;
@@ -128,6 +143,7 @@ void http_server(void *pvParameters) {
 		if (err == ERR_OK) {
 			http_server_netconn_serve(newconn);
 			netconn_delete(newconn);
+			netconn_free(newconn);
 		}
 		vTaskDelay( (TickType_t)10 ); /* allows the freeRTOS scheduler clean up stack without impacting performances of the server */
 	} while(err == ERR_OK);
@@ -294,7 +310,7 @@ void http_server_netconn_serve(struct netconn *conn) {
 				}
 
 				if(!found){
-					//bad request
+					/* bad request the authentification header is not complete/not the correct format */
 					netconn_write(conn, http_400_hdr, sizeof(http_400_hdr) - 1, NETCONN_NOCOPY);
 				}
 			}
@@ -307,8 +323,8 @@ void http_server_netconn_serve(struct netconn *conn) {
 		}
 	}
 
-	// close the connection and free the buffer
+	/* free the buffer */
 	netbuf_delete(inbuf);
-	netconn_close(conn);
+
 
 }
