@@ -77,30 +77,17 @@ EventBits_t uxBits;
 /* embedded binary data */
 extern const uint8_t style_css_start[] asm("_binary_style_css_start");
 extern const uint8_t style_css_end[]   asm("_binary_style_css_end");
-/*extern const uint8_t jquery_js_start[] asm("_binary_jquery_js_start");
-extern const uint8_t jquery_js_end[] asm("_binary_jquery_js_end");*/
 extern const uint8_t jquery_gz_start[] asm("_binary_jquery_gz_start");
 extern const uint8_t jquery_gz_end[] asm("_binary_jquery_gz_end");
 extern const uint8_t code_js_start[] asm("_binary_code_js_start");
 extern const uint8_t code_js_end[] asm("_binary_code_js_end");
 extern const uint8_t index_html_start[] asm("_binary_index_html_start");
 extern const uint8_t index_html_end[] asm("_binary_index_html_end");
-extern const uint8_t lock_png_start[] asm("_binary_lock_png_start");
-extern const uint8_t lock_png_end[] asm("_binary_lock_png_end");
-extern const uint8_t wifi0_png_start[] asm("_binary_wifi0_png_start");
-extern const uint8_t wifi0_png_end[] asm("_binary_wifi0_png_end");
-extern const uint8_t wifi1_png_start[] asm("_binary_wifi1_png_start");
-extern const uint8_t wifi1_png_end[] asm("_binary_wifi1_png_end");
-extern const uint8_t wifi2_png_start[] asm("_binary_wifi2_png_start");
-extern const uint8_t wifi2_png_end[] asm("_binary_wifi2_png_end");
-extern const uint8_t wifi3_png_start[] asm("_binary_wifi3_png_start");
-extern const uint8_t wifi3_png_end[] asm("_binary_wifi3_png_end");
 
 
 /* const http headers stored in ROM */
 const static char http_html_hdr[] = "HTTP/1.1 200 OK\nContent-type: text/html\n\n";
-const static char http_png_hdr[] = "HTTP/1.1 200 OK\nContent-type: image/png\n\n";
-const static char http_css_hdr[] = "HTTP/1.1 200 OK\nContent-type: text/css\n\n";
+const static char http_css_hdr[] = "HTTP/1.1 200 OK\nContent-type: text/css\nCache-Control: public, max-age=31536000\n\n";
 const static char http_js_hdr[] = "HTTP/1.1 200 OK\nContent-type: text/javascript\n\n";
 const static char http_jquery_gz_hdr[] = "HTTP/1.1 200 OK\nContent-type: text/javascript\nAccept-Ranges: bytes\nContent-Length: 29995\nContent-Encoding: gzip\n\n";
 const static char http_json_hdr[] = "HTTP/1.1 200 OK\nContent-type: application/json\n\n";
@@ -219,32 +206,10 @@ void http_server_netconn_serve(struct netconn *conn) {
 				}
 				/* request a wifi scan */
 				wifi_manager_scan_async();
-
-
 			}
 			else if(strstr(line, "GET /style.css ")) {
 				netconn_write(conn, http_css_hdr, sizeof(http_css_hdr) - 1, NETCONN_NOCOPY);
 				netconn_write(conn, style_css_start, style_css_end - style_css_start, NETCONN_NOCOPY);
-			}
-			else if(strstr(line, "GET /lock.png ")) {
-				netconn_write(conn, http_png_hdr, sizeof(http_png_hdr) - 1, NETCONN_NOCOPY);
-				netconn_write(conn, lock_png_start, lock_png_end - lock_png_start, NETCONN_NOCOPY);
-			}
-			else if(strstr(line, "GET /wifi0.png ")) {
-				netconn_write(conn, http_png_hdr, sizeof(http_png_hdr) - 1, NETCONN_NOCOPY);
-				netconn_write(conn, wifi0_png_start, wifi0_png_end - wifi0_png_start, NETCONN_NOCOPY);
-			}
-			else if(strstr(line, "GET /wifi1.png ")) {
-				netconn_write(conn, http_png_hdr, sizeof(http_png_hdr) - 1, NETCONN_NOCOPY);
-				netconn_write(conn, wifi1_png_start, wifi1_png_end - wifi1_png_start, NETCONN_NOCOPY);
-			}
-			else if(strstr(line, "GET /wifi2.png ")) {
-				netconn_write(conn, http_png_hdr, sizeof(http_png_hdr) - 1, NETCONN_NOCOPY);
-				netconn_write(conn, wifi2_png_start, wifi2_png_end - wifi2_png_start, NETCONN_NOCOPY);
-			}
-			else if(strstr(line, "GET /wifi3.png ")) {
-				netconn_write(conn, http_png_hdr, sizeof(http_png_hdr) - 1, NETCONN_NOCOPY);
-				netconn_write(conn, wifi3_png_start, wifi3_png_end - wifi3_png_start, NETCONN_NOCOPY);
 			}
 			else if(strstr(line, "GET /status ")){
 				if(wifi_manager_lock_json_buffer(( TickType_t ) 10)){
@@ -291,7 +256,7 @@ void http_server_netconn_serve(struct netconn *conn) {
 								memcpy(config->sta.ssid, ssid, lenS);
 								memcpy(config->sta.password, password, lenP);
 #if WIFI_MANAGER_DEBUG
-				printf("http_server_netconn_serve: wifi_manager_connect_async() call\n");
+								printf("http_server_netconn_serve: wifi_manager_connect_async() call\n");
 #endif
 								//initialize connection sequence
 								wifi_manager_connect_async();
