@@ -36,6 +36,9 @@ SOFTWARE.
 #ifndef HTTP_SERVER_H_INCLUDED
 #define HTTP_SERVER_H_INCLUDED
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #define HTTP_SERVER_START_BIT_0	( 1 << 0 )
 
@@ -44,6 +47,8 @@ void http_server(void *pvParameters);
 void http_server_netconn_serve(struct netconn *conn);
 void http_server_set_event_start();
 
-
+#ifdef __cplusplus
+}
+#endif
 
 #endif

@@ -25,11 +25,23 @@ OTHER DEALINGS IN THE SOFTWARE.
 @see https://github.com/DaveGamble/cJSON
 */
 
-#ifndef MAIN_JSON_H_
-#define MAIN_JSON_H_
+#ifndef JSON_H_INCLUDED
+#define JSON_H_INCLUDED
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-char* json_escape_string(char *str);
+/**
+ * @brief Render the cstring provided to a JSON escaped version that can be printed.
+ * @param input the input buffer to be escaped.
+ * @param output_buffer the output buffer to write to. You must ensure it is big enough to contain the final string.
+ * @see cJSON equivlaent static cJSON_bool print_string_ptr(const unsigned char * const input, printbuffer * const output_buffer)
+ */
 bool json_print_string(const unsigned char *input, unsigned char *output_buffer);
 
-#endif /* MAIN_JSON_H_ */
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* JSON_H_INCLUDED */
