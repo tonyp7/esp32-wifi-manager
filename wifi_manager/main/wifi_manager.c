@@ -241,23 +241,30 @@ void wifi_manager_generate_acess_points_json(){
 	strcpy(accessp_json, "[");
 
 
-	const char oneap_str[] = "{\"ssid\":\"%s\",\"chan\":%d,\"rssi\":%d,\"auth\":%d}%c\n";
+	const char oneap_str[] = ",\"chan\":%d,\"rssi\":%d,\"auth\":%d}%c\n";
+
+	/* stack buffer to hold on to one AP until it's copied over to accessp_json */
+	char one_ap[JSON_ONE_APP_SIZE];
 
 	for(int i=0; i<ap_num;i++){
 
-		char one_ap[JSON_ONE_APP_SIZE];
-
 		wifi_ap_record_t ap = accessp_records[i];
+
+		/* ssid needs to be json escaped. To save on heap memory it's directly printed at the correct address */
+		strcat(accessp_json, "{\"ssid\":");
+		json_print_string( (unsigned char*)ap.ssid,  (unsigned char*)(accessp_json+strlen(accessp_json)) );
+
+		/* print the rest of the json for this access point: no more string to escape */
 		snprintf(one_ap, (size_t)JSON_ONE_APP_SIZE, oneap_str,
-				json_escape_string((char*)ap.ssid),
 				ap.primary,
 				ap.rssi,
 				ap.authmode,
-				i==ap_num-1?' ':',');
-		strcat (accessp_json, one_ap);
+				i==ap_num-1?']':',');
+
+		/* add it to the list */
+		strcat(accessp_json, one_ap);
 	}
 
-	strcat(accessp_json, "]\n");
 }
 
 
@@ -340,23 +347,24 @@ char* wifi_manager_get_ip_info_json(){
 
 void wifi_manager_destroy(){
 
-	/* buffers */
+	/* heap buffers */
 	free(accessp_records);
 	accessp_records = NULL;
 	free(accessp_json);
 	accessp_json = NULL;
 	free(ip_info_json);
 	ip_info_json = NULL;
+	if(wifi_manager_config_sta){
+		free(wifi_manager_config_sta);
+		wifi_manager_config_sta = NULL;
+	}
 
 	/* RTOS objects */
 	vSemaphoreDelete(wifi_manager_json_mutex);
 	wifi_manager_json_mutex = NULL;
 	vEventGroupDelete(wifi_manager_event_group);
 
-	if(wifi_manager_config_sta){
-		free(wifi_manager_config_sta);
-		wifi_manager_config_sta = NULL;
-	}
+	vTaskDelete(NULL);
 }
 
 
