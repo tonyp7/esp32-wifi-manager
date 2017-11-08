@@ -224,7 +224,7 @@ function refreshAPHTML(data){
 
 function checkStatus(){
 	$.getJSON( "/status", function( data ) {
-		if(data["ssid"] && (data["ssid"] === selectedSSID)){
+		if(data["ssid"] && ( (data["ssid"] === selectedSSID) || selectedSSID === "") ){
 			if(data["ip"]){
 				//got connection
 				currentConnection = data;
