@@ -15,7 +15,6 @@ var apList = null;
 var selectedSSID = "";
 var refreshAPInterval = null; 
 var checkStatusInterval = null;
-var currentConnection = null;
 
 
 function stopCheckStatusInterval(){
@@ -55,12 +54,20 @@ $(function() {
 		$( "#wifi" ).slideUp( "fast", function() {});
 		$( "#connect" ).slideDown( "fast", function() {});
 		
+		//update wait screen
+		$( "#loading" ).show();
+		$( "#connect-success" ).hide();
+		$( "#connect-fail" ).hide();		
 	});
 	
 	$("#cancel").on("click", function() {
+		selectedSSID = "";
 		$( "#connect" ).slideUp( "fast", function() {});
 		$( "#wifi" ).slideDown( "fast", function() {});
-		
+	});
+	
+	$(document).on("click", "#join", function() {
+		performConnect();
 	});
 	
 	$("#ok-details").on("click", function() {
@@ -97,6 +104,10 @@ $(function() {
 	});
 	
 	$("#yes-disconnect").on("click", function() {
+		
+		stopCheckStatusInterval();
+		selectedSSID = "";
+		
 		$( "#diag-disconnect" ).slideUp( "fast", function() {});
 		$( "#connect-details-wrap" ).removeClass('blur');
 		
@@ -108,6 +119,8 @@ $(function() {
 			}
 		});
 		
+		startCheckStatusInterval();
+		
 		$( "#connect-details" ).slideUp( "fast", function() {});
 		$( "#wifi" ).slideDown( "fast", function() {})
 	});
@@ -116,9 +129,7 @@ $(function() {
 	
 	
 	
-	$(document).on("click", "#join", function() {
-		performConnect();
-	});
+	
 	
 	
 	//first time the page loads: attempt get the connection status and start the wifi scan
@@ -222,52 +233,68 @@ function refreshAPHTML(data){
 	$( "#wifi-list" ).html(h)
 }
 
+
+
+
 function checkStatus(){
 	$.getJSON( "/status", function( data ) {
-		if(data["ssid"] && ( (data["ssid"] === selectedSSID) || selectedSSID === "") ){
-			if(data["ip"]){
-				//got connection
-				currentConnection = data;
-				$("#connected-to span").text(data["ssid"]);
-				$("#connect-details h1").text(data["ssid"]);
-				$("#ip").text(data["ip"]);
-				$("#netmask").text(data["netmask"]);
-				$("#gw").text(data["gw"]);
-				
-				$("#wifi-status").slideDown( "fast", function() {});
-				
-				//unlock the wait screen if needed
-				$( "#ok-connect" ).prop("disabled",false);
-				
-				//update wait screen
-				$( "#loading" ).hide();
-				$( "#connect-success" ).show();
-				$( "#connect-fail" ).hide();
+		if(data.hasOwnProperty('ssid') && data['ssid'] != ""){
+			if(data["ssid"] === selectedSSID){
+				//that's a connection attempt
+				if(data["urc"] === 0){
+					//got connection
+					$("#connected-to span").text(data["ssid"]);
+					$("#connect-details h1").text(data["ssid"]);
+					$("#ip").text(data["ip"]);
+					$("#netmask").text(data["netmask"]);
+					$("#gw").text(data["gw"]);
+					$("#wifi-status").slideDown( "fast", function() {});
+					
+					//unlock the wait screen if needed
+					$( "#ok-connect" ).prop("disabled",false);
+					
+					//update wait screen
+					$( "#loading" ).hide();
+					$( "#connect-success" ).show();
+					$( "#connect-fail" ).hide();
+				}
+				else if(data["urc"] === 1){
+					//failed attempt
+					$("#connected-to span").text('');
+					$("#connect-details h1").text('');
+					$("#ip").text('0.0.0.0');
+					$("#netmask").text('0.0.0.0');
+					$("#gw").text('0.0.0.0');
+					
+					//don't show any connection
+					$("#wifi-status").slideUp( "fast", function() {});
+					
+					//unlock the wait screen
+					$( "#ok-connect" ).prop("disabled",false);
+					
+					//update wait screen
+					$( "#loading" ).hide();
+					$( "#connect-fail" ).show();
+					$( "#connect-success" ).hide();
+				}
 			}
-			else{
-				//disconnected
-				currentConnection = null;
-				$("#connected-to span").text('');
-				$("#connect-details h1").text('');
-				$("#ip").text('0.0.0.0');
-				$("#netmask").text('0.0.0.0');
-				$("#gw").text('0.0.0.0');
-				
-				//don't show any connection
-				$("#wifi-status").slideUp( "fast", function() {});
-				
-				//unlock the wait screen
-				$( "#ok-connect" ).prop("disabled",false);
-				
-				//update wait screen
-				$( "#loading" ).hide();
-				$( "#connect-fail" ).show();
-				$( "#connect-success" ).hide();
+			else if(data.hasOwnProperty('urc') && data['urc'] === 0){
+				//ESP32 is already connected to a wifi without having the user do anything
+				if( !($("#wifi-status").is(":visible")) ){
+					$("#connected-to span").text(data["ssid"]);
+					$("#connect-details h1").text(data["ssid"]);
+					$("#ip").text(data["ip"]);
+					$("#netmask").text(data["netmask"]);
+					$("#gw").text(data["gw"]);
+					$("#wifi-status").slideDown( "fast", function() {});
+				}
 			}
-
 		}
-		else{
-			//empty json: connection info is not available yet
+		else if(data.hasOwnProperty('urc') && data['urc'] === 2){
+			//that's a manual disconnect
+			if($("#wifi-status").is(":visible")){
+				$("#wifi-status").slideUp( "fast", function() {});
+			}
 		}
 	})
 	.fail(function() {
@@ -276,5 +303,3 @@ function checkStatus(){
 
 
 }
-
-
