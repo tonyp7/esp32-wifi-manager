@@ -132,7 +132,7 @@ void http_server(void *pvParameters) {
 			netconn_delete(newconn);
 			netconn_free(newconn);
 		}
-		vTaskDelay( (TickType_t)10 ); /* allows the freeRTOS scheduler clean up stack without impacting performances of the server */
+		vTaskDelay( (TickType_t)10); /* allows the freeRTOS scheduler to take over if needed */
 	} while(err == ERR_OK);
 	netconn_close(conn);
 	netconn_delete(conn);
