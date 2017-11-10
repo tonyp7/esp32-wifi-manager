@@ -1,6 +1,16 @@
 # What is esp32-wifi-manager?
-esp32-wifi-manager allows an ESP32 to connect to a previously saved wifi or start an access point where you can connect to existing wifis.
-Selection and connection to a wifi is done through any wifi-able device such as a mobile phone or a laptop: simply connect to the ESP32 access point, select the wifi in your browser and connect to it!
+*esp32-wifi-manager* is an esp32 program that enables easy management of wifi networks through a web application.
 
-# What does it look like?
-![esp32-wifi-manager on an mobile device](https://idyl.io/wp-content/uploads/2017/10/esp32-wifi-manager.png "esp32-wifi-manager")
+*esp32-wifi-manager* is **lightweight** (4KB of task stack in total) and barely uses any CPU power through a completely event driven architecture. Not a single CPU cycle 
+
+For real time constrained applications, *esp32-wifi-manager* can live entirely on PRO CPU, leaving the entire APP CPU untouched for your own needs.
+
+*esp32-wifi-manager* will automatically attempt to re-connect to a previously saved network on boot, and it will start its own wifi access point through which you can manage wifi networks.
+
+*esp32-wifi-manager* is an esp-idf project that compiles successfully with the esp-idf 3.0 WiP release. You can simply copy the project and start adding your own code to it.
+
+# Look and Feel
+![esp32-wifi-manager on an mobile device](https://idyl.io/wp-content/uploads/2017/11/esp32-wifi-manager-password.png "esp32-wifi-manager") ![esp32-wifi-manager on an mobile device](https://idyl.io/wp-content/uploads/2017/11/esp32-wifi-manager-connected-to.png "esp32-wifi-manager")
+
+# License
+*esp32-wifi-manager* is MIT licensed. As such, it can be included in any projects, even commercial ones. Please make sure you read the license file.
