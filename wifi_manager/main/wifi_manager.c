@@ -188,13 +188,12 @@ void wifi_manager_clear_ip_info_json(){
 }
 
 
-void wifi_manager_generate_ip_info_json(){
+void wifi_manager_generate_ip_info_json(update_reason_code_t update_reason_code){
 
-	EventBits_t uxBits = xEventGroupGetBits(wifi_manager_event_group);
 	wifi_config_t *config = wifi_manager_get_wifi_sta_config();
 	if(config){
 
-		const char ip_info_json_format[] = ",\"ip\":\"%s\",\"netmask\":\"%s\",\"gw\":\"%s\"}\n";
+		const char ip_info_json_format[] = ",\"ip\":\"%s\",\"netmask\":\"%s\",\"gw\":\"%s\",\"urc\":%d}\n";
 
 		memset(ip_info_json, 0x00, JSON_IP_INFO_SIZE);
 
@@ -204,7 +203,7 @@ void wifi_manager_generate_ip_info_json(){
 		strcpy(ip_info_json, "{\"ssid\":");
 		json_print_string(config->sta.ssid,  (unsigned char*)(ip_info_json+strlen(ip_info_json)) );
 
-		if((uxBits & WIFI_MANAGER_WIFI_CONNECTED_BIT)){
+		if(update_reason_code == UPDATE_CONNECTION_OK){
 			/* rest of the information is copied after the ssid */
 			tcpip_adapter_ip_info_t ip_info;
 			ESP_ERROR_CHECK(tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_STA, &ip_info));
@@ -214,16 +213,21 @@ void wifi_manager_generate_ip_info_json(){
 			strcpy(ip, ip4addr_ntoa(&ip_info.ip));
 			strcpy(netmask, ip4addr_ntoa(&ip_info.netmask));
 			strcpy(gw, ip4addr_ntoa(&ip_info.gw));
-			sprintf( (ip_info_json + strlen(ip_info_json)), ip_info_json_format,
+
+			snprintf( (ip_info_json + strlen(ip_info_json)), JSON_IP_INFO_SIZE, ip_info_json_format,
 					ip,
 					netmask,
-					gw);
+					gw,
+					(int)update_reason_code);
 		}
 		else{
-			/* if we are not connected we simply empty and close info for the json */
-			strcpy( (ip_info_json + strlen(ip_info_json)), "}\n");
+			/* notify in the json output the reason code why this was updated without a connection */
+			snprintf( (ip_info_json + strlen(ip_info_json)), JSON_IP_INFO_SIZE, ip_info_json_format,
+								"0",
+								"0",
+								"0",
+								(int)update_reason_code);
 		}
-
 	}
 	else{
 		wifi_manager_clear_ip_info_json();
@@ -336,6 +340,14 @@ wifi_config_t* wifi_manager_get_wifi_sta_config(){
 
 
 void wifi_manager_connect_async(){
+	/* in order to avoid a false positive on the front end app we need to quickly flush the ip json
+	 * There'se a risk the front end sees an IP or a password error when in fact
+	 * it's a remnant from a previous connection
+	 */
+	if(wifi_manager_lock_json_buffer( portMAX_DELAY )){
+		wifi_manager_clear_ip_info_json();
+		wifi_manager_unlock_json_buffer();
+	}
 	xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_STA_CONNECT_BIT);
 }
 
@@ -484,7 +496,7 @@ void wifi_manager( void * pvParameters ){
 
 			/* update JSON status */
 			if(wifi_manager_lock_json_buffer( portMAX_DELAY )){
-				wifi_manager_generate_ip_info_json();
+				wifi_manager_generate_ip_info_json(UPDATE_USER_DISCONNECT);
 				wifi_manager_unlock_json_buffer();
 			}
 			else{
@@ -502,15 +514,6 @@ void wifi_manager( void * pvParameters ){
 
 			/* first thing: if the esp32 is already connected to a access point: disconnect */
 			if( (uxBits & WIFI_MANAGER_WIFI_CONNECTED_BIT) == (WIFI_MANAGER_WIFI_CONNECTED_BIT) ){
-
-				/* in order to avoid a false positive on the front end app we need to quickly flush the ip json
-				 * There'se a risk the front end sees an IP and think the esp32 is connected when in fact
-				 * it's a remnant from a previous connection
-				 */
-				if(wifi_manager_lock_json_buffer( portMAX_DELAY )){
-					wifi_manager_clear_ip_info_json();
-					wifi_manager_unlock_json_buffer();
-				}
 
 				xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_STA_DISCONNECT_BIT);
 				ESP_ERROR_CHECK(esp_wifi_disconnect());
@@ -534,9 +537,29 @@ void wifi_manager( void * pvParameters ){
 
 				/* Update the json regardless of connection status.
 				 * If connection was succesful an IP will get assigned.
+				 * If the connection attempt is failed we mark it as a failed connection attempt
+				 * as it is important for the front end app to distinguish failed attempt to
+				 * regular disconnects
 				 */
 				if(wifi_manager_lock_json_buffer( portMAX_DELAY )){
-					wifi_manager_generate_ip_info_json();
+
+					/* only save the config if the connection was successful! */
+					if(uxBits & WIFI_MANAGER_WIFI_CONNECTED_BIT){
+
+						/* generate the connection info with success */
+						wifi_manager_generate_ip_info_json( UPDATE_CONNECTION_OK );
+
+						/* save wifi config in NVS */
+						wifi_manager_save_sta_config();
+					}
+					else{
+
+						/* failed attempt to connect regardles of the reason */
+						wifi_manager_generate_ip_info_json( UPDATE_FAILED_ATTEMPT );
+
+						/* otherwise: reset the config */
+						memset(wifi_manager_config_sta, 0x00, sizeof(wifi_config_t));
+					}
 					wifi_manager_unlock_json_buffer();
 				}
 				else{
@@ -545,17 +568,6 @@ void wifi_manager( void * pvParameters ){
 					 */
 					abort();
 				}
-
-				/* only save the config if the connection was successful! */
-				if(uxBits & WIFI_MANAGER_WIFI_CONNECTED_BIT){
-					/* save wifi config in NVS */
-					wifi_manager_save_sta_config();
-				}
-				else{
-					/* otherwise: reset the config */
-					memset(wifi_manager_config_sta, 0x00, sizeof(wifi_config_t));
-				}
-
 			}
 			else{
 				/* hit portMAX_DELAY limit ? */
@@ -588,5 +600,5 @@ void wifi_manager( void * pvParameters ){
 			xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_WIFI_SCAN);
 		}
 	} /* for(;;) */
-	vTaskDelay( (TickType_t)10 );
+	vTaskDelay( (TickType_t)10);
 } /*void wifi_manager*/

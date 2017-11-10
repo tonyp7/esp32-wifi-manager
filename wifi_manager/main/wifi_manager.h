@@ -106,10 +106,18 @@ extern "C" {
 /**
  * @brief Defines the maximum length in bytes of a JSON representation of the IP information
  * assuming all ips are 4*3 digits, and all characters in the ssid require to be escaped.
- * example: {"ssid":"abcdefghijklmnopqrstuvwxyz012345","ip":"192.168.1.119","netmask":"255.255.255.0","gw":"192.168.1.1"}
+ * example: {"ssid":"abcdefghijklmnopqrstuvwxyz012345","ip":"192.168.1.119","netmask":"255.255.255.0","gw":"192.168.1.1","urc":0}
  */
-#define JSON_IP_INFO_SIZE 142
+#define JSON_IP_INFO_SIZE 150
 
+
+
+typedef enum update_reason_code_t {
+	UPDATE_CONNECTION_OK = 0,
+	UPDATE_FAILED_ATTEMPT = 1,
+	UPDATE_USER_DISCONNECT = 2,
+	UPDATE_LOST_CONNECTION = 3
+}update_reason_code_t;
 
 /**
  * Frees up all memory allocated by the wifi_manager and kill the task.
@@ -196,7 +204,7 @@ void wifi_manager_unlock_json_buffer();
  * @brief Generates the connection status json: ssid and IP addresses.
  * @note This is not thread-safe and should be called only if wifi_manager_lock_json_buffer call is successful.
  */
-void wifi_manager_generate_ip_info_json();
+void wifi_manager_generate_ip_info_json(update_reason_code_t update_reason_code);
 /**
  * @brief Clears the connection status json.
  * @note This is not thread-safe and should be called only if wifi_manager_lock_json_buffer call is successful.
