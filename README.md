@@ -13,4 +13,4 @@ For real time constrained applications, *esp32-wifi-manager* can live entirely o
 ![esp32-wifi-manager on an mobile device](https://idyl.io/wp-content/uploads/2017/11/esp32-wifi-manager-password.png "esp32-wifi-manager") ![esp32-wifi-manager on an mobile device](https://idyl.io/wp-content/uploads/2017/11/esp32-wifi-manager-connected-to.png "esp32-wifi-manager")
 
 # License
-*esp32-wifi-manager* is MIT licensed. As such, it can be included in any projects, even commercial ones. Please make sure you read the license file.
+*esp32-wifi-manager* is MIT licensed. As such, it can be included in any project. Please make sure to read the license file.
