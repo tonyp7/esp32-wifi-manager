@@ -39,7 +39,7 @@ function startRefreshAPInterval(){
 	refreshAPInterval = setInterval(refreshAP, 2800);
 }
 
-$(function() {
+$(document).ready(function(){
 	
 	
 	$("#wifi-status").on("click", ".ape", function() {
@@ -66,7 +66,7 @@ $(function() {
 		$( "#wifi" ).slideDown( "fast", function() {});
 	});
 	
-	$(document).on("click", "#join", function() {
+	$("#join").on("click", function() {
 		performConnect();
 	});
 	
@@ -112,13 +112,13 @@ $(function() {
 		$( "#connect-details-wrap" ).removeClass('blur');
 		
 		$.ajax({
-			url: '/connect',
-			type: 'DELETE',
-			success: function(result) {
-				
-			}
+			url: '/connect.json',
+			dataType: 'json',
+			method: 'DELETE',
+			cache: false,
+			data: { 'timestamp': Date.now()}
 		});
-		
+
 		startCheckStatusInterval();
 		
 		$( "#connect-details" ).slideUp( "fast", function() {});
@@ -166,23 +166,17 @@ function performConnect(){
 	$( "#connect-wait" ).slideDown( "fast", function() {});
 	
 	
-	
-	var xhr = new XMLHttpRequest();
-	xhr.onload = function() {
-		if(this.status == 200){
-			//start refreshing every now and then the IP page
-			//to see if the connection to the STA is made
-		}
-		else{
-			//alert(this.responseText);
-		}
-	};
-	
 	var pwd = $("#pwd").val();
-	xhr.open("POST", "/connect", true);
-	xhr.setRequestHeader('Authorization', "\x02{0}\x03\x02{1}\x03".format(selectedSSID, pwd));
-	xhr.send();
-	
+	$.ajax({
+		url: '/connect.json',
+		dataType: 'json',
+		method: 'POST',
+		cache: false,
+		headers: { 'X-Custom-ssid': selectedSSID, 'X-Custom-pwd': pwd },
+		data: { 'timestamp': Date.now()}
+	});
+
+
 	//now we can re-set the intervals regardless of result
 	startCheckStatusInterval();
 	startRefreshAPInterval();
@@ -225,7 +219,6 @@ function refreshAP(){
 function refreshAPHTML(data){
 	var h = "";
 	data.forEach(function(e, idx, array) {
-		//<div class="ape brdb"><div class="w0"><div class="pw">a0308</div></div></div>
 		h += '<div class="ape{0}"><div class="{1}"><div class="{2}">{3}</div></div></div>'.format(idx === array.length - 1?'':' brdb', rssiToIcon(e.rssi), e.auth==0?'':'pw',e.ssid);
 		h += "\n";
 	});
@@ -237,7 +230,7 @@ function refreshAPHTML(data){
 
 
 function checkStatus(){
-	$.getJSON( "/status", function( data ) {
+	$.getJSON( "/status.json", function( data ) {
 		if(data.hasOwnProperty('ssid') && data['ssid'] != ""){
 			if(data["ssid"] === selectedSSID){
 				//that's a connection attempt

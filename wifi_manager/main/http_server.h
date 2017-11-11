@@ -47,6 +47,9 @@ void http_server(void *pvParameters);
 void http_server_netconn_serve(struct netconn *conn);
 void http_server_set_event_start();
 
+
+char* http_server_get_header(char *request, char *header_name, int *len);
+
 #ifdef __cplusplus
 }
 #endif

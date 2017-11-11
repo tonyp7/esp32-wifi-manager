@@ -90,10 +90,10 @@ const static char http_html_hdr[] = "HTTP/1.1 200 OK\nContent-type: text/html\n\
 const static char http_css_hdr[] = "HTTP/1.1 200 OK\nContent-type: text/css\nCache-Control: public, max-age=31536000\n\n";
 const static char http_js_hdr[] = "HTTP/1.1 200 OK\nContent-type: text/javascript\n\n";
 const static char http_jquery_gz_hdr[] = "HTTP/1.1 200 OK\nContent-type: text/javascript\nAccept-Ranges: bytes\nContent-Length: 29995\nContent-Encoding: gzip\n\n";
-const static char http_json_hdr[] = "HTTP/1.1 200 OK\nContent-type: application/json\n\n";
 const static char http_400_hdr[] = "HTTP/1.1 400 Bad Request\nContent-Length: 0\n\n";
 const static char http_404_hdr[] = "HTTP/1.1 404 Not Found\nContent-Length: 0\n\n";
 const static char http_503_hdr[] = "HTTP/1.1 503 Service Unavailable\nContent-Length: 0\n\n";
+const static char http_ok_json_no_cache_hdr[] = "HTTP/1.1 200 OK\nContent-type: application/json\nCache-Control: no-store, no-cache, must-revalidate, max-age=0\nPragma: no-cache\n\n";
 
 
 
@@ -139,24 +139,27 @@ void http_server(void *pvParameters) {
 }
 
 
-char* http_server_get_authorization_token(char *buffer, int *len) {
+char* http_server_get_header(char *request, char *header_name, int *len) {
+	const char new_line[2] = "\n";
 	*len = 0;
-	char* ptr = buffer;
-	char* ret = NULL;
-	while (*ptr != '\0' && *ptr != '\n') {
-		if (*ptr == '\x02') {
-			ret = ++ptr;
-			/* find the end of text char. To avoid out of bounds, new lines and 0x00 are considered showstoppers as well. */
-			while (*ptr != '\x03' && *ptr != '\n' && *ptr != '\0') {
-				(*len)++;
-				ptr++;
-			}
-			return ret;
+	char *ret = NULL;
+	char *ptr = NULL;
+
+	ptr = strstr(request, header_name);
+	if (ptr) {
+		ret = ptr + strlen(header_name);
+		ptr = ret;
+		while (*ptr != '\0' && *ptr != '\n' && *ptr != '\r') {
+			(*len)++;
+			ptr++;
 		}
-		ptr++;
+		return ret;
 	}
+
 	return NULL;
+
 }
+
 
 void http_server_netconn_serve(struct netconn *conn) {
 
@@ -193,7 +196,7 @@ void http_server_netconn_serve(struct netconn *conn) {
 			else if(strstr(line, "GET /ap.json ")) {
 				/* if we can get the mutex, write the last version of the AP list */
 				if(wifi_manager_lock_json_buffer(( TickType_t ) 10)){
-					netconn_write(conn, http_json_hdr, sizeof(http_json_hdr) - 1, NETCONN_NOCOPY);
+					netconn_write(conn, http_ok_json_no_cache_hdr, sizeof(http_ok_json_no_cache_hdr) - 1, NETCONN_NOCOPY);
 					char *buff = wifi_manager_get_ap_list_json();
 					netconn_write(conn, buff, strlen(buff), NETCONN_NOCOPY);
 					wifi_manager_unlock_json_buffer();
@@ -211,11 +214,11 @@ void http_server_netconn_serve(struct netconn *conn) {
 				netconn_write(conn, http_css_hdr, sizeof(http_css_hdr) - 1, NETCONN_NOCOPY);
 				netconn_write(conn, style_css_start, style_css_end - style_css_start, NETCONN_NOCOPY);
 			}
-			else if(strstr(line, "GET /status ")){
+			else if(strstr(line, "GET /status.json ")){
 				if(wifi_manager_lock_json_buffer(( TickType_t ) 10)){
 					char *buff = wifi_manager_get_ip_info_json();
 					if(buff){
-						netconn_write(conn, http_json_hdr, sizeof(http_json_hdr) - 1, NETCONN_NOCOPY);
+						netconn_write(conn, http_ok_json_no_cache_hdr, sizeof(http_ok_json_no_cache_hdr) - 1, NETCONN_NOCOPY);
 						netconn_write(conn, buff, strlen(buff), NETCONN_NOCOPY);
 						wifi_manager_unlock_json_buffer();
 					}
@@ -230,54 +233,44 @@ void http_server_netconn_serve(struct netconn *conn) {
 #endif
 				}
 			}
-			else if(strstr(line, "DELETE /connect ")) {
+			else if(strstr(line, "DELETE /connect.json ")) {
 #if WIFI_MANAGER_DEBUG
-				printf("http_server_netconn_serve: DELETE /connect\n");
+				printf("http_server_netconn_serve: DELETE /connect.json\n");
 #endif
 				/* request a disconnection from wifi and forget about it */
 				wifi_manager_disconnect_async();
-				netconn_write(conn, http_html_hdr, sizeof(http_html_hdr) - 1, NETCONN_NOCOPY); /* 200 ok */
+				netconn_write(conn, http_ok_json_no_cache_hdr, sizeof(http_ok_json_no_cache_hdr) - 1, NETCONN_NOCOPY); /* 200 ok */
 			}
-			else if(strstr(line, "POST /connect ")) {
+			else if(strstr(line, "POST /connect.json ")) {
 #if WIFI_MANAGER_DEBUG
-				printf("http_server_netconn_serve: POST /connect\n");
+				printf("http_server_netconn_serve: POST /connect.json\n");
 #endif
+
 				bool found = false;
-				while((line = strtok_r(save_ptr, new_line, &save_ptr))){
-					if(strstr(line, "Authorization:")){
-						int lenS = 0, lenP = 0;
-						char *ssid = http_server_get_authorization_token(line, &lenS);
-						char *password = NULL;
-						if(ssid && lenS <= MAX_SSID_SIZE){
-							password = http_server_get_authorization_token(ssid, &lenP);
-							if(password && lenP <= MAX_PASSWORD_SIZE){
-								wifi_config_t* config = wifi_manager_get_wifi_sta_config();
-								memset(config, 0x00, sizeof(wifi_config_t));
-								memcpy(config->sta.ssid, ssid, lenS);
-								memcpy(config->sta.password, password, lenP);
+				int lenS = 0, lenP = 0;
+				char *ssid = NULL, *password = NULL;
+				ssid = http_server_get_header(save_ptr, "X-Custom-ssid: ", &lenS);
+				password = http_server_get_header(save_ptr, "X-Custom-pwd: ", &lenP);
+
+				if(ssid && lenS <= MAX_SSID_SIZE && password && lenP <= MAX_PASSWORD_SIZE){
+					wifi_config_t* config = wifi_manager_get_wifi_sta_config();
+					memset(config, 0x00, sizeof(wifi_config_t));
+					memcpy(config->sta.ssid, ssid, lenS);
+					memcpy(config->sta.password, password, lenP);
+
 #if WIFI_MANAGER_DEBUG
-								printf("http_server_netconn_serve: wifi_manager_connect_async() call\n");
+					printf("http_server_netconn_serve: wifi_manager_connect_async() call\n");
 #endif
-								//initialize connection sequence
-								wifi_manager_connect_async();
-								netconn_write(conn, http_html_hdr, sizeof(http_html_hdr) - 1, NETCONN_NOCOPY); //200ok
-								found = true;
-							}
-							else{
-								break; /* no point going further, this request is bad and won't be processed */
-							}
-						}
-						else{
-							break; /* no point going further, this request is bad and won't be processed */
-						}
-						break; /* found the Authorization header, no point going further */
-					}
+					wifi_manager_connect_async();
+					netconn_write(conn, http_ok_json_no_cache_hdr, sizeof(http_ok_json_no_cache_hdr) - 1, NETCONN_NOCOPY); //200ok
+					found = true;
 				}
 
 				if(!found){
 					/* bad request the authentification header is not complete/not the correct format */
 					netconn_write(conn, http_400_hdr, sizeof(http_400_hdr) - 1, NETCONN_NOCOPY);
 				}
+
 			}
 			else{
 				netconn_write(conn, http_400_hdr, sizeof(http_400_hdr) - 1, NETCONN_NOCOPY);
