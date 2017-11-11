@@ -9,6 +9,9 @@ For real time constrained applications, *esp32-wifi-manager* can live entirely o
 
 *esp32-wifi-manager* is an esp-idf project that compiles successfully with the esp-idf 3.0 WiP release. You can simply copy the project and start adding your own code to it.
 
+# Demo
+[![esp32-wifi-manager demo](http://img.youtube.com/vi/hxlZi15bym4/0.jpg)](http://www.youtube.com/watch?v=hxlZi15bym4)
+
 # Look and Feel
 ![esp32-wifi-manager on an mobile device](https://idyl.io/wp-content/uploads/2017/11/esp32-wifi-manager-password.png "esp32-wifi-manager") ![esp32-wifi-manager on an mobile device](https://idyl.io/wp-content/uploads/2017/11/esp32-wifi-manager-connected-to.png "esp32-wifi-manager")
 
