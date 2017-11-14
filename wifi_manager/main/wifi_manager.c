@@ -87,7 +87,6 @@ const int WIFI_MANAGER_REQUEST_WIFI_SCAN = BIT5;
 /* @brief When set, means a client requested to disconnect from currently connected AP. */
 const int WIFI_MANAGER_REQUEST_WIFI_DISCONNECT = BIT6;
 
-//wifi_config_t wifi_config;
 
 void wifi_manager_scan_async(){
 	xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_WIFI_SCAN);
@@ -95,11 +94,6 @@ void wifi_manager_scan_async(){
 
 void wifi_manager_disconnect_async(){
 	xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_WIFI_DISCONNECT);
-}
-
-void set_wifi_sta_config(char *ssid, char *password){
-	strcpy((char*)wifi_manager_config_sta->sta.ssid, (char*)ssid);
-	strcpy((char*)wifi_manager_config_sta->sta.password, (char*)password);
 }
 
 
@@ -178,11 +172,6 @@ bool wifi_manager_fetch_wifi_sta_config(){
 }
 
 
-
-
-
-
-
 void wifi_manager_clear_ip_info_json(){
 	strcpy(ip_info_json, "{}\n");
 }
@@ -196,8 +185,6 @@ void wifi_manager_generate_ip_info_json(update_reason_code_t update_reason_code)
 		const char ip_info_json_format[] = ",\"ip\":\"%s\",\"netmask\":\"%s\",\"gw\":\"%s\",\"urc\":%d}\n";
 
 		memset(ip_info_json, 0x00, JSON_IP_INFO_SIZE);
-
-
 
 		/* to avoid declaring a new buffer we copy the data directly into the buffer at its correct address */
 		strcpy(ip_info_json, "{\"ssid\":");
