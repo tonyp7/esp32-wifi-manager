@@ -18,20 +18,18 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-*/
 
-/**
- * \file http_server.c
- * \author Tony Pottier
- * \brief Defines all functions necessary for the HTTP server to run.
- *
- * Contains the freeRTOS task for the HTTP listener and all necessary support
- * function to process requests, decode URLs, serve files, etc. etc.
- *
- * \note http_server task cannot run without the wifi_manager task!
- * \see https://idyl.io
- * \see https://github.com/tonyp7/esp32-wifi-manager
- */
+@file http_server.c
+@author Tony Pottier
+@brief Defines all functions necessary for the HTTP server to run.
+
+Contains the freeRTOS task for the HTTP listener and all necessary support
+function to process requests, decode URLs, serve files, etc. etc.
+
+@note http_server task cannot run without the wifi_manager task!
+@see https://idyl.io
+@see https://github.com/tonyp7/esp32-wifi-manager
+*/
 
 #include <stdio.h>
 #include <string.h>
@@ -44,10 +42,8 @@ SOFTWARE.
 #include "esp_event_loop.h"
 #include "nvs_flash.h"
 #include "esp_log.h"
-
 #include "driver/gpio.h"
 #include "mdns.h"
-
 #include "lwip/api.h"
 #include "lwip/err.h"
 #include "lwip/netdb.h"
@@ -60,15 +56,8 @@ SOFTWARE.
 #include "lwip/priv/tcp_priv.h"
 #include "lwip/priv/tcpip_priv.h"
 
-
-
-
 #include "http_server.h"
 #include "wifi_manager.h"
-
-
-
-
 
 
 EventGroupHandle_t http_server_event_group;
@@ -96,14 +85,9 @@ const static char http_503_hdr[] = "HTTP/1.1 503 Service Unavailable\nContent-Le
 const static char http_ok_json_no_cache_hdr[] = "HTTP/1.1 200 OK\nContent-type: application/json\nCache-Control: no-store, no-cache, must-revalidate, max-age=0\nPragma: no-cache\n\n";
 
 
-
-
-
 void http_server_set_event_start(){
 	xEventGroupSetBits(http_server_event_group, HTTP_SERVER_START_BIT_0 );
 }
-
-
 
 
 void http_server(void *pvParameters) {
@@ -140,7 +124,6 @@ void http_server(void *pvParameters) {
 
 
 char* http_server_get_header(char *request, char *header_name, int *len) {
-	const char new_line[2] = "\n";
 	*len = 0;
 	char *ret = NULL;
 	char *ptr = NULL;
@@ -155,9 +138,7 @@ char* http_server_get_header(char *request, char *header_name, int *len) {
 		}
 		return ret;
 	}
-
 	return NULL;
-
 }
 
 
@@ -174,7 +155,7 @@ void http_server_netconn_serve(struct netconn *conn) {
 
 		netbuf_data(inbuf, (void**)&buf, &buflen);
 
-		// extract the first line of the request
+		/* extract the first line of the request */
 		char *save_ptr = buf;
 		char *line = strtok_r(save_ptr, new_line, &save_ptr);
 
@@ -283,6 +264,4 @@ void http_server_netconn_serve(struct netconn *conn) {
 
 	/* free the buffer */
 	netbuf_delete(inbuf);
-
-
 }
