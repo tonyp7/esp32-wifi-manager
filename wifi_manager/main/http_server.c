@@ -106,7 +106,7 @@ void http_server(void *pvParameters) {
 	struct netconn *conn, *newconn;
 	err_t err;
 	conn = netconn_new(NETCONN_TCP);
-	netconn_bind(conn, NULL, 80);
+	netconn_bind(conn, IP_ADDR_ANY, 80);
 	netconn_listen(conn);
 	printf("HTTP Server listening...\n");
 	do {
@@ -114,7 +114,6 @@ void http_server(void *pvParameters) {
 		if (err == ERR_OK) {
 			http_server_netconn_serve(newconn);
 			netconn_delete(newconn);
-			netconn_free(newconn);
 		}
 		vTaskDelay( (TickType_t)10); /* allows the freeRTOS scheduler to take over if needed */
 	} while(err == ERR_OK);
