@@ -400,9 +400,9 @@ void wifi_manager( void * pvParameters ){
 	if(wifi_manager_fetch_wifi_sta_config()){
 #if WIFI_MANAGER_DEBUG
 		printf("wifi_manager: saved wifi found on startup\n");
+#endif
 		/* request a connection */
 		xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_STA_CONNECT_BIT);
-#endif
 	}
 
 	/* start the softAP access point */
