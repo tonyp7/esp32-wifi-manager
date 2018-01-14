@@ -71,18 +71,30 @@ extern "C" {
 #define AP_AUTHMODE 		WIFI_AUTH_WPA2_PSK
 
 /** @brief Defines visibility of the access point. 0: visible AP. 1: hidden */
-#define AP_SSID_HIDDEN 		0
+#define DEFAULT_AP_SSID_HIDDEN 		0
 
 /** @brief Defines access point's name. */
-#define AP_SSID 			"esp32"
+#define DEFAULT_AP_SSID 			"esp32"
 
 /** @brief Defines access point's password.
  *	@warning In the case of an open access point, the password must be a null string "" or "\0" if you want to be verbose but waste one byte.
  */
-#define AP_PASSWORD 		"esp32pwd"
+#define DEFAULT_AP_PASSWORD 		"esp32pwd"
 
-/** @brief Defines access point's channel. */
-#define AP_CHANNEL 			8
+/** @brief Defines access point's bandwidth.
+ *  Value: WIFI_BW_HT20 for 20 MHz  or  WIFI_BW_HT40 for 40 MHz
+ *  20 MHz minimize channel interference but is not suitable for
+ *  applications with high data speeds
+ */
+#define DEFAULT_AP_BANDWIDTH 			WIFI_BW_HT20
+
+/** @brief Defines access point's channel.
+ *  Channel selection is only effective when not connected to another AP.
+ *  Good practice for minimal channel interference to use
+ *  For 20 MHz: 1, 6 or 11 in USA and 1, 5, 9 or 13 in most parts of the world
+ *  For 40 MHz: 3 in USA and 3 or 11 in most parts of the world
+ */
+#define DEFAULT_AP_CHANNEL 			5
 
 /** @brief Defines access point's maximum number of clients. */
 #define AP_MAX_CONNECTIONS 	4
@@ -90,7 +102,19 @@ extern "C" {
 /** @brief Defines access point's beacon interval. 100ms is the recommended default. */
 #define AP_BEACON_INTERVAL 	100
 
+/** @brief Defines if esp32 shall run both AP + STA when connected to another AP.
+ *  Value: 0 will have the own AP always on (APSTA mode)
+ *  Value: 1 will turn off own AP when connected to another AP (STA only mode when connected)
+ *  Turning off own AP when connected to another AP minimize channel interference and increase throughput
+ */
+#define DEFAULT_STA_ONLY 			1
 
+/** @brief Defines if wifi power save shall be enabled.
+ *  Value: WIFI_PS_NONE for full power (wifi modem always on)
+ *  Value: WIFI_PS_MODEM for power save (wifi modem sleep periodically)
+ *  Note: Power save is only effective when in STA only mode
+ */
+#define DEFAULT_STA_POWER_SAVE 			WIFI_PS_MODEM
 
 /**
  * @brief Defines the maximum length in bytes of a JSON representation of an access point.
@@ -118,6 +142,25 @@ typedef enum update_reason_code_t {
 	UPDATE_USER_DISCONNECT = 2,
 	UPDATE_LOST_CONNECTION = 3
 }update_reason_code_t;
+
+/**
+ * The actual WiFi settings in use
+ */
+struct wifi_settings_t{
+	uint8_t ap_ssid[MAX_SSID_SIZE];
+	uint8_t ap_pwd[MAX_PASSWORD_SIZE];
+	uint8_t ap_channel;
+	uint8_t ap_ssid_hidden;
+	wifi_bandwidth_t ap_bandwidth;
+	bool sta_only;
+	wifi_ps_type_t sta_power_save;
+	bool sta_static_ip;
+	tcpip_adapter_ip_info_t sta_static_ip_config;
+} ;
+
+
+extern struct wifi_settings_t wifi_settings;
+
 
 /**
  * Frees up all memory allocated by the wifi_manager and kill the task.
