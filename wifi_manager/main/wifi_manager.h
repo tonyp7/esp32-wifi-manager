@@ -156,9 +156,7 @@ struct wifi_settings_t{
 	wifi_ps_type_t sta_power_save;
 	bool sta_static_ip;
 	tcpip_adapter_ip_info_t sta_static_ip_config;
-} ;
-
-
+};
 extern struct wifi_settings_t wifi_settings;
 
 
