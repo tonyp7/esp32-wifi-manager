@@ -115,6 +115,23 @@ h3 {
 #connect {
     display: none;
 }
+#connect_manual {
+    display: none;
+}
+#manual_ssid {
+    border: none;
+    width: 80%;
+    margin-left: 35px;
+    padding: 10px 0px 10px 10px;
+    display: block
+}
+#manual_pwd {
+    border: none;
+    width: 80%;
+    margin-left: 35px;
+    padding: 10px 0px 10px 10px;
+    display: block
+}
 #pwd {
     border: none;
     width: 80%;
@@ -126,6 +143,9 @@ h3 {
     padding: 15px;
 }
 #join {
+    float: right;
+}
+#manual_join {
     float: right;
 }
 #yes-disconnect {

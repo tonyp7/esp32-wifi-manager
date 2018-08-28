@@ -46,12 +46,25 @@ $(document).ready(function(){
 		$( "#wifi" ).slideUp( "fast", function() {});
 		$( "#connect-details" ).slideDown( "fast", function() {});
 	});
-	
-	
+
+	$("#manual_add").on("click", ".ape", function() {
+		selectedSSID = $(this).text();
+		$( "#ssid-pwd" ).text(selectedSSID);
+		$( "#wifi" ).slideUp( "fast", function() {});
+		$( "#connect_manual" ).slideDown( "fast", function() {});
+		$( "#connect" ).slideUp( "fast", function() {});
+
+		//update wait screen
+		$( "#loading" ).show();
+		$( "#connect-success" ).hide();
+		$( "#connect-fail" ).hide();
+	});
+
 	$("#wifi-list").on("click", ".ape", function() {
 		selectedSSID = $(this).text();
 		$( "#ssid-pwd" ).text(selectedSSID);
 		$( "#wifi" ).slideUp( "fast", function() {});
+		$( "#connect_manual" ).slideUp( "fast", function() {});
 		$( "#connect" ).slideDown( "fast", function() {});
 		
 		//update wait screen
@@ -63,11 +76,23 @@ $(document).ready(function(){
 	$("#cancel").on("click", function() {
 		selectedSSID = "";
 		$( "#connect" ).slideUp( "fast", function() {});
+		$( "#connect_manual" ).slideUp( "fast", function() {});
+		$( "#wifi" ).slideDown( "fast", function() {});
+	});
+
+	$("#manual_cancel").on("click", function() {
+		selectedSSID = "";
+		$( "#connect" ).slideUp( "fast", function() {});
+		$( "#connect_manual" ).slideUp( "fast", function() {});
 		$( "#wifi" ).slideDown( "fast", function() {});
 	});
 	
 	$("#join").on("click", function() {
 		performConnect();
+	});
+
+	$("#manual_join").on("click", function() {
+		performConnect($(this).data('connect'));
 	});
 	
 	$("#ok-details").on("click", function() {
@@ -145,7 +170,7 @@ $(document).ready(function(){
 
 
 
-function performConnect(){
+function performConnect(conntype){
 	
 	//stop the status refresh. This prevents a race condition where a status 
 	//request would be refreshed with wrong ip info from a previous connection
@@ -154,7 +179,15 @@ function performConnect(){
 	
 	//stop refreshing wifi list
 	stopRefreshAPInterval();
-	
+
+	var pwd;
+	if (conntype == 'manual') {
+		//Grab the manual SSID and PWD
+		selectedSSID=$('#manual_ssid').val();
+		pwd = $("#manual_pwd").val();
+	}else{
+		pwd = $("#pwd").val();
+	}
 	//reset connection 
 	$( "#loading" ).show();
 	$( "#connect-success" ).hide();
@@ -163,10 +196,10 @@ function performConnect(){
 	$( "#ok-connect" ).prop("disabled",true);
 	$( "#ssid-wait" ).text(selectedSSID);
 	$( "#connect" ).slideUp( "fast", function() {});
+	$( "#connect_manual" ).slideUp( "fast", function() {});
 	$( "#connect-wait" ).slideDown( "fast", function() {});
 	
 	
-	var pwd = $("#pwd").val();
 	$.ajax({
 		url: '/connect.json',
 		dataType: 'json',
