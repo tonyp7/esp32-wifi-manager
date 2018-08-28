@@ -166,6 +166,11 @@ extern struct wifi_settings_t wifi_settings;
 void wifi_manager_destroy();
 
 /**
+ * Filters the AP scan list to unique SSIDs
+ */
+void filter_unique( wifi_ap_record_t * aplist, uint16_t * ap_num);
+
+/**
  * Main task for the wifi_manager
  */
 void wifi_manager( void * pvParameters );
