@@ -22,10 +22,28 @@
 							<div class="ape"><div class="w0"><div class="pw"><span></span></div></div></div>
 						</section>
 					</div>
-					<h2>Choose a network...</h2>
+					<h2>Manual connect</h2>
+					<section id="manual_add">
+					<div class="ape">ADD (HIDDEN) SSID<div>
+					</section>
+					<h2>or choose a network...</h2>
 					<section id="wifi-list">
 					</section>
 					<div id="pwrdby"><em>Powered by </em><a id="acredits" href="#"><strong>esp32-wifi-manager</strong></a>.</div>
+				</div>
+				<div id="connect_manual">
+					<header>
+						<h1>Enter Details</h1>
+					</header>
+					<h2>Manual Connection</span></h2>
+					<section>
+						<input id="manual_ssid" type="text" placeholder="SSID" value="">
+						<input id="manual_pwd" type="password" placeholder="Password" value="">
+					</section>
+					<div class="buttons">
+							<input id="manual_join" type="button" value="Join" data-connect="manual" />
+							<input id="manual_cancel" type="button" value="Cancel"/>
+					</div>
 				</div>
 				<div id="connect">
 					<header>
