@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2017 Tony Pottier
+Copyright (c) 2017-2019 Tony Pottier
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -55,14 +55,17 @@ SOFTWARE.
 static TaskHandle_t task_http_server = NULL;
 static TaskHandle_t task_wifi_manager = NULL;
 
+/* @brief tag used for ESP serial console messages */
+static const char TAG[] = "main";
+
 /**
  * @brief RTOS task that periodically prints the heap memory available.
- * @note Pure debug information, should not be ever started on production code!
+ * @note Pure debug information, should not be ever started on production code! This is an example on how you can integrate your code with wifi-manager
  */
 void monitoring_task(void *pvParameter)
 {
 	for(;;){
-		printf("free heap: %d\n",esp_get_free_heap_size());
+		ESP_LOGD(TAG, "free heap: %d",esp_get_free_heap_size());
 		vTaskDelay(5000 / portTICK_PERIOD_MS);
 	}
 }
@@ -84,10 +87,8 @@ void app_main()
 	/* start the wifi manager task */
 	xTaskCreate(&wifi_manager, "wifi_manager", 4096, NULL, 4, &task_wifi_manager);
 
-	/* your code should go here. In debug mode we create a simple task on core 2 that monitors free heap memory */
-#if WIFI_MANAGER_DEBUG
+	/* your code should go here. Here we simply create a task on core 2 that monitors free heap memory */
 	xTaskCreatePinnedToCore(&monitoring_task, "monitoring_task", 2048, NULL, 1, NULL, 1);
-#endif
 
 
 }
