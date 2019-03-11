@@ -1,14 +1,16 @@
 /*
-MIT License
-Copyright (c) 2017 Olof Astrand (Ebiroll)
+Copyright (c) 2019 Tony Pottier
+
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
 in the Software without restriction, including without limitation the rights
 to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 copies of the Software, and to permit persons to whom the Software is
 furnished to do so, subject to the following conditions:
+
 The above copyright notice and this permission notice shall be included in all
 copies or substantial portions of the Software.
+
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -16,7 +18,20 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+@file dns_server.h
+@author Tony Pottier
+@brief Defines an extremely basic DNS server for captive portal functionality.
+It's basically a DNS hijack that replies to the esp's address no matter which
+request is sent to it.
+This is based on Olof Astrand's work, licensed under Apache 2.0
+
+Contains the freeRTOS task for the DNS server that processes the requests.
+
+@see https://idyl.io
+@see https://github.com/tonyp7/esp32-wifi-manager
 */
+
 
 
 #include <lwip/sockets.h>
@@ -37,29 +52,40 @@ SOFTWARE.
 #include <lwip/netdb.h>
 #include <lwip/dns.h>
 
+#include <byteswap.h>
+
+#include "wifi_manager.h"
 #include "dns_server.h"
 
 static const char TAG[] = "dns_server";
 
 
+void dns_server_start() {
+    xTaskCreate(&dns_server, "dns_server", 3048, NULL, 5, NULL);
+}
 
-void receive_thread(void *pvParameters) {
 
-	dns_reply_code_t dns_reply_code = NoError;
+
+void dns_server(void *pvParameters) {
+
 
     int socket_fd;
     struct sockaddr_in sa, ra;
 
+    /* Set redirection DNS hijack to the access point IP */
+    ip4_addr_t ip_resolved;
+    inet_pton(AF_INET, AP_IP, &ip_resolved);
 
 
+    /* Create UDP socket */
     socket_fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (socket_fd < 0){
         ESP_LOGE(TAG, "Failed to create socket");
         exit(0);
     }
-
     memset(&sa, 0, sizeof(struct sockaddr_in));
 
+    /* Bind to port 53 (typical DNS Server port) */
     tcpip_adapter_ip_info_t ip;
     tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_STA, &ip);
     ra.sin_family = AF_INET;
@@ -75,70 +101,68 @@ void receive_thread(void *pvParameters) {
     socklen_t client_len;
     client_len = sizeof(client);
     int length;
-    char data[80];
-    char response[100];
-    char ipAddress[INET_ADDRSTRLEN];
+    uint8_t data[80];	/* dns query buffer */
+    uint8_t response[100]; /* dns response buffer */
+    char ip_address[INET_ADDRSTRLEN]; /* buffer to store IPs as text. This is only used for debug and serves no other purpose */
+    char *domain; /* This is only used for debug and serves no other purpose */
     int idx;
     int err;
 
     ESP_LOGI(TAG, "DNS Server listening on 53/udp");
-    while (1) {
-        length = recvfrom(socket_fd, data, sizeof(data), 0, (struct sockaddr *)&client, &client_len);
+
+    /* Start loop to process DNS requests */
+    for(;;) {
+    	memset(data, 0x00,  sizeof(data)); /* reset buffer */
+        length = recvfrom(socket_fd, data, sizeof(data), 0, (struct sockaddr *)&client, &client_len); /* read udp request */
         if (length > 0) {
             data[length] = '\0';
 
-            inet_ntop(AF_INET, &(client.sin_addr), ipAddress, INET_ADDRSTRLEN);
-            ESP_LOGI(TAG, "Replying to DNS request (len=%d) from %s", length, ipAddress);
+            /* debug: convert IP request to another reuqest */
+            inet_ntop(AF_INET, &(client.sin_addr), ip_address, INET_ADDRSTRLEN);
 
-            // Prepare our response
-            response[0] = data[0];
-            response[1] = data[1];
-            response[2] = 0b10000100 | (0b00000001 & data[2]); //response, authorative answer, not truncated, copy the recursion bit
-            response[3] = 0b00000000; //no recursion available, no errors
-            response[4] = data[4];
-            response[5] = data[5]; //Question count
-            response[6] = data[4];
-            response[7] = data[5]; //answer count
-            response[8] = 0x00;
-            response[9] = 0x00;       //NS record count
-            response[10]= 0x00;
-            response[11]= 0x00;       //Resource record count
+            /* Generate header message */
+            memcpy(response, data, sizeof(dns_header_t));
+            dns_header_t *dns_header = (dns_header_t*)response;
+            dns_header->QR = 1; /*response bit */
+            dns_header->OPCode  = DNS_OPCODE_QUERY; /* no support for other type of response */
+            dns_header->AA = 1; /*authoritative answer */
+            dns_header->RCode = DNS_REPLY_CODE_NO_ERROR; /* no error */
+            dns_header->TC = 0; /*no truncation */
+            dns_header->RD = 0; /*no recursion */
+            dns_header->ANCount = dns_header->QDCount; /* set answer count = question count -- duhh! */
+            dns_header->NSCount = 0x0000; /* name server resource records = 0 */
+            dns_header->ARCount = 0x0000; /* resource records = 0 */
 
-            memcpy(response+12, data+12, length-12); //Copy the rest of the query section
+
+            /* copy the rest of the query in the response */
+            memcpy(response + sizeof(dns_header_t), data + sizeof(dns_header_t), length - sizeof(dns_header_t));
             idx = length;
+
+
+            /* extract domain name for debug */
+            domain = (char*) &data[sizeof(dns_header_t) + 1];
+            for(char* c=domain; *c != '\0'; c++){
+            	if(*c < ' ' || *c > 'z') *c = '.';
+            }
+            ESP_LOGI(TAG, "Replying to DNS request for %s from %s", domain, ip_address);
+
+
+
 
             // Prune off the OPT
             // FIXME: We should parse the packet better than this!
             if ((response[idx-11] == 0x00) && (response[idx-10] == 0x00) && (response[idx-9] == 0x29))
                 idx -= 11;
 
-            //Set a pointer to the domain name in the question section
-            response[idx] = 0xC0;
-            response[idx+1] = 0x0C;
 
-            //Set the type to "Host Address"
-            response[idx+2] = 0x00;
-            response[idx+3] = 0x01;
-
-            //Set the response class to IN
-            response[idx+4] = 0x00;
-            response[idx+5] = 0x01;
-
-            //A 32 bit integer specifying TTL in seconds, 0 means no caching
-            response[idx+6] = 0x00;
-            response[idx+7] = 0x00;
-            response[idx+8] = 0x00;
-            response[idx+9] = 0x00;
-
-            //RDATA length
-            response[idx+10] = 0x00;
-            response[idx+11] = 0x04; //4 byte IP address
-
-            //The IP address
-            response[idx + 12] = 192;
-            response[idx + 13] = 168;
-            response[idx + 14] = 1;
-            response[idx + 15] = 1;
+            /* create DNS answer */
+            dns_answer_t *dns_answer = (dns_answer_t*)&response[idx];
+            dns_answer->NAME = __bswap_16(0xC00C); /* This is a pointer to the beginning of the question. As per DNS standard, first two bits must be set to 11 for some odd reason hence 0xC0 */
+            dns_answer->TYPE = __bswap_16(DNS_ANSWER_TYPE_A);
+            dns_answer->CLASS = __bswap_16(DNS_ANSWER_CLASS_IN);
+            dns_answer->TTL = (uint32_t)0x00000000; /* no caching. Avoids DNS poisoning since this is a DNS hijack */
+            dns_answer->RDLENGTH = __bswap_16(0x0004); /* 4 byte => size of an ipv4 address */
+            dns_answer->RDATA = ip_resolved.addr;
 
             err = sendto(socket_fd, response, idx+16, 0, (struct sockaddr *)&client, client_len);
             if (err < 0) {
@@ -147,8 +171,9 @@ void receive_thread(void *pvParameters) {
         }
     }
     close(socket_fd);
+
 }
 
-void init_dns_server() {
-    xTaskCreate(&receive_thread, "receive_thread", 3048, NULL, 5, NULL);
-}
+
+
+
