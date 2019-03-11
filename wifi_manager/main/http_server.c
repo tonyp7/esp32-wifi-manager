@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2017 Tony Pottier
+Copyright (c) 2017-2019 Tony Pottier
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -63,6 +63,8 @@ function to process requests, decode URLs, serve files, etc. etc.
 EventGroupHandle_t http_server_event_group;
 EventBits_t uxBits;
 
+static const char TAG[] = "http_server";
+
 /* embedded binary data */
 extern const uint8_t style_css_start[] asm("_binary_style_css_start");
 extern const uint8_t style_css_end[]   asm("_binary_style_css_end");
@@ -85,6 +87,11 @@ const static char http_503_hdr[] = "HTTP/1.1 503 Service Unavailable\nContent-Le
 const static char http_ok_json_no_cache_hdr[] = "HTTP/1.1 200 OK\nContent-type: application/json\nCache-Control: no-store, no-cache, must-revalidate, max-age=0\nPragma: no-cache\n\n";
 
 
+const static char http_redirect_hdr[] = "HTTP/1.1 302 Found\nLocation: http://192.168.1.1/\n\n";
+
+
+
+
 void http_server_set_event_start(){
 	xEventGroupSetBits(http_server_event_group, HTTP_SERVER_START_BIT_0 );
 }
@@ -95,13 +102,9 @@ void http_server(void *pvParameters) {
 	http_server_event_group = xEventGroupCreate();
 
 	/* do not start the task until wifi_manager says it's safe to do so! */
-#if WIFI_MANAGER_DEBUG
-	printf("http_server: waiting for start bit\n");
-#endif
+	ESP_LOGD(TAG, "waiting for start bit");
 	uxBits = xEventGroupWaitBits(http_server_event_group, HTTP_SERVER_START_BIT_0, pdFALSE, pdTRUE, portMAX_DELAY );
-#if WIFI_MANAGER_DEBUG
-	printf("http_server: received start bit, starting server\n");
-#endif
+	ESP_LOGD(TAG, "received start bit, starting server");
 
 	struct netconn *conn, *newconn;
 	err_t err;
@@ -160,8 +163,18 @@ void http_server_netconn_serve(struct netconn *conn) {
 
 		if(line) {
 
+
+
+			// If a Host header is included, redirect to our IP
+						int lenH = 0;
+						char *host = NULL;
+						host = http_server_get_header(save_ptr, "Host: ", &lenH);
+
+			if ((sizeof(host) > 0) && !strstr(host, "192.168.1.1")) {
+							netconn_write(conn, http_redirect_hdr, sizeof(http_redirect_hdr) - 1, NETCONN_NOCOPY);
+			}
 			// default page
-			if(strstr(line, "GET / ")) {
+			else if(strstr(line, "GET / ")) {
 				netconn_write(conn, http_html_hdr, sizeof(http_html_hdr) - 1, NETCONN_NOCOPY);
 				netconn_write(conn, index_html_start, index_html_end - index_html_start, NETCONN_NOCOPY);
 			}
@@ -183,9 +196,7 @@ void http_server_netconn_serve(struct netconn *conn) {
 				}
 				else{
 					netconn_write(conn, http_503_hdr, sizeof(http_503_hdr) - 1, NETCONN_NOCOPY);
-#if WIFI_MANAGER_DEBUG
-					printf("http_server_netconn_serve: GET /ap.json failed to obtain mutex\n");
-#endif
+					ESP_LOGD(TAG, "http_server_netconn_serve: GET /ap.json failed to obtain mutex");
 				}
 				/* request a wifi scan */
 				wifi_manager_scan_async();
@@ -208,23 +219,17 @@ void http_server_netconn_serve(struct netconn *conn) {
 				}
 				else{
 					netconn_write(conn, http_503_hdr, sizeof(http_503_hdr) - 1, NETCONN_NOCOPY);
-#if WIFI_MANAGER_DEBUG
-					printf("http_server_netconn_serve: GET /status failed to obtain mutex\n");
-#endif
+					ESP_LOGD(TAG, "http_server_netconn_serve: GET /status failed to obtain mutex");
 				}
 			}
 			else if(strstr(line, "DELETE /connect.json ")) {
-#if WIFI_MANAGER_DEBUG
-				printf("http_server_netconn_serve: DELETE /connect.json\n");
-#endif
+				ESP_LOGD(TAG, "http_server_netconn_serve: DELETE /connect.json");
 				/* request a disconnection from wifi and forget about it */
 				wifi_manager_disconnect_async();
 				netconn_write(conn, http_ok_json_no_cache_hdr, sizeof(http_ok_json_no_cache_hdr) - 1, NETCONN_NOCOPY); /* 200 ok */
 			}
 			else if(strstr(line, "POST /connect.json ")) {
-#if WIFI_MANAGER_DEBUG
-				printf("http_server_netconn_serve: POST /connect.json\n");
-#endif
+				ESP_LOGD(TAG, "http_server_netconn_serve: POST /connect.json");
 
 				bool found = false;
 				int lenS = 0, lenP = 0;
@@ -237,10 +242,7 @@ void http_server_netconn_serve(struct netconn *conn) {
 					memset(config, 0x00, sizeof(wifi_config_t));
 					memcpy(config->sta.ssid, ssid, lenS);
 					memcpy(config->sta.password, password, lenP);
-
-#if WIFI_MANAGER_DEBUG
-					printf("http_server_netconn_serve: wifi_manager_connect_async() call\n");
-#endif
+					ESP_LOGD(TAG, "http_server_netconn_serve: wifi_manager_connect_async() call");
 					wifi_manager_connect_async();
 					netconn_write(conn, http_ok_json_no_cache_hdr, sizeof(http_ok_json_no_cache_hdr) - 1, NETCONN_NOCOPY); //200ok
 					found = true;
