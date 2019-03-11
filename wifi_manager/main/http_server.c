@@ -85,8 +85,6 @@ const static char http_400_hdr[] = "HTTP/1.1 400 Bad Request\nContent-Length: 0\
 const static char http_404_hdr[] = "HTTP/1.1 404 Not Found\nContent-Length: 0\n\n";
 const static char http_503_hdr[] = "HTTP/1.1 503 Service Unavailable\nContent-Length: 0\n\n";
 const static char http_ok_json_no_cache_hdr[] = "HTTP/1.1 200 OK\nContent-type: application/json\nCache-Control: no-store, no-cache, must-revalidate, max-age=0\nPragma: no-cache\n\n";
-
-
 const static char http_redirect_hdr[] = "HTTP/1.1 302 Found\nLocation: http://192.168.1.1/\n\n";
 
 
