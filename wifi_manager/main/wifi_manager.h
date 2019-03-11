@@ -64,6 +64,7 @@ extern "C" {
 /** @brief Defines the auth mode as an access point
  *  Value must be of type wifi_auth_mode_t
  *  @see esp_wifi_types.h
+ *  @warning if set to WIFI_AUTH_OPEN, passowrd me be empty. See DEFAULT_AP_PASSWORD.
  */
 #define AP_AUTHMODE 		WIFI_AUTH_WPA2_PSK
 
@@ -75,6 +76,7 @@ extern "C" {
 
 /** @brief Defines access point's password.
  *	@warning In the case of an open access point, the password must be a null string "" or "\0" if you want to be verbose but waste one byte.
+ *	In addition, the AP_AUTHMODE must be WIFI_AUTH_OPEN
  */
 #define DEFAULT_AP_PASSWORD 		"esp32pwd"
 
