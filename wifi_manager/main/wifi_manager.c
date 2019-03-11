@@ -525,10 +525,12 @@ void wifi_manager( void * pvParameters ){
 	/* assign a static IP to the AP network interface */
 	tcpip_adapter_ip_info_t info;
 	memset(&info, 0x00, sizeof(info));
-	IP4_ADDR(&info.ip, 192, 168, 1, 1);
-	IP4_ADDR(&info.gw, 192, 168, 1, 1);
-	IP4_ADDR(&info.netmask, 255, 255, 255, 0);
+	inet_pton(AF_INET, AP_IP, &info.ip); /*avoid hardcoding IP such like old style: IP4_ADDR(&info.ip, 192, 168, 1, 1); */
+	inet_pton(AF_INET, AP_GATEWAY, &info.gw);
+	inet_pton(AF_INET, AP_NETMASK, &info.netmask);
 	ESP_ERROR_CHECK(tcpip_adapter_set_ip_info(TCPIP_ADAPTER_IF_AP, &info));
+
+
 
 	/* start dhcp server */
 	ESP_ERROR_CHECK(tcpip_adapter_dhcps_start(TCPIP_ADAPTER_IF_AP));
@@ -588,7 +590,7 @@ void wifi_manager( void * pvParameters ){
 	ESP_LOGD(TAG, "softAP started, starting http_server");
 
 	http_server_set_event_start();
-	init_dns_server();
+	dns_server_start();
 
 
 	EventBits_t uxBits;

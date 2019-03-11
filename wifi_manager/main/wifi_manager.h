@@ -98,8 +98,20 @@ extern "C" {
  */
 #define DEFAULT_AP_CHANNEL 			5
 
+
+
+/** @brief Defines the access point's default IP address. */
+#define AP_IP				"192.168.1.1"
+
+
+/** @brief Defines the access point's gateway. This should be the same as your IP */
+#define AP_GATEWAY			"192.168.1.1"
+
+/** @brief Defines the access point's netmask.  */
+#define AP_NETMASK			"255.255.255.0"
+
 /** @brief Defines access point's maximum number of clients. */
-#define AP_MAX_CONNECTIONS 	4
+#define AP_MAX_CONNECTIONS 	2
 
 /** @brief Defines access point's beacon interval. 100ms is the recommended default. */
 #define AP_BEACON_INTERVAL 	100
