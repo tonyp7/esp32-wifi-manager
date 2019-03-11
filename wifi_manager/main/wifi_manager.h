@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2017 Tony Pottier
+Copyright (c) 2017-2019 Tony Pottier
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -37,10 +37,7 @@ Contains the freeRTOS task and all necessary support
 extern "C" {
 #endif
 
-/**
- * @brief If WIFI_MANAGER_DEBUG is defined, additional debug information will be sent to the standard output.
- */
-#define WIFI_MANAGER_DEBUG	1
+
 
 /**
  * @brief Defines the maximum size of a SSID name. 32 is IEEE standard.
@@ -81,6 +78,9 @@ extern "C" {
  */
 #define DEFAULT_AP_PASSWORD 		"esp32pwd"
 
+/** @brief Defines the hostname broadcasted by mDNS */
+#define DEFAULT_HOSTNAME			"esp32"
+
 /** @brief Defines access point's bandwidth.
  *  Value: WIFI_BW_HT20 for 20 MHz  or  WIFI_BW_HT40 for 40 MHz
  *  20 MHz minimize channel interference but is not suitable for
@@ -114,7 +114,7 @@ extern "C" {
  *  Value: WIFI_PS_MODEM for power save (wifi modem sleep periodically)
  *  Note: Power save is only effective when in STA only mode
  */
-#define DEFAULT_STA_POWER_SAVE 			WIFI_PS_MODEM
+#define DEFAULT_STA_POWER_SAVE 			WIFI_PS_NONE
 
 /**
  * @brief Defines the maximum length in bytes of a JSON representation of an access point.
@@ -268,6 +268,12 @@ void wifi_manager_generate_acess_points_json();
  * @note This is not thread-safe and should be called only if wifi_manager_lock_json_buffer call is successful.
  */
 void wifi_manager_clear_access_points_json();
+
+
+/**
+ * @brief Start the mDNS service
+ */
+void wifi_manager_initialise_mdns();
 
 #ifdef __cplusplus
 }
