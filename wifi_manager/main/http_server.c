@@ -85,8 +85,8 @@ const static char http_400_hdr[] = "HTTP/1.1 400 Bad Request\nContent-Length: 0\
 const static char http_404_hdr[] = "HTTP/1.1 404 Not Found\nContent-Length: 0\n\n";
 const static char http_503_hdr[] = "HTTP/1.1 503 Service Unavailable\nContent-Length: 0\n\n";
 const static char http_ok_json_no_cache_hdr[] = "HTTP/1.1 200 OK\nContent-type: application/json\nCache-Control: no-store, no-cache, must-revalidate, max-age=0\nPragma: no-cache\n\n";
-const static char http_redirect_hdr[] = "HTTP/1.1 302 Found\nLocation: http://192.168.1.1/\n\n";
-
+const static char http_redirect_hdr_start[] = "HTTP/1.1 302 Found\nLocation: http://";
+const static char http_redirect_hdr_end[] = "/\n\n";
 
 
 
@@ -162,16 +162,15 @@ void http_server_netconn_serve(struct netconn *conn) {
 		if(line) {
 
 
-
-			// If a Host header is included, redirect to our IP
-						int lenH = 0;
-						char *host = NULL;
-						host = http_server_get_header(save_ptr, "Host: ", &lenH);
-
-			if ((sizeof(host) > 0) && !strstr(host, "192.168.1.1")) {
-							netconn_write(conn, http_redirect_hdr, sizeof(http_redirect_hdr) - 1, NETCONN_NOCOPY);
+			/* captive portal functionality: redirect to the access point IP addresss */
+			int lenH = 0;
+			char *host = http_server_get_header(save_ptr, "Host: ", &lenH);
+			if ((sizeof(host) > 0) && !strstr(host, AP_IP)) {
+				netconn_write(conn, http_redirect_hdr_start, sizeof(http_redirect_hdr_start) - 1, NETCONN_NOCOPY);
+				netconn_write(conn, AP_IP, sizeof(AP_IP) - 1, NETCONN_NOCOPY);
+				netconn_write(conn, http_redirect_hdr_end, sizeof(http_redirect_hdr_end) - 1, NETCONN_NOCOPY);
 			}
-			// default page
+			/* default page */
 			else if(strstr(line, "GET / ")) {
 				netconn_write(conn, http_html_hdr, sizeof(http_html_hdr) - 1, NETCONN_NOCOPY);
 				netconn_write(conn, index_html_start, index_html_end - index_html_start, NETCONN_NOCOPY);
