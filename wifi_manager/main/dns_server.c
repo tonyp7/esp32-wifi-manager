@@ -160,6 +160,8 @@ void dns_server(void *pvParameters) {
             	ESP_LOGE(TAG, "UDP sendto failed: %d", err);
             }
         }
+
+        vTaskDelay( (TickType_t)10); /* allows the freeRTOS scheduler to take over if needed. DNS daemon should not be taxing on the system */
     }
     close(socket_fd);
 
