@@ -589,7 +589,10 @@ void wifi_manager( void * pvParameters ){
 
 	ESP_LOGD(TAG, "softAP started, starting http_server");
 
+	/* start http server */
 	http_server_set_event_start();
+
+	/* start DNS server */
 	dns_server_start();
 
 
