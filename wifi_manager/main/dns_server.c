@@ -31,8 +31,6 @@ Contains the freeRTOS task for the DNS server that processes the requests.
 @see https://github.com/tonyp7/esp32-wifi-manager
 */
 
-
-
 #include <lwip/sockets.h>
 #include <string.h>
 #include <freertos/FreeRTOS.h>
@@ -60,7 +58,7 @@ static const char TAG[] = "dns_server";
 static TaskHandle_t task_dns_server = NULL;
 
 void dns_server_start() {
-    xTaskCreate(&dns_server, "dns_server", 2048, NULL, 5, &task_dns_server);
+    xTaskCreate(&dns_server, "dns_server", 3072, NULL, 5, &task_dns_server);
 }
 
 
