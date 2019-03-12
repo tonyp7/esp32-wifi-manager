@@ -71,14 +71,14 @@ extern "C" {
 /** @brief Defines visibility of the access point. 0: visible AP. 1: hidden */
 #define DEFAULT_AP_SSID_HIDDEN 		0
 
-/** @brief Defines access point's name. */
-#define DEFAULT_AP_SSID 			"esp32"
+/** @brief Defines access point's name. Default value: esp32. Run 'make menuconfig' to setup your own value or replace here by a string */
+#define DEFAULT_AP_SSID 			CONFIG_DEFAULT_AP_SSID
 
 /** @brief Defines access point's password.
  *	@warning In the case of an open access point, the password must be a null string "" or "\0" if you want to be verbose but waste one byte.
  *	In addition, the AP_AUTHMODE must be WIFI_AUTH_OPEN
  */
-#define DEFAULT_AP_PASSWORD 		"esp32pwd"
+#define DEFAULT_AP_PASSWORD 		CONFIG_DEFAULT_AP_PASSWORD
 
 /** @brief Defines the hostname broadcasted by mDNS */
 #define DEFAULT_HOSTNAME			"esp32"
@@ -96,25 +96,24 @@ extern "C" {
  *  For 20 MHz: 1, 6 or 11 in USA and 1, 5, 9 or 13 in most parts of the world
  *  For 40 MHz: 3 in USA and 3 or 11 in most parts of the world
  */
-#define DEFAULT_AP_CHANNEL 			5
+#define DEFAULT_AP_CHANNEL 			CONFIG_DEFAULT_AP_CHANNEL
 
 
 
-/** @brief Defines the access point's default IP address. */
-#define AP_IP				"192.168.1.1"
+/** @brief Defines the access point's default IP address. Default: "192.168.1.1" */
+#define DEFAULT_AP_IP				CONFIG_DEFAULT_AP_IP
 
+/** @brief Defines the access point's gateway. This should be the same as your IP. Default: "192.168.1.1" */
+#define DEFAULT_AP_GATEWAY			CONFIG_DEFAULT_AP_GATEWAY
 
-/** @brief Defines the access point's gateway. This should be the same as your IP */
-#define AP_GATEWAY			"192.168.1.1"
+/** @brief Defines the access point's netmask. Default: "255.255.255.0" */
+#define DEFAULT_AP_NETMASK			CONFIG_DEFAULT_AP_NETMASK
 
-/** @brief Defines the access point's netmask.  */
-#define AP_NETMASK			"255.255.255.0"
-
-/** @brief Defines access point's maximum number of clients. */
-#define AP_MAX_CONNECTIONS 	2
+/** @brief Defines access point's maximum number of clients. Default: 4 */
+#define DEFAULT_AP_MAX_CONNECTIONS 	CONFIG_DEFAULT_AP_MAX_CONNECTIONS
 
 /** @brief Defines access point's beacon interval. 100ms is the recommended default. */
-#define AP_BEACON_INTERVAL 	100
+#define DEFAULT_AP_BEACON_INTERVAL 	CONFIG_DEFAULT_AP_BEACON_INTERVAL
 
 /** @brief Defines if esp32 shall run both AP + STA when connected to another AP.
  *  Value: 0 will have the own AP always on (APSTA mode)

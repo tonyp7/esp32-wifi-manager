@@ -66,7 +66,7 @@ void monitoring_task(void *pvParameter)
 {
 	for(;;){
 		ESP_LOGD(TAG, "free heap: %d",esp_get_free_heap_size());
-		vTaskDelay(5000 / portTICK_PERIOD_MS);
+		vTaskDelay(10000 / portTICK_PERIOD_MS);
 	}
 }
 

@@ -166,9 +166,9 @@ void http_server_netconn_serve(struct netconn *conn) {
 			/* captive portal functionality: redirect to the access point IP addresss */
 			int lenH = 0;
 			char *host = http_server_get_header(save_ptr, "Host: ", &lenH);
-			if ((sizeof(host) > 0) && !strstr(host, AP_IP)) {
+			if ((sizeof(host) > 0) && !strstr(host, DEFAULT_AP_IP)) {
 				netconn_write(conn, http_redirect_hdr_start, sizeof(http_redirect_hdr_start) - 1, NETCONN_NOCOPY);
-				netconn_write(conn, AP_IP, sizeof(AP_IP) - 1, NETCONN_NOCOPY);
+				netconn_write(conn, DEFAULT_AP_IP, sizeof(DEFAULT_AP_IP) - 1, NETCONN_NOCOPY);
 				netconn_write(conn, http_redirect_hdr_end, sizeof(http_redirect_hdr_end) - 1, NETCONN_NOCOPY);
 			}
 			/* default page */

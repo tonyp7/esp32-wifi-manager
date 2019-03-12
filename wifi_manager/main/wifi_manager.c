@@ -525,9 +525,9 @@ void wifi_manager( void * pvParameters ){
 	/* assign a static IP to the AP network interface */
 	tcpip_adapter_ip_info_t info;
 	memset(&info, 0x00, sizeof(info));
-	inet_pton(AF_INET, AP_IP, &info.ip); /*avoid hardcoding IP such like old style: IP4_ADDR(&info.ip, 192, 168, 1, 1); */
-	inet_pton(AF_INET, AP_GATEWAY, &info.gw);
-	inet_pton(AF_INET, AP_NETMASK, &info.netmask);
+	inet_pton(AF_INET, DEFAULT_AP_IP, &info.ip); /*avoid hardcoding IP such like old style: IP4_ADDR(&info.ip, 192, 168, 1, 1); */
+	inet_pton(AF_INET, DEFAULT_AP_GATEWAY, &info.gw);
+	inet_pton(AF_INET, DEFAULT_AP_NETMASK, &info.netmask);
 	ESP_ERROR_CHECK(tcpip_adapter_set_ip_info(TCPIP_ADAPTER_IF_AP, &info));
 
 

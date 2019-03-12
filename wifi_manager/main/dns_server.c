@@ -71,7 +71,7 @@ void dns_server(void *pvParameters) {
 
     /* Set redirection DNS hijack to the access point IP */
     ip4_addr_t ip_resolved;
-    inet_pton(AF_INET, AP_IP, &ip_resolved);
+    inet_pton(AF_INET, DEFAULT_AP_IP, &ip_resolved);
 
 
     /* Create UDP socket */
