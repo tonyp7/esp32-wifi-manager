@@ -27,6 +27,7 @@ Contains the freeRTOS task for the DNS server that processes the requests.
 
 @see https://idyl.io
 @see https://github.com/tonyp7/esp32-wifi-manager
+@see http://www.zytrax.com/books/dns/ch15
 */
 
 #ifndef MAIN_DNS_SERVER_H_
