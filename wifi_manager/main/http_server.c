@@ -109,7 +109,7 @@ void http_server(void *pvParameters) {
 	conn = netconn_new(NETCONN_TCP);
 	netconn_bind(conn, IP_ADDR_ANY, 80);
 	netconn_listen(conn);
-	printf("HTTP Server listening...\n");
+	ESP_LOGI(TAG, "HTTP Server listening on 80/tcp");
 	do {
 		err = netconn_accept(conn, &newconn);
 		if (err == ERR_OK) {
