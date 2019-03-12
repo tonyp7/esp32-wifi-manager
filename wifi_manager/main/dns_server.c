@@ -19,12 +19,11 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-@file dns_server.h
+@file dns_server.c
 @author Tony Pottier
 @brief Defines an extremely basic DNS server for captive portal functionality.
 It's basically a DNS hijack that replies to the esp's address no matter which
 request is sent to it.
-This is based on Olof Astrand's work, licensed under Apache 2.0
 
 Contains the freeRTOS task for the DNS server that processes the requests.
 
@@ -101,11 +100,10 @@ void dns_server(void *pvParameters) {
     socklen_t client_len;
     client_len = sizeof(client);
     int length;
-    uint8_t data[80];	/* dns query buffer */
-    uint8_t response[100]; /* dns response buffer */
+    uint8_t data[DNS_QUERY_MAX_SIZE];	/* dns query buffer */
+    uint8_t response[DNS_ANSWER_MAX_SIZE]; /* dns response buffer */
     char ip_address[INET_ADDRSTRLEN]; /* buffer to store IPs as text. This is only used for debug and serves no other purpose */
     char *domain; /* This is only used for debug and serves no other purpose */
-    int idx;
     int err;
 
     ESP_LOGI(TAG, "DNS Server listening on 53/udp");
@@ -114,11 +112,12 @@ void dns_server(void *pvParameters) {
     for(;;) {
     	memset(data, 0x00,  sizeof(data)); /* reset buffer */
         length = recvfrom(socket_fd, data, sizeof(data), 0, (struct sockaddr *)&client, &client_len); /* read udp request */
-        if (length > 0) {
-            data[length] = '\0';
 
-            /* debug: convert IP request to another reuqest */
-            inet_ntop(AF_INET, &(client.sin_addr), ip_address, INET_ADDRSTRLEN);
+        /*if the query is bigger than the buffer size we simply ignore it. This case should only happen in case of multiple
+         * queries within the same DNS packet and is not supported by this simple DNS hijack. */
+        if ( length > 0   &&  ((length + sizeof(dns_answer_t)-1) < DNS_ANSWER_MAX_SIZE)   ) {
+
+        	data[length] = '\0'; /*in case there's a bogus domain name that isn't null terminated */
 
             /* Generate header message */
             memcpy(response, data, sizeof(dns_header_t));
@@ -136,27 +135,19 @@ void dns_server(void *pvParameters) {
 
             /* copy the rest of the query in the response */
             memcpy(response + sizeof(dns_header_t), data + sizeof(dns_header_t), length - sizeof(dns_header_t));
-            idx = length;
 
 
-            /* extract domain name for debug */
+            /* extract domain name and request IP for debug */
+            inet_ntop(AF_INET, &(client.sin_addr), ip_address, INET_ADDRSTRLEN);
             domain = (char*) &data[sizeof(dns_header_t) + 1];
             for(char* c=domain; *c != '\0'; c++){
-            	if(*c < ' ' || *c > 'z') *c = '.';
+            	if(*c < ' ' || *c > 'z') *c = '.'; /* technically we should test if the first two bits are 00 (e.g. if( (*c & 0xC0) == 0x00) *c = '.') but this makes the code a lot more readable */
             }
             ESP_LOGI(TAG, "Replying to DNS request for %s from %s", domain, ip_address);
 
 
-
-
-            // Prune off the OPT
-            // FIXME: We should parse the packet better than this!
-            if ((response[idx-11] == 0x00) && (response[idx-10] == 0x00) && (response[idx-9] == 0x29))
-                idx -= 11;
-
-
-            /* create DNS answer */
-            dns_answer_t *dns_answer = (dns_answer_t*)&response[idx];
+            /* create DNS answer at the end of the query*/
+            dns_answer_t *dns_answer = (dns_answer_t*)&response[length];
             dns_answer->NAME = __bswap_16(0xC00C); /* This is a pointer to the beginning of the question. As per DNS standard, first two bits must be set to 11 for some odd reason hence 0xC0 */
             dns_answer->TYPE = __bswap_16(DNS_ANSWER_TYPE_A);
             dns_answer->CLASS = __bswap_16(DNS_ANSWER_CLASS_IN);
@@ -164,9 +155,9 @@ void dns_server(void *pvParameters) {
             dns_answer->RDLENGTH = __bswap_16(0x0004); /* 4 byte => size of an ipv4 address */
             dns_answer->RDATA = ip_resolved.addr;
 
-            err = sendto(socket_fd, response, idx+16, 0, (struct sockaddr *)&client, client_len);
+            err = sendto(socket_fd, response, length+sizeof(dns_answer_t), 0, (struct sockaddr *)&client, client_len);
             if (err < 0) {
-                ESP_LOGE(TAG, "sendto failed: %s", strerror(errno));
+            	ESP_LOGE(TAG, "UDP sendto failed: %d", err);
             }
         }
     }

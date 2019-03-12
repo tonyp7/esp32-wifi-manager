@@ -37,8 +37,12 @@ extern "C" {
 #endif
 
 
-#define DNS_QR_QUERY 0
-#define DNS_QR_RESPONSE 1
+/** 12 byte header, 64 byte domain name, 4 byte qtype/qclass. This NOT compliant with the RFC, but it's good enough for a captive portal
+ * if a DNS query is too big it just wont be processed. */
+#define	DNS_QUERY_MAX_SIZE 80
+
+/** Query + 2 byte ptr, 2 byte type, 2 byte class, 4 byte TTL, 2 byte len, 4 byte data */
+#define	DNS_ANSWER_MAX_SIZE (DNS_QUERY_MAX_SIZE+16)
 
 
 /**
