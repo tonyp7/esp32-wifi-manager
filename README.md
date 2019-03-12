@@ -1,7 +1,7 @@
 # What is esp32-wifi-manager?
 *esp32-wifi-manager* is an esp32 program that enables easy management of wifi networks through a web application.
 
-*esp32-wifi-manager* is **lightweight** (6KB of task stack in total) and barely uses any CPU power through a completely event driven architecture. Not a single CPU cycle is wasted doing some polling work.
+*esp32-wifi-manager* is **lightweight** (8KB of task stack in total) and barely uses any CPU power through a completely event driven architecture. It's an all in one wifi scanner, http server & dns daemon living in the least amount of RAM possible.
 
 For real time constrained applications, *esp32-wifi-manager* can live entirely on PRO CPU, leaving the entire APP CPU untouched for your own needs.
 
