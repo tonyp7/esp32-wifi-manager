@@ -57,10 +57,10 @@ Contains the freeRTOS task for the DNS server that processes the requests.
 #include "dns_server.h"
 
 static const char TAG[] = "dns_server";
-
+static TaskHandle_t task_dns_server = NULL;
 
 void dns_server_start() {
-    xTaskCreate(&dns_server, "dns_server", 2048, NULL, 5, NULL);
+    xTaskCreate(&dns_server, "dns_server", 2048, NULL, 5, &task_dns_server);
 }
 
 
