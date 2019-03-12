@@ -60,7 +60,7 @@ function to process requests, decode URLs, serve files, etc. etc.
 #include "wifi_manager.h"
 
 
-EventGroupHandle_t http_server_event_group;
+EventGroupHandle_t http_server_event_group = NULL;
 EventBits_t uxBits;
 
 static const char TAG[] = "http_server";
@@ -91,13 +91,14 @@ const static char http_redirect_hdr_end[] = "/\n\n";
 
 
 void http_server_set_event_start(){
+	if(!http_server_event_group) http_server_event_group = xEventGroupCreate();
 	xEventGroupSetBits(http_server_event_group, HTTP_SERVER_START_BIT_0 );
 }
 
 
 void http_server(void *pvParameters) {
 
-	http_server_event_group = xEventGroupCreate();
+	if(!http_server_event_group) http_server_event_group = xEventGroupCreate();
 
 	/* do not start the task until wifi_manager says it's safe to do so! */
 	ESP_LOGD(TAG, "waiting for start bit");
