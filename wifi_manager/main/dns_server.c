@@ -60,7 +60,7 @@ static const char TAG[] = "dns_server";
 
 
 void dns_server_start() {
-    xTaskCreate(&dns_server, "dns_server", 3048, NULL, 5, NULL);
+    xTaskCreate(&dns_server, "dns_server", 2048, NULL, 5, NULL);
 }
 
 
