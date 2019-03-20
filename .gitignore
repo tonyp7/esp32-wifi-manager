@@ -64,6 +64,7 @@ wifi_manager/build/aws_iot/
 *.d
 wifi_manager/.cproject
 wifi_manager/.project
+wifi_manager/sdkconfig*
 
 #doxygen
 Doxyfile

@@ -570,8 +570,8 @@ void wifi_manager( void * pvParameters ){
 			.channel = wifi_settings.ap_channel,
 			.authmode = WIFI_AUTH_WPA2_PSK,
 			.ssid_hidden = wifi_settings.ap_ssid_hidden,
-			.max_connection = AP_MAX_CONNECTIONS,
-			.beacon_interval = AP_BEACON_INTERVAL,
+			.max_connection = DEFAULT_AP_MAX_CONNECTIONS,
+			.beacon_interval = DEFAULT_AP_BEACON_INTERVAL,
 		},
 	};
 	memcpy(ap_config.ap.ssid, wifi_settings.ap_ssid , sizeof(wifi_settings.ap_ssid));
