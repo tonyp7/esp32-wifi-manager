@@ -43,7 +43,7 @@ extern "C" {
 
 void http_server(void *pvParameters);
 void http_server_netconn_serve(struct netconn *conn);
-void http_server_set_event_start(); //TODO: delete
+//void http_server_set_event_start(); //TODO: delete
 void http_server_start();
 
 /**
