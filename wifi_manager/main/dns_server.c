@@ -58,7 +58,7 @@ static const char TAG[] = "dns_server";
 static TaskHandle_t task_dns_server = NULL;
 
 void dns_server_start() {
-    xTaskCreate(&dns_server, "dns_server", 3072, NULL, 5, &task_dns_server);
+    xTaskCreate(&dns_server, "dns_server", 3072, NULL, WIFI_MANAGER_TASK_PRIORITY-1, &task_dns_server);
 }
 
 

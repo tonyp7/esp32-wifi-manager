@@ -64,6 +64,8 @@ EventGroupHandle_t http_server_event_group = NULL;
 EventBits_t uxBits;
 
 static const char TAG[] = "http_server";
+static TaskHandle_t task_http_server = NULL;
+
 
 /* embedded binary data */
 extern const uint8_t style_css_start[] asm("_binary_style_css_start");
@@ -90,20 +92,24 @@ const static char http_redirect_hdr_end[] = "/\n\n";
 
 
 
+//TODO: delete
 void http_server_set_event_start(){
 	if(!http_server_event_group) http_server_event_group = xEventGroupCreate();
 	xEventGroupSetBits(http_server_event_group, HTTP_SERVER_START_BIT_0 );
 }
 
+void http_server_start(){
+	xTaskCreate(&http_server, "http_server", 2048, NULL, WIFI_MANAGER_TASK_PRIORITY-1, &task_http_server);
+}
 
 void http_server(void *pvParameters) {
 
 	if(!http_server_event_group) http_server_event_group = xEventGroupCreate();
 
 	/* do not start the task until wifi_manager says it's safe to do so! */
-	ESP_LOGD(TAG, "waiting for start bit");
-	uxBits = xEventGroupWaitBits(http_server_event_group, HTTP_SERVER_START_BIT_0, pdFALSE, pdTRUE, portMAX_DELAY );
-	ESP_LOGD(TAG, "received start bit, starting server");
+	//TODO: delete ESP_LOGD(TAG, "waiting for start bit");
+	//TODO: delete uxBits = xEventGroupWaitBits(http_server_event_group, HTTP_SERVER_START_BIT_0, pdFALSE, pdTRUE, portMAX_DELAY );
+	//TODO: delete ESP_LOGD(TAG, "received start bit, starting server");
 
 	struct netconn *conn, *newconn;
 	err_t err;
@@ -117,10 +123,12 @@ void http_server(void *pvParameters) {
 			http_server_netconn_serve(newconn);
 			netconn_delete(newconn);
 		}
-		vTaskDelay( (TickType_t)10); /* allows the freeRTOS scheduler to take over if needed */
+		vTaskDelay( pdMS_TO_TICKS(50) ); /* allows the freeRTOS scheduler to take over if needed. 50ms = 5ticks at 100Hz tickrate */
 	} while(err == ERR_OK);
 	netconn_close(conn);
 	netconn_delete(conn);
+
+	vTaskDelete( NULL );
 }
 
 
