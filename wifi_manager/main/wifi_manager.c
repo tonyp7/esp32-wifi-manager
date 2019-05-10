@@ -47,6 +47,7 @@ Contains the freeRTOS task and all necessary support
 #include "lwip/api.h"
 #include "lwip/err.h"
 #include "lwip/netdb.h"
+#include "lwip/ip4_addr.h"
 
 #include "json.h"
 #include "http_server.h"
@@ -60,6 +61,9 @@ QueueHandle_t wifi_manager_queue;
 
 
 SemaphoreHandle_t wifi_manager_json_mutex = NULL;
+SemaphoreHandle_t wifi_manager_sta_ip_mutex = NULL;
+char *wifi_manager_sta_ip = NULL;
+
 uint16_t ap_num = MAX_AP_NUM;
 wifi_ap_record_t *accessp_records;
 char *accessp_json = NULL;
@@ -342,6 +346,47 @@ void wifi_manager_generate_acess_points_json(){
 }
 
 
+
+bool wifi_manager_lock_sta_ip_string(TickType_t xTicksToWait){
+	if(wifi_manager_sta_ip_mutex){
+		if( xSemaphoreTake( wifi_manager_sta_ip_mutex, xTicksToWait ) == pdTRUE ) {
+			return true;
+		}
+		else{
+			return false;
+		}
+	}
+	else{
+		return false;
+	}
+
+}
+void wifi_manager_unlock_sta_ip_string(){
+	xSemaphoreGive( wifi_manager_sta_ip_mutex );
+}
+
+void wifi_manager_safe_update_sta_ip_string(uint32_t ip){
+
+	if(wifi_manager_lock_sta_ip_string(portMAX_DELAY)){
+
+		struct ip4_addr ip4;
+		ip4.addr = ip;
+
+		strcpy(wifi_manager_sta_ip, ip4addr_ntoa(&ip4));
+
+		ESP_LOGI(TAG, "Set STA IP String to: %s", wifi_manager_sta_ip);
+
+		wifi_manager_unlock_sta_ip_string();
+
+
+	}
+}
+
+char* wifi_manager_get_sta_ip_string(){
+	return wifi_manager_sta_ip;
+}
+
+
 bool wifi_manager_lock_json_buffer(TickType_t xTicksToWait){
 	if(wifi_manager_json_mutex){
 		if( xSemaphoreTake( wifi_manager_json_mutex, xTicksToWait ) == pdTRUE ) {
@@ -419,7 +464,7 @@ esp_err_t wifi_manager_event_handler(void *ctx, system_event_t *event)
 	case SYSTEM_EVENT_STA_GOT_IP:
 		ESP_LOGI(TAG, "SYSTEM_EVENT_STA_GOT_IP");
         xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_WIFI_CONNECTED_BIT);
-        wifi_manager_send_message(EVENT_STA_GOT_IP, NULL );
+        wifi_manager_send_message(EVENT_STA_GOT_IP, (void*)event->event_info.got_ip.ip_info.ip.addr );
         break;
 
 	case SYSTEM_EVENT_STA_CONNECTED:
@@ -469,6 +514,9 @@ char* wifi_manager_get_ip_info_json(){
 
 void wifi_manager_destroy(){
 
+	vTaskDelete(task_wifi_manager);
+	task_wifi_manager = NULL;
+
 	/* heap buffers */
 	free(accessp_records);
 	accessp_records = NULL;
@@ -476,6 +524,8 @@ void wifi_manager_destroy(){
 	accessp_json = NULL;
 	free(ip_info_json);
 	ip_info_json = NULL;
+	free(wifi_manager_sta_ip);
+	wifi_manager_sta_ip = NULL;
 	if(wifi_manager_config_sta){
 		free(wifi_manager_config_sta);
 		wifi_manager_config_sta = NULL;
@@ -484,9 +534,14 @@ void wifi_manager_destroy(){
 	/* RTOS objects */
 	vSemaphoreDelete(wifi_manager_json_mutex);
 	wifi_manager_json_mutex = NULL;
+	vSemaphoreDelete(wifi_manager_sta_ip_mutex);
+	wifi_manager_sta_ip_mutex = NULL;
 	vEventGroupDelete(wifi_manager_event_group);
+	wifi_manager_event_group = NULL;
+	vQueueDelete(wifi_manager_queue);
+	wifi_manager_queue = NULL;
 
-	vTaskDelete(NULL);
+
 }
 
 
@@ -578,6 +633,11 @@ void wifi_manager( void * pvParameters ){
 	memset(wifi_manager_config_sta, 0x00, sizeof(wifi_config_t));
 	memset(&wifi_settings.sta_static_ip_config, 0x00, sizeof(tcpip_adapter_ip_info_t));
 
+	wifi_manager_sta_ip_mutex = xSemaphoreCreateMutex();
+	wifi_manager_sta_ip = (char*)malloc(sizeof(char) * IP4ADDR_STRLEN_MAX);
+	wifi_manager_safe_update_sta_ip_string((uint32_t)0);
+
+
 
 	/* initialize the tcp stack */
 	tcpip_adapter_init();
@@ -602,11 +662,7 @@ void wifi_manager( void * pvParameters ){
 
 
 
-	/* Access Point configuration setup
-	 *
-	 * CODE BELOW RELATES TO ACCESS POINT CONFIGURATION
-	 *
-	 * */
+	/* SoftAP - Wifi Access Point configuration setup */
 	tcpip_adapter_ip_info_t info;
 	memset(&info, 0x00, sizeof(info));
 	wifi_config_t ap_config = {
@@ -635,10 +691,10 @@ void wifi_manager( void * pvParameters ){
 	ESP_ERROR_CHECK(esp_wifi_set_ps(wifi_settings.sta_power_save));
 
 
-	/** STA setup */
+	/* STA - Wifi Station configuration setup */
 	tcpip_adapter_dhcp_status_t status;
 	if(wifi_settings.sta_static_ip) {
-		ESP_LOGI(TAG, "Assigning static ip to STA interface. IP: %s , GW: %s , Mask: %s\n", ip4addr_ntoa(&wifi_settings.sta_static_ip_config.ip), ip4addr_ntoa(&wifi_settings.sta_static_ip_config.gw), ip4addr_ntoa(&wifi_settings.sta_static_ip_config.netmask));
+		ESP_LOGI(TAG, "Assigning static ip to STA interface. IP: %s , GW: %s , Mask: %s", ip4addr_ntoa(&wifi_settings.sta_static_ip_config.ip), ip4addr_ntoa(&wifi_settings.sta_static_ip_config.gw), ip4addr_ntoa(&wifi_settings.sta_static_ip_config.netmask));
 
 		/* stop DHCP client*/
 		ESP_ERROR_CHECK(tcpip_adapter_dhcpc_stop(TCPIP_ADAPTER_IF_STA));
@@ -647,7 +703,7 @@ void wifi_manager( void * pvParameters ){
 		}
 	else {
 		/* start DHCP client if not started*/
-		ESP_LOGI(TAG, "wifi_manager: Start DHCP client for STA interface. If not already running\n");
+		ESP_LOGI(TAG, "wifi_manager: Start DHCP client for STA interface. If not already running");
 		ESP_ERROR_CHECK(tcpip_adapter_dhcpc_get_status(TCPIP_ADAPTER_IF_STA, &status));
 		if (status!=TCPIP_ADAPTER_DHCP_STARTED)
 			ESP_ERROR_CHECK(tcpip_adapter_dhcpc_start(TCPIP_ADAPTER_IF_STA));
@@ -785,6 +841,10 @@ void wifi_manager( void * pvParameters ){
 				 *  204		HANDSHAKE_TIMEOUT
 				 *
 				 * */
+
+				/* reset saved sta IP */
+				wifi_manager_safe_update_sta_ip_string((uint32_t)0);
+
 				uxBits = xEventGroupGetBits(wifi_manager_event_group);
 				if( uxBits & WIFI_MANAGER_REQUEST_STA_CONNECT_BIT ){
 					/* there are no retries when it's a user requested connection by design. This avoids a user hanging too much
@@ -824,6 +884,9 @@ void wifi_manager( void * pvParameters ){
 
 				/* reset connection requests bits -- doesn't matter if it was set or not */
 				xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_STA_CONNECT_BIT);
+
+				/* save IP as a string for the HTTP server host */
+				wifi_manager_safe_update_sta_ip_string((uint32_t)msg.param);
 
 				/* refresh JSON with the new IP */
 				if(wifi_manager_lock_json_buffer( portMAX_DELAY )){
@@ -978,7 +1041,7 @@ void wifi_managerBACKUP( void * pvParameters ){
 	ESP_LOGI(TAG, "softAP started, starting http_server");
 
 	/* start http server */
-	http_server_set_event_start();
+	//http_server_set_event_start();
 
 	/* start DNS server */
 	dns_server_start();
