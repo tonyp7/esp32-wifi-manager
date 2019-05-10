@@ -184,6 +184,9 @@ typedef enum message_code_t {
 
 }message_code_t;
 
+/**
+ * @brief simplified reason codes for a lost connection
+ */
 typedef enum update_reason_code_t {
 	UPDATE_CONNECTION_OK = 0,
 	UPDATE_FAILED_ATTEMPT = 1,

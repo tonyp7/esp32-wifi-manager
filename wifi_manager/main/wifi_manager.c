@@ -126,7 +126,8 @@ void wifi_manager_scan_async(){
 }
 
 void wifi_manager_disconnect_async(){
-	xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_WIFI_DISCONNECT);
+	wifi_manager_send_message(ORDER_DISCONNECT_STA, NULL);
+	//xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_WIFI_DISCONNECT); TODO: delete
 }
 
 
@@ -422,7 +423,7 @@ esp_err_t wifi_manager_event_handler(void *ctx, system_event_t *event)
     	break;
 
     case SYSTEM_EVENT_SCAN_DONE:
-    	ESP_LOGI(TAG, "SYSTEM_EVENT_SCAN_DONE");
+    	ESP_LOGD(TAG, "SYSTEM_EVENT_SCAN_DONE");
     	xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_SCAN_BIT);
     	wifi_manager_send_message(EVENT_SCAN_DONE, NULL);
     	break;
@@ -472,7 +473,7 @@ esp_err_t wifi_manager_event_handler(void *ctx, system_event_t *event)
 		break;
 
 	case SYSTEM_EVENT_STA_DISCONNECTED:
-		ESP_LOGI(TAG, "SYSTEM_EVENT_STA_DISCONNECTED - REASON CODE %d", event->event_info.disconnected.reason);
+		ESP_LOGI(TAG, "SYSTEM_EVENT_STA_DISCONNECTED");
 
 		/* if a DISCONNECT message is posted while a scan is in progress this scan will NEVER end, causing scan to never work again. For this reason SCAN_BIT is cleared too */
 		xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_WIFI_CONNECTED_BIT | WIFI_MANAGER_SCAN_BIT);
@@ -643,7 +644,7 @@ void wifi_manager( void * pvParameters ){
 	tcpip_adapter_init();
 
 	/* event handler and event group for the wifi driver */
-	wifi_manager_event_group = xEventGroupCreate(); //TODO: DELETE
+	wifi_manager_event_group = xEventGroupCreate();
 	ESP_ERROR_CHECK(esp_event_loop_init(wifi_manager_event_handler, NULL));
 
 	/* wifi scanner config */
@@ -739,12 +740,12 @@ void wifi_manager( void * pvParameters ){
 					wifi_manager_unlock_json_buffer();
 				}
 				else{
-					ESP_LOGI(TAG, "wifi_manager: could not get access to json mutex in wifi_scan");
+					ESP_LOGE(TAG, "could not get access to json mutex in wifi_scan");
 				}
 				break;
 
 			case ORDER_START_WIFI_SCAN:
-				ESP_LOGI(TAG, "MESSAGE: ORDER_START_WIFI_SCAN");
+				ESP_LOGD(TAG, "MESSAGE: ORDER_START_WIFI_SCAN");
 
 				/* if a scan is already in progress this message is simply ignored thanks to the WIFI_MANAGER_SCAN_BIT uxBit */
 				uxBits = xEventGroupGetBits(wifi_manager_event_group);
@@ -850,14 +851,33 @@ void wifi_manager( void * pvParameters ){
 					/* there are no retries when it's a user requested connection by design. This avoids a user hanging too much
 					 * in case they typed a wrong password for instance. Here we simply clear the request bit and move on */
 					xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_STA_CONNECT_BIT);
+
+					if(wifi_manager_lock_json_buffer( portMAX_DELAY )){
+						wifi_manager_generate_ip_info_json( UPDATE_FAILED_ATTEMPT );
+						wifi_manager_unlock_json_buffer();
+					}
+
 				}
 				else if (uxBits & WIFI_MANAGER_REQUEST_DISCONNECT_BIT){
 					/* user manually requested a disconnect so the lost connection is a normal event. Clear the flag and restart the AP */
 					xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_DISCONNECT_BIT);
+
+					if(wifi_manager_lock_json_buffer( portMAX_DELAY )){
+						wifi_manager_generate_ip_info_json( UPDATE_USER_DISCONNECT );
+						wifi_manager_unlock_json_buffer();
+					}
+
+					/* TODO: FORGET SAVED WIFI IN NVS MEMORY */
+
 					wifi_manager_send_message(ORDER_START_AP, NULL);
 				}
 				else{
 					/* lost connection ? */
+					if(wifi_manager_lock_json_buffer( portMAX_DELAY )){
+						wifi_manager_generate_ip_info_json( UPDATE_LOST_CONNECTION );
+						wifi_manager_unlock_json_buffer();
+					}
+
 					if(retries < WIFI_MANAGER_MAX_RETRY){
 						retries++;
 						wifi_manager_send_message(ORDER_CONNECT_STA, (void*)CONNECTION_REQUEST_AUTO_RECONNECT);
@@ -915,8 +935,6 @@ void wifi_manager( void * pvParameters ){
 				/* order wifi discconect */
 				ESP_ERROR_CHECK(esp_wifi_disconnect());
 
-				/* wait until wifi disconnects. From experiments, it seems to take about 150ms to disconnect */
-				xEventGroupWaitBits(wifi_manager_event_group, WIFI_MANAGER_STA_DISCONNECT_BIT, pdFALSE, pdTRUE, portMAX_DELAY );
 				break;
 			default:
 				break;
