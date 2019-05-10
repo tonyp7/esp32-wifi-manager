@@ -56,9 +56,19 @@ Contains the freeRTOS task for the DNS server that processes the requests.
 
 static const char TAG[] = "dns_server";
 static TaskHandle_t task_dns_server = NULL;
+int socket_fd;
 
 void dns_server_start() {
     xTaskCreate(&dns_server, "dns_server", 3072, NULL, WIFI_MANAGER_TASK_PRIORITY-1, &task_dns_server);
+}
+
+void dns_server_stop(){
+	if(task_dns_server){
+		vTaskDelete(task_dns_server);
+		close(socket_fd);
+		task_dns_server = NULL;
+	}
+
 }
 
 
@@ -66,7 +76,7 @@ void dns_server_start() {
 void dns_server(void *pvParameters) {
 
 
-    int socket_fd;
+
     struct sockaddr_in sa, ra;
 
     /* Set redirection DNS hijack to the access point IP */
@@ -108,6 +118,7 @@ void dns_server(void *pvParameters) {
 
     /* Start loop to process DNS requests */
     for(;;) {
+
     	memset(data, 0x00,  sizeof(data)); /* reset buffer */
         length = recvfrom(socket_fd, data, sizeof(data), 0, (struct sockaddr *)&client, &client_len); /* read udp request */
 
@@ -159,10 +170,12 @@ void dns_server(void *pvParameters) {
             }
         }
 
-        vTaskDelay( (TickType_t)10); /* allows the freeRTOS scheduler to take over if needed. DNS daemon should not be taxing on the system */
+        taskYIELD(); /* allows the freeRTOS scheduler to take over if needed. DNS daemon should not be taxing on the system */
+
     }
     close(socket_fd);
 
+    vTaskDelete ( NULL );
 }
 
 
