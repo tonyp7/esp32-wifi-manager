@@ -99,7 +99,7 @@ const int WIFI_MANAGER_WIFI_CONNECTED_BIT = BIT0;
 const int WIFI_MANAGER_AP_STA_CONNECTED_BIT = BIT1;
 
 /* @brief Set automatically once the SoftAP is started */
-const int WIFI_MANAGER_AP_STARTED = BIT2;
+const int WIFI_MANAGER_AP_STARTED_BIT = BIT2;
 
 /* @brief When set, means a client requested to connect to an access point.*/
 const int WIFI_MANAGER_REQUEST_STA_CONNECT_BIT = BIT3;
@@ -107,11 +107,11 @@ const int WIFI_MANAGER_REQUEST_STA_CONNECT_BIT = BIT3;
 /* @brief This bit is set automatically as soon as a connection was lost */
 const int WIFI_MANAGER_STA_DISCONNECT_BIT = BIT4;
 
-/* @brief When set, means a client requested to scan wireless networks. */
-//const int WIFI_MANAGER_REQUEST_WIFI_SCAN = BIT5; //TODO: DELETE
+/* @brief When set, means the wifi manager attempts to restore a previously saved connection at startup. */
+const int WIFI_MANAGER_REQUEST_RESTORE_STA_BIT = BIT5;
 
 /* @brief When set, means a client requested to disconnect from currently connected AP. */
-const int WIFI_MANAGER_REQUEST_WIFI_DISCONNECT = BIT6;
+const int WIFI_MANAGER_REQUEST_WIFI_DISCONNECT_BIT = BIT6;
 
 /* @brief When set, means a scan is in progress */
 const int WIFI_MANAGER_SCAN_BIT = BIT7;
@@ -128,7 +128,7 @@ void wifi_manager_scan_async(){
 
 void wifi_manager_disconnect_async(){
 	wifi_manager_send_message(ORDER_DISCONNECT_STA, NULL);
-	//xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_WIFI_DISCONNECT); TODO: delete
+	//xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_WIFI_DISCONNECT_BIT); TODO: delete
 }
 
 
@@ -436,7 +436,7 @@ esp_err_t wifi_manager_event_handler(void *ctx, system_event_t *event)
 
     case SYSTEM_EVENT_AP_START:
     	ESP_LOGI(TAG, "SYSTEM_EVENT_AP_START");
-    	xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_AP_STARTED);
+    	xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_AP_STARTED_BIT);
 		break;
 
     case SYSTEM_EVENT_AP_STOP:
@@ -713,13 +713,17 @@ void wifi_manager( void * pvParameters ){
 
 
 
+	/* by default the mode is STA because wifi_manager will not start the access point unless it has to! */
 	ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
 	ESP_ERROR_CHECK(esp_wifi_start());
 
 
+	/* start http server */
+	http_server_start();
 
 	/* enqueue first event: load previous config */
 	wifi_manager_send_message(ORDER_LOAD_AND_RESTORE_STA, NULL);
+
 
 	/* main processing loop */
 	for(;;){
@@ -777,8 +781,12 @@ void wifi_manager( void * pvParameters ){
 				 * Param in that case is a boolean indicating if the request was made automatically
 				 * by the wifi_manager.
 				 * */
-				if((BaseType_t)msg.param == CONNECTION_REQUEST_USER)
+				if((BaseType_t)msg.param == CONNECTION_REQUEST_USER) {
 					xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_STA_CONNECT_BIT);
+				}
+				else if((BaseType_t)msg.param == CONNECTION_REQUEST_RESTORE_CONNECTION) {
+					xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_RESTORE_STA_BIT);
+				}
 
 				uxBits = xEventGroupGetBits(wifi_manager_event_group);
 				if( uxBits & WIFI_MANAGER_WIFI_CONNECTED_BIT ){
@@ -898,6 +906,9 @@ void wifi_manager( void * pvParameters ){
 						/* In this scenario the connection was lost beyond repair: kick start the AP! */
 						retries = 0;
 
+						/* if it was a restore attempt connection, we clear the bit */
+						xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_RESTORE_STA_BIT);
+
 						/* erase configuration that could not be used to connect */
 						if(wifi_manager_config_sta){
 							memset(wifi_manager_config_sta, 0x00, sizeof(wifi_config_t));
@@ -916,7 +927,7 @@ void wifi_manager( void * pvParameters ){
 				ESP_LOGI(TAG, "MESSAGE: ORDER_START_AP");
 				esp_wifi_set_mode(WIFI_MODE_APSTA);
 
-				http_server_start();
+				//http_server_start();
 				dns_server_start();
 
 				break;
@@ -924,20 +935,26 @@ void wifi_manager( void * pvParameters ){
 			case EVENT_STA_GOT_IP:
 				ESP_LOGI(TAG, "MESSAGE: EVENT_STA_GOT_IP");
 
+				uxBits = xEventGroupGetBits(wifi_manager_event_group);
+
 				/* reset connection requests bits -- doesn't matter if it was set or not */
 				xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_STA_CONNECT_BIT);
 
 				/* save IP as a string for the HTTP server host */
 				wifi_manager_safe_update_sta_ip_string((uint32_t)msg.param);
 
+				/* save wifi config in NVS if it wasn't a restored of a connection */
+				if(uxBits & WIFI_MANAGER_REQUEST_RESTORE_STA_BIT){
+					xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_RESTORE_STA_BIT);
+				}
+				else{
+					wifi_manager_save_sta_config();
+				}
+
 				/* refresh JSON with the new IP */
 				if(wifi_manager_lock_json_buffer( portMAX_DELAY )){
 					/* generate the connection info with success */
 					wifi_manager_generate_ip_info_json( UPDATE_CONNECTION_OK );
-
-					/* save wifi config in NVS */
-					wifi_manager_save_sta_config();
-
 					wifi_manager_unlock_json_buffer();
 				}
 				else { abort(); }
@@ -957,6 +974,7 @@ void wifi_manager( void * pvParameters ){
 				ESP_ERROR_CHECK(esp_wifi_disconnect());
 
 				break;
+
 			default:
 				break;
 
