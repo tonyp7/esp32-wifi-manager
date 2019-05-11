@@ -60,10 +60,12 @@ function to process requests, decode URLs, serve files, etc. etc.
 #include "wifi_manager.h"
 
 
-EventGroupHandle_t http_server_event_group = NULL;
-EventBits_t uxBits;
+//EventGroupHandle_t http_server_event_group = NULL;
+//EventBits_t uxBits;
 
 static const char TAG[] = "http_server";
+static TaskHandle_t task_http_server = NULL;
+
 
 /* embedded binary data */
 extern const uint8_t style_css_start[] asm("_binary_style_css_start");
@@ -90,20 +92,13 @@ const static char http_redirect_hdr_end[] = "/\n\n";
 
 
 
-void http_server_set_event_start(){
-	if(!http_server_event_group) http_server_event_group = xEventGroupCreate();
-	xEventGroupSetBits(http_server_event_group, HTTP_SERVER_START_BIT_0 );
+void http_server_start(){
+	if(task_http_server == NULL){
+		xTaskCreate(&http_server, "http_server", 2048, NULL, WIFI_MANAGER_TASK_PRIORITY-1, &task_http_server);
+	}
 }
 
-
 void http_server(void *pvParameters) {
-
-	if(!http_server_event_group) http_server_event_group = xEventGroupCreate();
-
-	/* do not start the task until wifi_manager says it's safe to do so! */
-	ESP_LOGD(TAG, "waiting for start bit");
-	uxBits = xEventGroupWaitBits(http_server_event_group, HTTP_SERVER_START_BIT_0, pdFALSE, pdTRUE, portMAX_DELAY );
-	ESP_LOGD(TAG, "received start bit, starting server");
 
 	struct netconn *conn, *newconn;
 	err_t err;
@@ -117,10 +112,12 @@ void http_server(void *pvParameters) {
 			http_server_netconn_serve(newconn);
 			netconn_delete(newconn);
 		}
-		vTaskDelay( (TickType_t)10); /* allows the freeRTOS scheduler to take over if needed */
+		taskYIELD();  /* allows the freeRTOS scheduler to take over if needed. */
 	} while(err == ERR_OK);
 	netconn_close(conn);
 	netconn_delete(conn);
+
+	vTaskDelete( NULL );
 }
 
 
@@ -162,98 +159,104 @@ void http_server_netconn_serve(struct netconn *conn) {
 
 		if(line) {
 
-
-			/* captive portal functionality: redirect to the access point IP addresss */
+			/* captive portal functionality: redirect to access point IP for HOST that are not the access point IP OR the STA IP */
 			int lenH = 0;
 			char *host = http_server_get_header(save_ptr, "Host: ", &lenH);
-			if ((sizeof(host) > 0) && !strstr(host, DEFAULT_AP_IP)) {
+			/* determine if Host is from the STA IP address */
+			wifi_manager_lock_sta_ip_string(portMAX_DELAY);
+			bool access_from_sta_ip = lenH > 0?strstr(host, wifi_manager_get_sta_ip_string()):false;
+			wifi_manager_unlock_sta_ip_string();
+
+			if (lenH > 0 && !strstr(host, DEFAULT_AP_IP) && !access_from_sta_ip) {
 				netconn_write(conn, http_redirect_hdr_start, sizeof(http_redirect_hdr_start) - 1, NETCONN_NOCOPY);
 				netconn_write(conn, DEFAULT_AP_IP, sizeof(DEFAULT_AP_IP) - 1, NETCONN_NOCOPY);
 				netconn_write(conn, http_redirect_hdr_end, sizeof(http_redirect_hdr_end) - 1, NETCONN_NOCOPY);
 			}
-			/* default page */
-			else if(strstr(line, "GET / ")) {
-				netconn_write(conn, http_html_hdr, sizeof(http_html_hdr) - 1, NETCONN_NOCOPY);
-				netconn_write(conn, index_html_start, index_html_end - index_html_start, NETCONN_NOCOPY);
-			}
-			else if(strstr(line, "GET /jquery.js ")) {
-				netconn_write(conn, http_jquery_gz_hdr, sizeof(http_jquery_gz_hdr) - 1, NETCONN_NOCOPY);
-				netconn_write(conn, jquery_gz_start, jquery_gz_end - jquery_gz_start, NETCONN_NOCOPY);
-			}
-			else if(strstr(line, "GET /code.js ")) {
-				netconn_write(conn, http_js_hdr, sizeof(http_js_hdr) - 1, NETCONN_NOCOPY);
-				netconn_write(conn, code_js_start, code_js_end - code_js_start, NETCONN_NOCOPY);
-			}
-			else if(strstr(line, "GET /ap.json ")) {
-				/* if we can get the mutex, write the last version of the AP list */
-				if(wifi_manager_lock_json_buffer(( TickType_t ) 10)){
-					netconn_write(conn, http_ok_json_no_cache_hdr, sizeof(http_ok_json_no_cache_hdr) - 1, NETCONN_NOCOPY);
-					char *buff = wifi_manager_get_ap_list_json();
-					netconn_write(conn, buff, strlen(buff), NETCONN_NOCOPY);
-					wifi_manager_unlock_json_buffer();
+			else{
+				/* default page */
+				if(strstr(line, "GET / ")) {
+					netconn_write(conn, http_html_hdr, sizeof(http_html_hdr) - 1, NETCONN_NOCOPY);
+					netconn_write(conn, index_html_start, index_html_end - index_html_start, NETCONN_NOCOPY);
 				}
-				else{
-					netconn_write(conn, http_503_hdr, sizeof(http_503_hdr) - 1, NETCONN_NOCOPY);
-					ESP_LOGD(TAG, "http_server_netconn_serve: GET /ap.json failed to obtain mutex");
+				else if(strstr(line, "GET /jquery.js ")) {
+					netconn_write(conn, http_jquery_gz_hdr, sizeof(http_jquery_gz_hdr) - 1, NETCONN_NOCOPY);
+					netconn_write(conn, jquery_gz_start, jquery_gz_end - jquery_gz_start, NETCONN_NOCOPY);
 				}
-				/* request a wifi scan */
-				wifi_manager_scan_async();
-			}
-			else if(strstr(line, "GET /style.css ")) {
-				netconn_write(conn, http_css_hdr, sizeof(http_css_hdr) - 1, NETCONN_NOCOPY);
-				netconn_write(conn, style_css_start, style_css_end - style_css_start, NETCONN_NOCOPY);
-			}
-			else if(strstr(line, "GET /status.json ")){
-				if(wifi_manager_lock_json_buffer(( TickType_t ) 10)){
-					char *buff = wifi_manager_get_ip_info_json();
-					if(buff){
+				else if(strstr(line, "GET /code.js ")) {
+					netconn_write(conn, http_js_hdr, sizeof(http_js_hdr) - 1, NETCONN_NOCOPY);
+					netconn_write(conn, code_js_start, code_js_end - code_js_start, NETCONN_NOCOPY);
+				}
+				else if(strstr(line, "GET /ap.json ")) {
+					/* if we can get the mutex, write the last version of the AP list */
+					if(wifi_manager_lock_json_buffer(( TickType_t ) 10)){
 						netconn_write(conn, http_ok_json_no_cache_hdr, sizeof(http_ok_json_no_cache_hdr) - 1, NETCONN_NOCOPY);
+						char *buff = wifi_manager_get_ap_list_json();
 						netconn_write(conn, buff, strlen(buff), NETCONN_NOCOPY);
 						wifi_manager_unlock_json_buffer();
 					}
 					else{
 						netconn_write(conn, http_503_hdr, sizeof(http_503_hdr) - 1, NETCONN_NOCOPY);
+						ESP_LOGD(TAG, "http_server_netconn_serve: GET /ap.json failed to obtain mutex");
+					}
+					/* request a wifi scan */
+					wifi_manager_scan_async();
+				}
+				else if(strstr(line, "GET /style.css ")) {
+					netconn_write(conn, http_css_hdr, sizeof(http_css_hdr) - 1, NETCONN_NOCOPY);
+					netconn_write(conn, style_css_start, style_css_end - style_css_start, NETCONN_NOCOPY);
+				}
+				else if(strstr(line, "GET /status.json ")){
+					if(wifi_manager_lock_json_buffer(( TickType_t ) 10)){
+						char *buff = wifi_manager_get_ip_info_json();
+						if(buff){
+							netconn_write(conn, http_ok_json_no_cache_hdr, sizeof(http_ok_json_no_cache_hdr) - 1, NETCONN_NOCOPY);
+							netconn_write(conn, buff, strlen(buff), NETCONN_NOCOPY);
+							wifi_manager_unlock_json_buffer();
+						}
+						else{
+							netconn_write(conn, http_503_hdr, sizeof(http_503_hdr) - 1, NETCONN_NOCOPY);
+						}
+					}
+					else{
+						netconn_write(conn, http_503_hdr, sizeof(http_503_hdr) - 1, NETCONN_NOCOPY);
+						ESP_LOGD(TAG, "http_server_netconn_serve: GET /status failed to obtain mutex");
 					}
 				}
+				else if(strstr(line, "DELETE /connect.json ")) {
+					ESP_LOGD(TAG, "http_server_netconn_serve: DELETE /connect.json");
+					/* request a disconnection from wifi and forget about it */
+					wifi_manager_disconnect_async();
+					netconn_write(conn, http_ok_json_no_cache_hdr, sizeof(http_ok_json_no_cache_hdr) - 1, NETCONN_NOCOPY); /* 200 ok */
+				}
+				else if(strstr(line, "POST /connect.json ")) {
+					ESP_LOGD(TAG, "http_server_netconn_serve: POST /connect.json");
+
+					bool found = false;
+					int lenS = 0, lenP = 0;
+					char *ssid = NULL, *password = NULL;
+					ssid = http_server_get_header(save_ptr, "X-Custom-ssid: ", &lenS);
+					password = http_server_get_header(save_ptr, "X-Custom-pwd: ", &lenP);
+
+					if(ssid && lenS <= MAX_SSID_SIZE && password && lenP <= MAX_PASSWORD_SIZE){
+						wifi_config_t* config = wifi_manager_get_wifi_sta_config();
+						memset(config, 0x00, sizeof(wifi_config_t));
+						memcpy(config->sta.ssid, ssid, lenS);
+						memcpy(config->sta.password, password, lenP);
+						ESP_LOGD(TAG, "http_server_netconn_serve: wifi_manager_connect_async() call");
+						wifi_manager_connect_async();
+						netconn_write(conn, http_ok_json_no_cache_hdr, sizeof(http_ok_json_no_cache_hdr) - 1, NETCONN_NOCOPY); //200ok
+						found = true;
+					}
+
+					if(!found){
+						/* bad request the authentification header is not complete/not the correct format */
+						netconn_write(conn, http_400_hdr, sizeof(http_400_hdr) - 1, NETCONN_NOCOPY);
+					}
+
+				}
 				else{
-					netconn_write(conn, http_503_hdr, sizeof(http_503_hdr) - 1, NETCONN_NOCOPY);
-					ESP_LOGD(TAG, "http_server_netconn_serve: GET /status failed to obtain mutex");
-				}
-			}
-			else if(strstr(line, "DELETE /connect.json ")) {
-				ESP_LOGD(TAG, "http_server_netconn_serve: DELETE /connect.json");
-				/* request a disconnection from wifi and forget about it */
-				wifi_manager_disconnect_async();
-				netconn_write(conn, http_ok_json_no_cache_hdr, sizeof(http_ok_json_no_cache_hdr) - 1, NETCONN_NOCOPY); /* 200 ok */
-			}
-			else if(strstr(line, "POST /connect.json ")) {
-				ESP_LOGD(TAG, "http_server_netconn_serve: POST /connect.json");
-
-				bool found = false;
-				int lenS = 0, lenP = 0;
-				char *ssid = NULL, *password = NULL;
-				ssid = http_server_get_header(save_ptr, "X-Custom-ssid: ", &lenS);
-				password = http_server_get_header(save_ptr, "X-Custom-pwd: ", &lenP);
-
-				if(ssid && lenS <= MAX_SSID_SIZE && password && lenP <= MAX_PASSWORD_SIZE){
-					wifi_config_t* config = wifi_manager_get_wifi_sta_config();
-					memset(config, 0x00, sizeof(wifi_config_t));
-					memcpy(config->sta.ssid, ssid, lenS);
-					memcpy(config->sta.password, password, lenP);
-					ESP_LOGD(TAG, "http_server_netconn_serve: wifi_manager_connect_async() call");
-					wifi_manager_connect_async();
-					netconn_write(conn, http_ok_json_no_cache_hdr, sizeof(http_ok_json_no_cache_hdr) - 1, NETCONN_NOCOPY); //200ok
-					found = true;
-				}
-
-				if(!found){
-					/* bad request the authentification header is not complete/not the correct format */
 					netconn_write(conn, http_400_hdr, sizeof(http_400_hdr) - 1, NETCONN_NOCOPY);
 				}
-
-			}
-			else{
-				netconn_write(conn, http_400_hdr, sizeof(http_400_hdr) - 1, NETCONN_NOCOPY);
 			}
 		}
 		else{

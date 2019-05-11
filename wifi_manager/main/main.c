@@ -52,8 +52,7 @@ SOFTWARE.
 
 
 
-static TaskHandle_t task_http_server = NULL;
-static TaskHandle_t task_wifi_manager = NULL;
+
 
 /* @brief tag used for ESP serial console messages */
 static const char TAG[] = "main";
@@ -65,8 +64,8 @@ static const char TAG[] = "main";
 void monitoring_task(void *pvParameter)
 {
 	for(;;){
-		ESP_LOGD(TAG, "free heap: %d",esp_get_free_heap_size());
-		vTaskDelay(10000 / portTICK_PERIOD_MS);
+		ESP_LOGI(TAG, "free heap: %d",esp_get_free_heap_size());
+		vTaskDelay( pdMS_TO_TICKS(10000) );
 	}
 }
 
@@ -75,17 +74,10 @@ void app_main()
 {
 
 
-	/* disable the default wifi logging */
-	esp_log_level_set("wifi", ESP_LOG_NONE);
 
-	/* initialize flash memory */
-	nvs_flash_init();
 
-	/* start the HTTP Server task */
-	xTaskCreate(&http_server, "http_server", 2048, NULL, 5, &task_http_server);
-
-	/* start the wifi manager task */
-	xTaskCreate(&wifi_manager, "wifi_manager", 4096, NULL, 4, &task_wifi_manager);
+	/* start the wifi manager */
+	wifi_manager_start();
 
 	/* your code should go here. Here we simply create a task on core 2 that monitors free heap memory */
 	xTaskCreatePinnedToCore(&monitoring_task, "monitoring_task", 2048, NULL, 1, NULL, 1);

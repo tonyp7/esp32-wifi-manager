@@ -1,5 +1,17 @@
 menu "Wifi Manager Configuration"
 
+config WIFI_MANAGER_TASK_PRIORITY
+    int "RTOS Task Priority for the wifi_manager"
+    default 5
+    help
+	Tasks spawn by the manager will have a priority of WIFI_MANAGER_TASK_PRIORITY-1. For this particular reason, minimum recommended task priority is 2.
+
+config WIFI_MANAGER_MAX_RETRY
+	int "Max Retry on failed connection"
+    default 2
+    help
+	Defines when a connection is lost/attempt to connect is made, how many retries should be made before giving up.
+	
 config DEFAULT_AP_SSID
     string "Access Point SSID"
     default "esp32"
@@ -20,13 +32,13 @@ config DEFAULT_AP_CHANNEL
 	
 config DEFAULT_AP_IP
     string "Access Point IP Address"
-    default "192.168.1.1"
+    default "10.10.0.1"
     help
 	This is used for the redirection to the captive portal. It is recommended to leave unchanged.
 	
 config DEFAULT_AP_GATEWAY
     string "Access Point IP Gateway"
-    default "192.168.1.1"
+    default "10.10.0.1"
     help
 	This is used for the redirection to the captive portal. It is recommended to leave unchanged.
 	
