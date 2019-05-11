@@ -66,7 +66,7 @@ extern "C" {
  * @brief Defines when a connection is lost/attempt to connect is made, how many retries should be made before giving up.
  * Setting it to 2 for instance means there will be 3 attempts in total (original request + 2 retries)
  */
-#define	WIFI_MANAGER_MAX_RETRY				2
+#define	WIFI_MANAGER_MAX_RETRY				CONFIG_WIFI_MANAGER_MAX_RETRY
 
 /** @brief Defines the task priority of the wifi_manager.
  *
