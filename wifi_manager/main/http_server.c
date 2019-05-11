@@ -93,7 +93,9 @@ const static char http_redirect_hdr_end[] = "/\n\n";
 
 
 void http_server_start(){
-	xTaskCreate(&http_server, "http_server", 2048, NULL, WIFI_MANAGER_TASK_PRIORITY-1, &task_http_server);
+	if(task_http_server == NULL){
+		xTaskCreate(&http_server, "http_server", 2048, NULL, WIFI_MANAGER_TASK_PRIORITY-1, &task_http_server);
+	}
 }
 
 void http_server(void *pvParameters) {
