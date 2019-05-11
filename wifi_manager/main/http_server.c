@@ -92,20 +92,11 @@ const static char http_redirect_hdr_end[] = "/\n\n";
 
 
 
-//TODO: delete
-//void http_server_set_event_start(){
-//	if(!http_server_event_group) http_server_event_group = xEventGroupCreate();
-//	xEventGroupSetBits(http_server_event_group, HTTP_SERVER_START_BIT_0 );
-//}
-
 void http_server_start(){
 	xTaskCreate(&http_server, "http_server", 2048, NULL, WIFI_MANAGER_TASK_PRIORITY-1, &task_http_server);
 }
 
 void http_server(void *pvParameters) {
-
-	//if(!http_server_event_group) http_server_event_group = xEventGroupCreate();
-
 
 	struct netconn *conn, *newconn;
 	err_t err;
