@@ -178,9 +178,10 @@ typedef enum message_code_t {
 	ORDER_START_AP = 9,
 	ORDER_START_HTTP = 10,
 	ORDER_START_DNS_HIJACK = 11,
-	EVENT_STA_DISCONNECTED = 100,
-	EVENT_SCAN_DONE = 101,
-	EVENT_STA_GOT_IP = 102
+	EVENT_STA_DISCONNECTED = 12,
+	EVENT_SCAN_DONE = 13,
+	EVENT_STA_GOT_IP = 14,
+	MESSAGE_CODE_COUNT = 15 /* important for the callback array */
 
 }message_code_t;
 
@@ -350,16 +351,24 @@ void wifi_manager_clear_access_points_json();
 void wifi_manager_initialise_mdns();
 
 
-
-
 bool wifi_manager_lock_sta_ip_string(TickType_t xTicksToWait);
 void wifi_manager_unlock_sta_ip_string();
+
+/**
+ * @brief gets the string representation of the STA IP address, e.g.: "192.168.1.69"
+ */
 char* wifi_manager_get_sta_ip_string();
 
 /**
  * @brief thread safe char representation of the STA IP update
  */
 void wifi_manager_safe_update_sta_ip_string(uint32_t ip);
+
+
+/**
+ * @brief Register a callback to a custom function when specific event message_code happens.
+ */
+void wifi_manager_set_callback(message_code_t message_code, void (*func_ptr)(void*) );
 
 
 BaseType_t wifi_manager_send_message(message_code_t code, void *param);

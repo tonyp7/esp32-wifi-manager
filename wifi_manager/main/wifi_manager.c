@@ -69,6 +69,8 @@ char *accessp_json = NULL;
 char *ip_info_json = NULL;
 wifi_config_t* wifi_manager_config_sta = NULL;
 
+void (**cb_ptr_arr)(void*) = NULL;
+
 /* @brief tag used for ESP serial console messages */
 static const char TAG[] = "wifi_manager";
 
@@ -139,6 +141,25 @@ void wifi_manager_start(){
 
 	/* initialize flash memory */
 	nvs_flash_init();
+
+	/* memory allocation */
+	wifi_manager_queue = xQueueCreate( 3, sizeof( queue_message) );
+	wifi_manager_json_mutex = xSemaphoreCreateMutex();
+	accessp_records = (wifi_ap_record_t*)malloc(sizeof(wifi_ap_record_t) * MAX_AP_NUM);
+	accessp_json = (char*)malloc(MAX_AP_NUM * JSON_ONE_APP_SIZE + 4); /* 4 bytes for json encapsulation of "[\n" and "]\0" */
+	wifi_manager_clear_access_points_json();
+	ip_info_json = (char*)malloc(sizeof(char) * JSON_IP_INFO_SIZE);
+	wifi_manager_clear_ip_info_json();
+	wifi_manager_config_sta = (wifi_config_t*)malloc(sizeof(wifi_config_t));
+	memset(wifi_manager_config_sta, 0x00, sizeof(wifi_config_t));
+	memset(&wifi_settings.sta_static_ip_config, 0x00, sizeof(tcpip_adapter_ip_info_t));
+	cb_ptr_arr = malloc(  sizeof(   sizeof( void (*)( void* ) )        ) * MESSAGE_CODE_COUNT);
+	for(int i=0; i<MESSAGE_CODE_COUNT; i++){
+		cb_ptr_arr[i] = NULL;
+	}
+	wifi_manager_sta_ip_mutex = xSemaphoreCreateMutex();
+	wifi_manager_sta_ip = (char*)malloc(sizeof(char) * IP4ADDR_STRLEN_MAX);
+	wifi_manager_safe_update_sta_ip_string((uint32_t)0);
 
 	/* start wifi manager task */
 	xTaskCreate(&wifi_manager, "wifi_manager", 4096, NULL, WIFI_MANAGER_TASK_PRIORITY, &task_wifi_manager);
@@ -613,6 +634,14 @@ BaseType_t wifi_manager_send_message(message_code_t code, void *param){
 	return xQueueSend( wifi_manager_queue, &msg, portMAX_DELAY);
 }
 
+
+void wifi_manager_set_callback(message_code_t message_code, void (*func_ptr)(void*) ){
+
+	if(cb_ptr_arr && message_code < MESSAGE_CODE_COUNT){
+		cb_ptr_arr[message_code] = func_ptr;
+	}
+}
+
 void wifi_manager( void * pvParameters ){
 
 
@@ -621,23 +650,7 @@ void wifi_manager( void * pvParameters ){
 	EventBits_t uxBits;
 	uint8_t	retries = 0;
 
-	/* initiate queue objects that are needed for the wifi manager */
-	wifi_manager_queue = xQueueCreate( 3, sizeof( queue_message) );
 
-	/* memory allocation of objects used by the task */
-	wifi_manager_json_mutex = xSemaphoreCreateMutex();
-	accessp_records = (wifi_ap_record_t*)malloc(sizeof(wifi_ap_record_t) * MAX_AP_NUM);
-	accessp_json = (char*)malloc(MAX_AP_NUM * JSON_ONE_APP_SIZE + 4); /* 4 bytes for json encapsulation of "[\n" and "]\0" */
-	wifi_manager_clear_access_points_json();
-	ip_info_json = (char*)malloc(sizeof(char) * JSON_IP_INFO_SIZE);
-	wifi_manager_clear_ip_info_json();
-	wifi_manager_config_sta = (wifi_config_t*)malloc(sizeof(wifi_config_t));
-	memset(wifi_manager_config_sta, 0x00, sizeof(wifi_config_t));
-	memset(&wifi_settings.sta_static_ip_config, 0x00, sizeof(tcpip_adapter_ip_info_t));
-
-	wifi_manager_sta_ip_mutex = xSemaphoreCreateMutex();
-	wifi_manager_sta_ip = (char*)malloc(sizeof(char) * IP4ADDR_STRLEN_MAX);
-	wifi_manager_safe_update_sta_ip_string((uint32_t)0);
 
 
 
@@ -747,6 +760,10 @@ void wifi_manager( void * pvParameters ){
 				else{
 					ESP_LOGE(TAG, "could not get access to json mutex in wifi_scan");
 				}
+
+				/* callback */
+				if(cb_ptr_arr[msg.code]) (*cb_ptr_arr[msg.code])(NULL);
+
 				break;
 
 			case ORDER_START_WIFI_SCAN:
@@ -758,6 +775,9 @@ void wifi_manager( void * pvParameters ){
 					xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_SCAN_BIT);
 					ESP_ERROR_CHECK(esp_wifi_scan_start(&scan_config, false));
 				}
+
+				/* callback */
+				if(cb_ptr_arr[msg.code]) (*cb_ptr_arr[msg.code])(NULL);
 
 				break;
 
@@ -772,6 +792,10 @@ void wifi_manager( void * pvParameters ){
 					ESP_LOGI(TAG, "No saved wifi found on startup. Starting access point.");
 					wifi_manager_send_message(ORDER_START_AP, NULL);
 				}
+
+				/* callback */
+				if(cb_ptr_arr[msg.code]) (*cb_ptr_arr[msg.code])(NULL);
+
 				break;
 
 			case ORDER_CONNECT_STA:
@@ -798,6 +822,9 @@ void wifi_manager( void * pvParameters ){
 					ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, wifi_manager_get_wifi_sta_config()));
 					ESP_ERROR_CHECK(esp_wifi_connect());
 				}
+
+				/* callback */
+				if(cb_ptr_arr[msg.code]) (*cb_ptr_arr[msg.code])(NULL);
 
 				break;
 
@@ -921,6 +948,10 @@ void wifi_manager( void * pvParameters ){
 						wifi_manager_send_message(ORDER_START_AP, NULL);
 					}
 				}
+
+				/* callback */
+				if(cb_ptr_arr[msg.code]) (*cb_ptr_arr[msg.code])(NULL);
+
 				break;
 
 			case ORDER_START_AP:
@@ -929,6 +960,9 @@ void wifi_manager( void * pvParameters ){
 
 				//http_server_start();
 				dns_server_start();
+
+				/* callback */
+				if(cb_ptr_arr[msg.code]) (*cb_ptr_arr[msg.code])(NULL);
 
 				break;
 
@@ -962,6 +996,9 @@ void wifi_manager( void * pvParameters ){
 				/* bring down DNS hijack */
 				dns_server_stop();
 
+				/* callback */
+				if(cb_ptr_arr[msg.code]) (*cb_ptr_arr[msg.code])(NULL);
+
 				break;
 
 			case ORDER_DISCONNECT_STA:
@@ -972,6 +1009,9 @@ void wifi_manager( void * pvParameters ){
 
 				/* order wifi discconect */
 				ESP_ERROR_CHECK(esp_wifi_disconnect());
+
+				/* callback */
+				if(cb_ptr_arr[msg.code]) (*cb_ptr_arr[msg.code])(NULL);
 
 				break;
 
