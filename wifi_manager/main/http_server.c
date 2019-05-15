@@ -60,14 +60,18 @@ function to process requests, decode URLs, serve files, etc. etc.
 #include "wifi_manager.h"
 
 
-//EventGroupHandle_t http_server_event_group = NULL;
-//EventBits_t uxBits;
-
+/* @brief tag used for ESP serial console messages */
 static const char TAG[] = "http_server";
+
+/* @brief task handle for the http server */
 static TaskHandle_t task_http_server = NULL;
 
 
-/* embedded binary data */
+/**
+ * @brief embedded binary data.
+ * @see file "component.mk"
+ * @see https://docs.espressif.com/projects/esp-idf/en/latest/api-guides/build-system.html#embedding-binary-data
+ */
 extern const uint8_t style_css_start[] asm("_binary_style_css_start");
 extern const uint8_t style_css_end[]   asm("_binary_style_css_end");
 extern const uint8_t jquery_gz_start[] asm("_binary_jquery_gz_start");

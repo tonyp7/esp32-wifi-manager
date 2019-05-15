@@ -38,12 +38,16 @@ function to process requests, decode URLs, serve files, etc. etc.
 extern "C" {
 #endif
 
-#define HTTP_SERVER_START_BIT_0	( 1 << 0 )
-
-
+/**
+ * @brief RTOS task for the HTTP server. Do not start manually.
+ * @see void http_server_start()
+ */
 void http_server(void *pvParameters);
+
+/* @brief helper function that processes one HTTP request at a time */
 void http_server_netconn_serve(struct netconn *conn);
-//void http_server_set_event_start(); //TODO: delete
+
+/* @brief create the task for the http server */
 void http_server_start();
 
 /**

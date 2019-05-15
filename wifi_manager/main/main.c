@@ -70,14 +70,13 @@ void monitoring_task(void *pvParameter)
 }
 
 
+/* brief this is an exemple of a callback that you can setup in your own app to get notified of wifi manager event */
 void cb_connection_ok(void *pvParameter){
 	ESP_LOGI(TAG, "I have a connection!");
 }
 
 void app_main()
 {
-
-
 	/* start the wifi manager */
 	wifi_manager_start();
 
@@ -86,6 +85,4 @@ void app_main()
 
 	/* your code should go here. Here we simply create a task on core 2 that monitors free heap memory */
 	xTaskCreatePinnedToCore(&monitoring_task, "monitoring_task", 2048, NULL, 1, NULL, 1);
-
-
 }

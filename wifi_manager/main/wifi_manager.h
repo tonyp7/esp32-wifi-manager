@@ -165,6 +165,16 @@ extern "C" {
 
 
 
+/**
+ * @brief Defines the complete list of all messages that the wifi_manager can process.
+ *
+ * Some of these message are events ("EVENT"), and some of them are action ("ORDER")
+ * Each of these messages can trigger a callback function and each callback function is stored
+ * in a function pointer array for convenience. Because of this behavior, it is extremely important
+ * to maintain a strict sequence and the top level special element 'MESSAGE_CODE_COUNT'
+ *
+ * @see wifi_manager_set_callback
+ */
 typedef enum message_code_t {
 	NONE = 0,
 	ORDER_START_HTTP_SERVER = 1,
@@ -186,7 +196,9 @@ typedef enum message_code_t {
 }message_code_t;
 
 /**
- * @brief simplified reason codes for a lost connection
+ * @brief simplified reason codes for a lost connection.
+ *
+ * esp-idf maintains a big list of reason codes which in practice are useless for most typical application.
  */
 typedef enum update_reason_code_t {
 	UPDATE_CONNECTION_OK = 0,
@@ -231,7 +243,7 @@ typedef struct{
 
 
 /**
- *
+ * Allocate heap memory for the wifi manager and start the wifi_manager RTOS task
  */
 void wifi_manager_start();
 
@@ -272,14 +284,7 @@ wifi_config_t* wifi_manager_get_wifi_sta_config();
 
 
 /**
- * @brief A standard wifi event manager.
- * The following event are being monitoring and will set/clear group events:
- * SYSTEM_EVENT_AP_START
- * SYSTEM_EVENT_AP_STACONNECTED
- * SYSTEM_EVENT_AP_STADISCONNECTED
- * SYSTEM_EVENT_STA_START
- * SYSTEM_EVENT_STA_GOT_IP
- * SYSTEM_EVENT_STA_DISCONNECTED
+ * @brief A standard wifi event handler as recommended by Espressif
  */
 esp_err_t wifi_manager_event_handler(void *ctx, system_event_t *event);
 
