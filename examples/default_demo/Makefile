@@ -5,7 +5,7 @@
 
 PROJECT_NAME := wifi_manager
 
-EXTRA_COMPONENT_DIRS := ../../wifi_manager
+EXTRA_COMPONENT_DIRS := ../../
 
 include $(IDF_PATH)/make/project.mk
 

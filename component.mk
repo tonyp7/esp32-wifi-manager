@@ -1,2 +1,4 @@
-COMPONENT_ADD_INCLUDEDIRS = wifi_manager
-COMPONENT_DEPENDS = driver log
+COMPONENT_ADD_INCLUDEDIRS = src
+COMPONENT_SRCDIRS = src
+COMPONENT_DEPENDS = log
+COMPONENT_EMBED_FILES := src/style.css src/jquery.gz src/code.js src/index.html
