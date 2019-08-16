@@ -62,7 +62,7 @@ wifi_manager/.cproject
 wifi_manager/.project
 sdkconfig
 sdkconfig.old
-*/build/
+**/build/
 #doxygen
 Doxyfile
 wifi_manager/doc/
