@@ -1,0 +1,250 @@
+body {
+    background-color: #eee;
+    border: 0;
+    margin: 0;
+    font: 1.1em tahoma, arial, sans-serif;
+}
+a {
+    color: darkblue;
+    transition: color .2s ease-out;
+    text-decoration: none
+}
+a:hover {
+    color: red;
+}
+input {
+    display: none;
+    font: 1.1em tahoma, arial, sans-serif;
+}
+input:focus,
+select:focus,
+textarea:focus,
+button:focus {
+    outline: none;
+}
+input[type="button"] {
+    width: 100px;
+    padding: 5px;
+    text-align: center;
+    display: block;
+}
+p {
+    padding: 10px;
+}
+#credits {
+    display: none;
+}
+#app {} #app-wrap {} #disconnect {
+    width: 150px;
+}
+.diag-box {
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+    height: 100%;
+    width: 100%;
+    display: none;
+}
+.diag-box-win {
+    position: absolute;
+    left: 10%;
+    width: 80%;
+    text-align: center;
+    border: 2px outset #888;
+    background-color: #fff;
+    border-radius: 10px;
+    top: 20%;
+}
+.blur {
+    -webkit-filter: blur(2px);
+    -moz-filter: blur(2px);
+    -ms-filter: blur(2px);
+    -o-filter: blur(2px);
+    filter: blur(2px);
+}
+.ape {
+    margin-left: 20px;
+    padding: 10px 0px 10px 10px;
+}
+.ape:hover {
+    cursor: pointer;
+}
+.brdb {
+    border-bottom: 1px solid #888;
+}
+header {
+    background-color: #fff;
+    border-bottom: 1px solid #888;
+}
+section {
+    background-color: #fff;
+    border-bottom: 1px solid #888;
+    border-top: 1px solid #888;
+}
+h1 {
+    display: block;
+    text-align: center;
+    margin: 0;
+    padding: 15px;
+    font-size: 1.4em
+}
+h2 {
+    margin: 0;
+    margin-top: 20px;
+    padding: 10px;
+    text-transform: uppercase;
+    color: #888;
+    font-size: 1.0em
+}
+h3 {
+    margin: 0;
+    text-align: center;
+    padding: 20px 0px 20px 0px;
+}
+.gr {
+    color: green;
+}
+.rd {
+    color: red;
+}
+#wifi-status {
+    display: none;
+}
+#connect {
+    display: none;
+}
+#connect_manual {
+    display: none;
+}
+#manual_ssid {
+    border: none;
+    width: 80%;
+    margin-left: 35px;
+    padding: 10px 0px 10px 10px;
+    display: block
+}
+#manual_pwd {
+    border: none;
+    width: 80%;
+    margin-left: 35px;
+    padding: 10px 0px 10px 10px;
+    display: block
+}
+#pwd {
+    border: none;
+    width: 80%;
+    margin-left: 35px;
+    padding: 10px 0px 10px 10px;
+    display: block
+}
+.buttons {
+    padding: 15px;
+}
+#join {
+    float: right;
+}
+#manual_join {
+    float: right;
+}
+#yes-disconnect {
+    display: inline-block;
+    margin-left: 20px;
+}
+#no-disconnect {
+    display: inline-block;
+}
+.ctr {
+    margin: 0 auto;
+}
+.tctr {
+    text-align: center;
+}
+#connect-wait {
+    display: none;
+}
+#connect-success {
+    display: none;
+}
+#connect-fail {
+    display: none;
+}
+#connect-details {
+    display: none;
+}
+.fr {
+    float: right;
+    margin-right: 20px;
+}
+.w0 {
+    background: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAACxIAAAsSAdLdfvwAAAAZdEVYdFNvZnR3YXJlAHBhaW50Lm5ldCA0LjAuMTJDBGvsAAABzUlEQVRIS+WUTShEURTH3zyRhjQ+8hWxmCJMoSzEwsbCgi1LZRYW9pONptiwka9iI81CWFpYaEqNMkVKmpWN1IhYKN9ZDL/z3p3mxZh5g9X4168799xz/vPefedeLeuVC+3gdTgc07CsmCQ2DI2gg21Jci30wSpGt/CeghickTsHPVACDkgqp67rPgpO4E0ZZMIj7OHhxSvPtEyomcVDeFXJv+EZNvEsNa01rZfAuSUhThR2wU+ObJkbyhRNMMDaDIThBqy1MdZ3wAPawqfFC2Lj0Ab5kpBGxdAJs9TeW72ITUhCPZMjFYwwbwXpnkwlDzOIx50yXwP5c0MeggHGanNqSDqqBqQ7/Kxvg2zHAfMN8IE8uZhYO6eBnBXGKnOakLWfaQZ9jMRjSPXhZUuC5A9JjVFpKkeNSVVA0Tq8KJN0yFl4gilqbW2tm+SQKoybXIG8jcT34RSsh1Byt6iVg2ZLlRCg6JpROqEDpFheXZ5S9rcLFsl5YJwHad+MVA5y13w5lRY5oRsKjdm/Vz/7LR86zG+5wr+9NX+iOowjEO+aELEic+lv1ILppeUPosRst6QduTANgnE2mC+BnYswI1VwfYzCCL9dZij7pWkf6UeSTYAuE/QAAAAASUVORK5CYII=') no-repeat right top;
+    height: 24px;
+    margin-right: 20px;
+}
+.w1 {
+    background:  url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAABGdBTUEAALGPC/xhBQAAAAlwSFlzAAALEQAACxEBf2RfkQAAABl0RVh0U29mdHdhcmUAcGFpbnQubmV0IDQuMC4xNkRpr/UAAAHiSURBVEhL5dRPKINxHMfxPVskpA35F3FYEVasHBYHFwcHrhyVZ8vBfblIceEi/4qLtINwdHCQUpQVKcnJRYqIg/J3OYz399nv0YPNtuzEt149+31/v+/n4fGYLVHpup4Rnyregd+K27TIghe63+8fx7wySqsPdbAj3qzha0MOV6ETiwTd4u0HUZxydgrtKISGj0xreG4gEAgycIRXFZCOR2yTQZSebeaa4Q1s7iOiDv/GM1bJLDJv0EHjzHLAdIFNjHBGHpkbxUo9utmbQBg3sM5G2d+AR24w82XznN4QmpGjXrCExRkXfJhk9t6aRW9YDtSwOFDNE9ZNyFLzKRczOegh406FL8ElG8JDM8S1Qtaq7KhEO0Y0TVtHGHusVxCEDy5oMLNqyVrgWm5kqaYw3mdVdmqQsENE8JbAPbY43yszMqiyHOr66QayL5XH0DJeVEgyUTxhjNmPR/vtBpZyc3hHDZohV5DfRvq7OMYtrDdZY7YwFpG8yhBi6JrrMFogww7IT1mOVsxy5oHrNIqRVpWgDtnGKn7log35xurfVxfPW/7QYT57Ybz7mapqgk9gvjU79ApiW5mpRkIvLTe4oJfyK5lKOQndgvG/wXoOSb8I061Svj4G0M9nZ6z198tmeweYtIrMYP17VAAAAABJRU5ErkJggg==') no-repeat right top;
+    height: 24px;
+    margin-right: 20px;
+}
+.w2 {
+    background:  url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAABGdBTUEAALGPC/xhBQAAAAlwSFlzAAALEQAACxEBf2RfkQAAABl0RVh0U29mdHdhcmUAcGFpbnQubmV0IDQuMC4xNkRpr/UAAAHkSURBVEhL3dRLKERRGMDxuSPSkLzyilgo8iiUhVjYWFiwZancmSzsZSPFho28io1kISwtLKQURZGSrGykiFgo7yyG/zdzznRm5iK5Sk79uvd85/u++5hzx2Pb9q9yDLrJMWhIRB1sv98/ghlliFAXyuGFU21IbECSi9CKORrd4O0TQZyQO45mZMJCpKfZ3BcIBPooOMSravAdD9ikB63sJN1XN69kcQ8vKvknnrBMzyx9gRYCp0aCdo51DJIjr6wU2UoF2lkbxS6uYdYGWV9DtVxgMmbxjFg/apEM/ZQfyUADxqi9M3sRG5CEEib7KnjMvAaye2IbfUVupoMet6r5PDL0YjXBBY4Fai5kRxVCdscg66uQ17HDfAl9kDuXJzB3Thk5sxzzZa6DumHknN3QS+IBPvvh5ZVskN8ZU5+gz3XAlELRIp5Vk6/It/CIYWrjXm3URCkleUsV6iaXkKeR+DaOYH6EkrtCrXxoUf2iJoY8LFB0xXEA9ZBieXS5S3m/jZgi557jBGT7xvWKCxhyIP81ka/SgQ9NSDViURyDbvpTo82yrAPscl4HKxR1aRTT+BhvyhaxtPCSO6OKphfGBc6JZYaX3BnpNN1AUC7AfBrJoRUXR67X6+1BN+fp4dD/Hx7PO4o9VGuAapKIAAAAAElFTkSuQmCC') no-repeat right top;
+    height: 24px;
+    margin-right: 20px;
+}
+.w3 {
+    background:  url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAAZdEVYdFNvZnR3YXJlAHBhaW50Lm5ldCA0LjAuMTZEaa/1AAACAElEQVRIS7XUP0gbYRjH8VSpiBZJWvEflXYQKtqACg6ig4uDg651LPQSHLpLlyDoUhdpVdBFxEG0YwcHCQgRFJSCFKcuUohY6iC0VYtD9PuE9w3vXZ74h16HD3fv733e53KX9y7ied5/pYZhUkPHQ3TBSyQS7zFvTBC9RivKoK3NCwZS3IxBLNLoBFc3yOEbtR/Qj8d4gEJPt3lVMpkcY8E+Lk2D+/iDTXrQyquwfW3zdiZ38dcU/4tzrNHzib3AAMGhU2BlsYFxauSRtaDWaMMwc1PYwU+4a3PMryMuF5gJTH4ne4dOVMLeZSkx9GCatb/cXmQpKXjOYM+EB4w7ILsn2Og28mNe0ePUNF9CzE7GCZc5NpmxkB31FLI7xpn/DHkc24xXMQb55XIH7s55Qc0Cx0YZ29A2LJyzG95S+AU3/fHySNLUjwTWl9tzG7iqWbSCC9PkNvIunGGStUWP1jcwWijOmIW2yTHkbiTfwle4L6HUfmKtvGi+fr6BowHLLPrBMYVuyGK5dfmV8nx7MUvNb44fIdu3qFdR4KiDfGsKb6WiCn145GQ+ahgmNQyTGpYwxPOWP3qHc/mE+76apaih4hmND2B3TYasJlCjUkPFS5oeORfIkhVtSY0aKqI0TSP/bjCew10+hPf6D+r5fIziDefRwFxJahgmNQyPF7kGEsc1es+A2E4AAAAASUVORK5CYII=') no-repeat right top;
+    height: 24px;
+    margin-right: 20px;
+}
+.pw {
+    background:  url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAACxIAAAsSAdLdfvwAAAAZdEVYdFNvZnR3YXJlAHBhaW50Lm5ldCA0LjAuMTJDBGvsAAABIUlEQVRIS+3VsU7CUBTGcYhBJCwqwcmEJ2DkCQgzb8ADmLgYWXTzMVjcGNjYGEAXgoSRhTg5OroYIyFY/h+hWGwvtzQ0LpzkF8i5l/uRQ2kTjuPEKrC5T79vzHWJO4wxwzeGuMY5AitsQBFvmEObvNQboQBfhQk4gQ5wD+zgBrcYrHrSwzE2KkxAHVrQWB6QgiqJLB7xA+2pYaNsAWm8QAsa0Sn+1gU+oT1NHGFdtoAcJtBCSw1DuaPqQiNdly0gj1doQaMwleavPc+IJUDffKeADO7Rxxe08A4dEOQD2qPXJ1xh+VuYAirQVaNGFFPov2MM0OXm/UAUZRwCtjoEWP1vQBXuLTgKPYRKMAacoY0oIboDNLB8+PgC4hLY3B8nsQCQEf56jLJoQAAAAABJRU5ErkJggg==') no-repeat right top;
+    height: 24px;
+    margin-right: 20px;
+    height: 24px;
+    margin-right: 30px;
+}
+/* SpinKit is licensed under the MIT License. Copyright (c) 2015 Tobias Ahlin */
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    position: relative;
+    margin: 100px auto;
+}
+.double-bounce1,
+.double-bounce2 {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background-color: #333;
+    opacity: 0.6;
+    position: absolute;
+    top: 0;
+    left: 0;
+    -webkit-animation: sk-bounce 2.0s infinite ease-in-out;
+    animation: sk-bounce 2.0s infinite ease-in-out;
+}
+.double-bounce2 {
+    -webkit-animation-delay: -1.0s;
+    animation-delay: -1.0s;
+}
+@-webkit-keyframes sk-bounce {
+    0%, 100% {
+        -webkit-transform: scale(0.0)
+    }
+    50% {
+        -webkit-transform: scale(1.0)
+    }
+}
+@keyframes sk-bounce {
+    0%, 100% {
+        transform: scale(0.0);
+        -webkit-transform: scale(0.0);
+    }
+    50% {
+        transform: scale(1.0);
+        -webkit-transform: scale(1.0);
+    }
+}
+/* end of SpinKit */

@@ -94,7 +94,9 @@ script:
         for i in $(ls -d */); do
           if [ ! -e $PROJECT_PATH/examples/$i/$IGNORE_FILE ]; then
             cd $PROJECT_PATH/examples/$i
-            BATCH_BUILD=1 $BUILD_COMMAND menuconfig
+            # XXX the latest idf.py does not support defconfig
+            make list-components
+            make defconfig
             # use travis_wait to avoid timeout during the build
             travis_wait $BUILD_COMMAND all >> ~/build.log 2>&1
             if [ $? -ne 0 ]; then
