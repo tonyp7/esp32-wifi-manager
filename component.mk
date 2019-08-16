@@ -1,0 +1,2 @@
+COMPONENT_ADD_INCLUDEDIRS = wifi_manager
+COMPONENT_DEPENDS = driver log

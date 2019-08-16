@@ -26,33 +26,13 @@ SOFTWARE.
 @see https://github.com/tonyp7/esp32-wifi-manager
 */
 
-
-
 #include <stdio.h>
 #include <string.h>
 #include "freertos/FreeRTOS.h"
-#include "driver/gpio.h"
-#include "driver/spi_master.h"
 #include "freertos/task.h"
 #include "esp_system.h"
-#include "esp_spi_flash.h"
-#include "esp_wifi.h"
-#include "esp_system.h"
-#include "esp_event_loop.h"
-#include "nvs_flash.h"
 #include "esp_log.h"
-#include "freertos/event_groups.h"
-#include "mdns.h"
-#include "lwip/api.h"
-#include "lwip/err.h"
-#include "lwip/netdb.h"
-
-#include "http_server.h"
 #include "wifi_manager.h"
-
-
-
-
 
 /* @brief tag used for ESP serial console messages */
 static const char TAG[] = "main";
