@@ -82,21 +82,31 @@ script:
       esac
 
       cd $PROJECT_PATH/examples
-      for i in $(ls -d */); do
-        if [ ! -e $PROJECT_PATH/examples/$i/$IGNORE_FILE ]; then
-          cd $PROJECT_PATH/examples/$i
-          make defconfig
-          # use travis_wait to avoid timeout during the build
-          travis_wait make -j2 >> ~/build.log 2>&1
-          if [ $? -ne 0 ]; then
-            # when failed, show last 100 lines for debugging, and exit with
-            # non-zero exit code
-            tail -n 100 ~/build.log
-            exit 1
+      for BUILD in cmake make; do
+        BUILD_COMMAND="python $IDF_PATH/tools/idf.py"
+        case $BUILD in
+          cmake)
+            ;;
+          make)
+            BUILD_COMMAND="make"
+            ;;
+        esac
+        for i in $(ls -d */); do
+          if [ ! -e $PROJECT_PATH/examples/$i/$IGNORE_FILE ]; then
+            cd $PROJECT_PATH/examples/$i
+            BATCH_BUILD=1 $BUILD_COMMAND menuconfig
+            # use travis_wait to avoid timeout during the build
+            travis_wait $BUILD_COMMAND all >> ~/build.log 2>&1
+            if [ $? -ne 0 ]; then
+              # when failed, show last 100 lines for debugging, and exit with
+              # non-zero exit code
+              tail -n 100 ~/build.log
+              exit 1
+            fi
+            $BUILD_COMMAND clean >/dev/null
+            # make sure the directory is clean
+            rm -rf sdkconfig build
           fi
-          make clean >/dev/null
-          # make sure the directory is clean
-          rm -rf sdkconfig build
-        fi
+        done
       done
     done
