@@ -36,6 +36,7 @@ wifi_manager_set_callback(EVENT_STA_GOT_IP, &cb_connection_ok);
 ```
 
 That's it! Now everytime the event is triggered it will call this function.
+See [examples/default_demo](examples/default_demo).
 
 # License
 *esp32-wifi-manager* is MIT licensed. As such, it can be included in any project, commercial or not, as long as you retain original copyright. Please make sure to read the license file.
