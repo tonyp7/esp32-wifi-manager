@@ -11,7 +11,7 @@ config WIFI_MANAGER_MAX_RETRY
     default 2
     help
 	Defines when a connection is lost/attempt to connect is made, how many retries should be made before giving up.
-	
+
 config DEFAULT_AP_SSID
     string "Access Point SSID"
     default "esp32"
@@ -29,35 +29,35 @@ config DEFAULT_AP_CHANNEL
     default 1
     help
 	Be careful you might not see the access point if you use a channel not allowed in your country.
-	
+
 config DEFAULT_AP_IP
     string "Access Point IP Address"
     default "10.10.0.1"
     help
 	This is used for the redirection to the captive portal. It is recommended to leave unchanged.
-	
+
 config DEFAULT_AP_GATEWAY
     string "Access Point IP Gateway"
     default "10.10.0.1"
     help
 	This is used for the redirection to the captive portal. It is recommended to leave unchanged.
-	
+
 config DEFAULT_AP_NETMASK
     string "Access Point Netmask"
     default "255.255.255.0"
     help
 	This is used for the redirection to the captive portal. It is recommended to leave unchanged.
-	
+
 config DEFAULT_AP_MAX_CONNECTIONS
     int "Access Point Max Connections"
     default 4
     help
 	Max is 4.
-	
+
 config DEFAULT_AP_BEACON_INTERVAL
     int "Access Point Beacon Interval (ms)"
     default 100
     help
 	100ms is the recommended default.
-	
+
 endmenu
