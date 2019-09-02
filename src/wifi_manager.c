@@ -160,6 +160,7 @@ void wifi_manager_start(){
 	wifi_manager_sta_ip_mutex = xSemaphoreCreateMutex();
 	wifi_manager_sta_ip = (char*)malloc(sizeof(char) * IP4ADDR_STRLEN_MAX);
 	wifi_manager_safe_update_sta_ip_string((uint32_t)0);
+	wifi_manager_event_group = xEventGroupCreate();
 
 	/* start wifi manager task */
 	xTaskCreate(&wifi_manager, "wifi_manager", 4096, NULL, WIFI_MANAGER_TASK_PRIORITY, &task_wifi_manager);
@@ -657,8 +658,7 @@ void wifi_manager( void * pvParameters ){
 	/* initialize the tcp stack */
 	tcpip_adapter_init();
 
-	/* event handler and event group for the wifi driver */
-	wifi_manager_event_group = xEventGroupCreate();
+	/* event loop for the wifi driver */
 	ESP_ERROR_CHECK(esp_event_loop_init(wifi_manager_event_handler, NULL));
 
 	/* wifi scanner config */
