@@ -37,7 +37,7 @@ Contains the freeRTOS task and all necessary support
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
-#include "esp_event_loop.h"
+#include "esp_event.h"
 #include "esp_wifi.h"
 #include "esp_wifi_types.h"
 #include "esp_log.h"
@@ -433,81 +433,67 @@ char* wifi_manager_get_ap_list_json(){
 }
 
 
-esp_err_t wifi_manager_event_handler(void *ctx, system_event_t *event)
+void wifi_manager_event_handler(void *ctx, esp_event_base_t event_base, int32_t event_id, void * event_data)
 {
-
-
-
-    switch(event->event_id) {
-
-    case SYSTEM_EVENT_WIFI_READY:
-    	ESP_LOGI(TAG, "SYSTEM_EVENT_WIFI_READY");
-    	break;
-
-    case SYSTEM_EVENT_SCAN_DONE:
-    	ESP_LOGD(TAG, "SYSTEM_EVENT_SCAN_DONE");
-    	xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_SCAN_BIT);
-    	wifi_manager_send_message(EVENT_SCAN_DONE, NULL);
-    	break;
-
-    case SYSTEM_EVENT_STA_AUTHMODE_CHANGE:
-    	ESP_LOGI(TAG, "SYSTEM_EVENT_STA_AUTHMODE_CHANGE");
-    	break;
-
-
-    case SYSTEM_EVENT_AP_START:
-    	ESP_LOGI(TAG, "SYSTEM_EVENT_AP_START");
-    	xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_AP_STARTED_BIT);
+    if (event_base == WIFI_EVENT) {
+        switch (event_id) {
+	    case WIFI_EVENT_WIFI_READY:
+		ESP_LOGI(TAG, "WIFI_EVENT_WIFI_READY");
 		break;
-
-    case SYSTEM_EVENT_AP_STOP:
-    	break;
-
-    case SYSTEM_EVENT_AP_PROBEREQRECVED:
-    	break;
-
-    case SYSTEM_EVENT_AP_STACONNECTED: /* a user disconnected from the SoftAP */
-    	ESP_LOGI(TAG, "SYSTEM_EVENT_AP_STACONNECTED");
+	    case WIFI_EVENT_SCAN_DONE:
+		ESP_LOGD(TAG, "WIFI_EVENT_SCAN_DONE");
+		xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_SCAN_BIT);
+		wifi_manager_send_message(EVENT_SCAN_DONE, NULL);
+		break;
+	    case WIFI_EVENT_STA_AUTHMODE_CHANGE:
+		ESP_LOGI(TAG, "WIFI_EVENT_STA_AUTHMODE_CHANGE");
+		break;
+	    case WIFI_EVENT_AP_START:
+		ESP_LOGI(TAG, "WIFI_EVENT_AP_START");
+		xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_AP_STARTED_BIT);
+		break;
+	    case WIFI_EVENT_AP_STOP:
+		break;
+	    case WIFI_EVENT_AP_PROBEREQRECVED:
+		break;
+	    case WIFI_EVENT_AP_STACONNECTED: /* a user disconnected from the SoftAP */
+		ESP_LOGI(TAG, "WIFI_EVENT_AP_STACONNECTED");
 		xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_AP_STA_CONNECTED_BIT);
 		break;
-
-    case SYSTEM_EVENT_AP_STADISCONNECTED:
-    	ESP_LOGI(TAG, "SYSTEM_EVENT_AP_STADISCONNECTED");
-    	xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_AP_STA_CONNECTED_BIT);
+	    case WIFI_EVENT_AP_STADISCONNECTED:
+		ESP_LOGI(TAG, "WIFI_EVENT_AP_STADISCONNECTED");
+		xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_AP_STA_CONNECTED_BIT);
 		break;
-
-    case SYSTEM_EVENT_STA_START:
-    	ESP_LOGI(TAG, "SYSTEM_EVENT_STA_START");
-        break;
-
-    case SYSTEM_EVENT_STA_STOP:
-    	ESP_LOGI(TAG, "SYSTEM_EVENT_STA_STOP");
-    	break;
-
-	case SYSTEM_EVENT_STA_GOT_IP:
-		ESP_LOGI(TAG, "SYSTEM_EVENT_STA_GOT_IP");
-        xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_WIFI_CONNECTED_BIT);
-        wifi_manager_send_message(EVENT_STA_GOT_IP, (void*)event->event_info.got_ip.ip_info.ip.addr );
-        break;
-
-	case SYSTEM_EVENT_STA_CONNECTED:
-		ESP_LOGI(TAG, "SYSTEM_EVENT_STA_CONNECTED");
+	    case WIFI_EVENT_STA_START:
+		ESP_LOGI(TAG, "WIFI_EVENT_STA_START");
 		break;
-
-	case SYSTEM_EVENT_STA_DISCONNECTED:
-		ESP_LOGI(TAG, "SYSTEM_EVENT_STA_DISCONNECTED");
-
+	    case WIFI_EVENT_STA_STOP:
+		ESP_LOGI(TAG, "WIFI_EVENT_STA_STOP");
+		break;
+	    case WIFI_EVENT_STA_CONNECTED:
+		ESP_LOGI(TAG, "WIFI_EVENT_STA_CONNECTED");
+		break;
+	    case WIFI_EVENT_STA_DISCONNECTED:
+		ESP_LOGI(TAG, "WIFI_EVENT_STA_DISCONNECTED");
 		/* if a DISCONNECT message is posted while a scan is in progress this scan will NEVER end, causing scan to never work again. For this reason SCAN_BIT is cleared too */
 		xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_WIFI_CONNECTED_BIT | WIFI_MANAGER_SCAN_BIT);
-
+		wifi_event_sta_disconnected_t* disconnected = (wifi_event_sta_disconnected_t*) event_data;
 		/* post disconnect event with reason code */
-		wifi_manager_send_message(EVENT_STA_DISCONNECTED, (void*)( (uint32_t)event->event_info.disconnected.reason) );
-        break;
-
-	default:
-        break;
+		wifi_manager_send_message(EVENT_STA_DISCONNECTED, (void*)( (uint32_t)disconnected->reason) );
+	    break;
+	    default:
+	    break;
+	}
+    }else if (event_base == IP_EVENT) {
+        switch (event_id) {
+	    case IP_EVENT_STA_GOT_IP:
+		ESP_LOGI(TAG, "IP_EVENT_STA_GOT_IP");
+		xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_WIFI_CONNECTED_BIT);
+		ip_event_got_ip_t* ipevent = (ip_event_got_ip_t*) event_data;
+		wifi_manager_send_message(EVENT_STA_GOT_IP, (void*)( (uint32_t)ipevent->ip_info.ip.addr) );
+		break;
+	}
     }
-	return ESP_OK;
 }
 
 
@@ -659,7 +645,11 @@ void wifi_manager( void * pvParameters ){
 
 	/* event handler and event group for the wifi driver */
 	wifi_manager_event_group = xEventGroupCreate();
-	ESP_ERROR_CHECK(esp_event_loop_init(wifi_manager_event_handler, NULL));
+
+	ESP_ERROR_CHECK(esp_event_loop_create_default());
+	ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_manager_event_handler, NULL));
+	ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &wifi_manager_event_handler, NULL));
+
 
 	/* wifi scanner config */
 	wifi_scan_config_t scan_config = {
@@ -841,10 +831,10 @@ void wifi_manager( void * pvParameters ){
 				 *
 				 * With wifi_manager, we determine:
 				 *  If WIFI_MANAGER_REQUEST_STA_CONNECT_BIT is set, We consider it's a client that requested the connection.
-				 *    When SYSTEM_EVENT_STA_DISCONNECTED is posted, it's probably a password/something went wrong with the handshake.
+				 *    When WIFI_EVENT_STA_DISCONNECTED is posted, it's probably a password/something went wrong with the handshake.
 				 *
 				 *  If WIFI_MANAGER_REQUEST_STA_CONNECT_BIT is set, it's a disconnection that was ASKED by the client (clicking disconnect in the app)
-				 *    When SYSTEM_EVENT_STA_DISCONNECTED is posted, saved wifi is erased from the NVS memory.
+				 *    When WIFI_EVENT_STA_DISCONNECTED is posted, saved wifi is erased from the NVS memory.
 				 *
 				 *  If WIFI_MANAGER_REQUEST_STA_CONNECT_BIT and WIFI_MANAGER_REQUEST_STA_CONNECT_BIT are NOT set, it's a lost connection
 				 *

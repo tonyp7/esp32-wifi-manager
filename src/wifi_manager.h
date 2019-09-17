@@ -287,7 +287,7 @@ wifi_config_t* wifi_manager_get_wifi_sta_config();
 /**
  * @brief A standard wifi event handler as recommended by Espressif
  */
-esp_err_t wifi_manager_event_handler(void *ctx, system_event_t *event);
+void wifi_manager_event_handler(void *ctx, esp_event_base_t event_base, int32_t event_id, void * event_data);
 
 
 /**
