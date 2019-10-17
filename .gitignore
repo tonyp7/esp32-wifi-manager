@@ -66,6 +66,8 @@ sdkconfig.old
 #doxygen
 Doxyfile
 wifi_manager/doc/
+.project
+.cproject
 
 # Visual Studio Code
 .vscode/

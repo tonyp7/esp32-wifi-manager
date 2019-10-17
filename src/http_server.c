@@ -108,14 +108,20 @@ void http_server(void *pvParameters) {
 	netconn_bind(conn, IP_ADDR_ANY, 80);
 	netconn_listen(conn);
 	ESP_LOGI(TAG, "HTTP Server listening on 80/tcp");
-	do {
+	for(;;) {
 		err = netconn_accept(conn, &newconn);
 		if (err == ERR_OK) {
 			http_server_netconn_serve(newconn);
 			netconn_delete(newconn);
 		}
+		else if(err == ERR_TIMEOUT){
+			ESP_LOGE(TAG, "http_server: netconn_accept ERR_TIMEOUT");
+		}
+		else if(err == ERR_ABRT){
+			ESP_LOGE(TAG, "http_server: netconn_accept ERR_ABRT");
+		}
 		taskYIELD();  /* allows the freeRTOS scheduler to take over if needed. */
-	} while(err == ERR_OK);
+	}
 	netconn_close(conn);
 	netconn_delete(conn);
 
