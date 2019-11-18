@@ -47,6 +47,9 @@ void http_server(void *pvParameters);
 /* @brief helper function that processes one HTTP request at a time */
 void http_server_netconn_serve(struct netconn *conn);
 
+/* @brief stop the http server task */
+void http_server_stop();
+
 /* @brief create the task for the http server */
 void http_server_start();
 

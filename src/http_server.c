@@ -57,6 +57,8 @@ function to process requests, decode URLs, serve files, etc. etc.
 #include "http_server.h"
 #include "wifi_manager.h"
 
+#include "../../main/includes/ruuvidongle.h"
+#include "cJSON.h"
 
 /* @brief tag used for ESP serial console messages */
 static const char TAG[] = "http_server";
@@ -78,6 +80,10 @@ extern const uint8_t code_js_start[] asm("_binary_code_js_start");
 extern const uint8_t code_js_end[] asm("_binary_code_js_end");
 extern const uint8_t index_html_start[] asm("_binary_index_html_start");
 extern const uint8_t index_html_end[] asm("_binary_index_html_end");
+extern const uint8_t ruuvi_html_start[] asm("_binary_ruuvi_html_start");
+extern const uint8_t ruuvi_html_end[] asm("_binary_ruuvi_html_end");
+extern const uint8_t ruuvi_js_start[] asm("_binary_ruuvi_js_start");
+extern const uint8_t ruuvi_js_end[] asm("_binary_ruuvi_js_end");
 
 
 /* const http headers stored in ROM */
@@ -96,7 +102,14 @@ const static char http_redirect_hdr_end[] = "/\n\n";
 
 void http_server_start(){
 	if(task_http_server == NULL){
-		xTaskCreate(&http_server, "http_server", 2048, NULL, WIFI_MANAGER_TASK_PRIORITY-1, &task_http_server);
+		xTaskCreate(&http_server, "http_server", 2*2048, NULL, WIFI_MANAGER_TASK_PRIORITY-1, &task_http_server);
+	}
+}
+
+void http_server_stop() {
+	if (task_http_server) {
+		vTaskDelete(task_http_server);
+		task_http_server = NULL;
 	}
 }
 
@@ -147,6 +160,146 @@ char* http_server_get_header(char *request, char *header_name, int *len) {
 	return NULL;
 }
 
+char* get_http_body(char* msg, int len)
+{
+	int body_len;
+	char* newlines = "\r\n\r\n";
+	char* p = strstr(msg, newlines);
+	if (p) {
+		p += strlen(newlines);
+	} else {
+		ESP_LOGI(TAG, "body not found: %s", msg);
+		return 0;
+	}
+
+	body_len = len - (p - msg);
+
+	//copy body to a new buffer so we can have 0-terminated string
+	char* b = malloc(body_len+1);
+	if (!b) {
+		ESP_LOGE(TAG, "%s: malloc error", __func__);
+		return 0;
+	}
+	memcpy(b, p, body_len);
+	b[body_len] = 0;
+
+	ESP_LOGD(TAG, "http body len: %d, body: %s", body_len, b);
+
+	return b;
+}
+
+void parse_ruuvi_config_json(const char* body, struct dongle_config *c)
+{
+	//TODO replace this parsing with generic implementation
+	cJSON* root = cJSON_Parse(body);
+	if (root) {
+		cJSON* um = cJSON_GetObjectItem(root, "use_mqtt");
+		if (um) {
+			bool use_mqtt = cJSON_IsTrue(um);
+			c->use_mqtt = use_mqtt;
+			ESP_LOGD(TAG, "use_mqtt: %d", use_mqtt);
+		} else {
+			ESP_LOGE(TAG, "use_mqtt not found");
+		}
+
+		cJSON* ms = cJSON_GetObjectItem(root, "mqtt_server");
+		if (ms) {
+			char* mqtt_server = cJSON_GetStringValue(ms);
+			if (mqtt_server) {
+				strncpy(c->mqtt_server, mqtt_server, MAX_MQTTUSER_LEN-1);
+				ESP_LOGD(TAG, "mqtt_server: %s", mqtt_server);
+			}
+		}
+
+		cJSON* mu = cJSON_GetObjectItem(root, "mqtt_user");
+		if (mu) {
+			char* mqtt_user = cJSON_GetStringValue(mu);
+			if (mqtt_user) {
+				strncpy(c->mqtt_user, mqtt_user, MAX_MQTTUSER_LEN-1);
+				ESP_LOGD(TAG, "mqtt_user: %s", mqtt_user);
+			}
+		} else {
+			ESP_LOGE(TAG, "mqtt_user not found");
+		}
+
+		cJSON* mp = cJSON_GetObjectItem(root, "mqtt_pass");
+		if (mp) {
+			char* mqtt_pass = cJSON_GetStringValue(mp);
+			if (mqtt_pass) {
+				strncpy(c->mqtt_pass, mqtt_pass, MAX_MQTTPASS_LEN-1);
+				ESP_LOGD(TAG, "mqtt_pass: %s", mqtt_pass);
+			}
+		} else {
+			ESP_LOGE(TAG, "mqtt_pass not found");
+		}
+
+		cJSON* uh = cJSON_GetObjectItem(root, "use_http");
+		if (uh) {
+			bool use_http = cJSON_IsTrue(uh);
+			c->use_http = use_http;
+			ESP_LOGD(TAG, "use_http: %d", use_http);
+		} else {
+			ESP_LOGE(TAG, "use_http not found");
+		}
+
+		cJSON* hs = cJSON_GetObjectItem(root, "http_server");
+		if (hs) {
+			char* http_server = cJSON_GetStringValue(hs);
+			if (http_server) {
+				strncpy(c->http_server, http_server, MAX_HTTPSERVER_LEN-1);
+				ESP_LOGD(TAG, "http_server: %s", http_server);
+			}
+		} else {
+			ESP_LOGE(TAG, "http_server not found");
+		}
+
+		cJSON* hu = cJSON_GetObjectItem(root, "http_user");
+		if (hu) {
+			char* http_user = cJSON_GetStringValue(hu);
+			if (http_user) {
+				strncpy(c->http_user, http_user, MAX_HTTPUSER_LEN-1);
+				ESP_LOGD(TAG, "http_user: %s", http_user);
+			}
+		} else {
+			ESP_LOGE(TAG, "http_user not found");
+		}
+
+		cJSON* hp = cJSON_GetObjectItem(root, "http_pass");
+		if (hp) {
+			char* http_pass = cJSON_GetStringValue(hp);
+			if (http_pass) {
+				strncpy(c->http_pass, http_pass, MAX_HTTPPASS_LEN-1);
+				ESP_LOGD(TAG, "http_pass: %s", http_pass);
+			}
+		} else {
+			ESP_LOGE(TAG, "http_pass not found");
+		}
+
+		cJSON* uf = cJSON_GetObjectItem(root, "use_filtering");
+		if (uf) {
+			bool use_filtering = cJSON_IsTrue(uf);
+			c->company_filter = use_filtering;
+			ESP_LOGD(TAG, "use_filtering: %d", use_filtering);
+		} else {
+			ESP_LOGE(TAG, "use_filtering not found");
+		}
+
+		cJSON* co = cJSON_GetObjectItem(root, "coordinates");
+		if (co) {
+			char* coordinates = cJSON_GetStringValue(co);
+			if (coordinates) {
+				strncpy(c->coordinates, coordinates, MAX_CONFIG_STR_LEN-1);
+				ESP_LOGD(TAG, "coordinates: %s", coordinates);
+			}
+		} else {
+			ESP_LOGE(TAG, "coordinates not found");
+		}
+	} else {
+		ESP_LOGE(TAG, "Can't parse json: %s", body);
+	}
+
+	cJSON_Delete(root);
+}
 
 void http_server_netconn_serve(struct netconn *conn) {
 
@@ -186,6 +339,14 @@ void http_server_netconn_serve(struct netconn *conn) {
 					netconn_write(conn, http_html_hdr, sizeof(http_html_hdr) - 1, NETCONN_NOCOPY);
 					netconn_write(conn, index_html_start, index_html_end - index_html_start, NETCONN_NOCOPY);
 				}
+				else if(strstr(line, "GET /ruuvi.html ")) {
+					netconn_write(conn, http_html_hdr, sizeof(http_html_hdr) - 1, NETCONN_NOCOPY);
+					netconn_write(conn, ruuvi_html_start, ruuvi_html_end - ruuvi_html_start, NETCONN_NOCOPY);
+				}
+				else if(strstr(line, "GET /ruuvi.js ")) {
+					netconn_write(conn, http_js_hdr, sizeof(http_js_hdr) - 1, NETCONN_NOCOPY);
+					netconn_write(conn, ruuvi_js_start, ruuvi_js_end - ruuvi_js_start, NETCONN_NOCOPY);
+				}
 				else if(strstr(line, "GET /jquery.js ")) {
 					netconn_write(conn, http_jquery_gz_hdr, sizeof(http_jquery_gz_hdr) - 1, NETCONN_NOCOPY);
 					netconn_write(conn, jquery_gz_start, jquery_gz_end - jquery_gz_start, NETCONN_NOCOPY);
@@ -194,6 +355,12 @@ void http_server_netconn_serve(struct netconn *conn) {
 					netconn_write(conn, http_js_hdr, sizeof(http_js_hdr) - 1, NETCONN_NOCOPY);
 					netconn_write(conn, code_js_start, code_js_end - code_js_start, NETCONN_NOCOPY);
 				}
+				else if(strstr(line, "GET /ruuvi_conf.js ")) {
+					netconn_write(conn, http_ok_json_no_cache_hdr, sizeof(http_ok_json_no_cache_hdr) - 1, NETCONN_NOCOPY);
+					char* buff = ruuvi_get_conf_json();
+					netconn_write(conn, buff, strlen(buff), NETCONN_NOCOPY);
+				}
+
 				else if(strstr(line, "GET /ap.json ")) {
 					/* if we can get the mutex, write the last version of the AP list */
 					if(wifi_manager_lock_json_buffer(( TickType_t ) 10)){
@@ -261,8 +428,16 @@ void http_server_netconn_serve(struct netconn *conn) {
 						netconn_write(conn, http_400_hdr, sizeof(http_400_hdr) - 1, NETCONN_NOCOPY);
 					}
 
-				}
-				else{
+				} else if(strstr(line, "POST /ruuvi.json ")) {
+					ESP_LOGD(TAG, "http_server_netconn_serve: POST /ruuvi.json");
+
+					char* body = get_http_body(save_ptr, buflen - (save_ptr - buf));
+					struct dongle_config config = RUUVIDONGLE_DEFAULT_CONFIGURATION;
+					parse_ruuvi_config_json(body, &config);
+
+					free(body);
+
+				} else{
 					netconn_write(conn, http_400_hdr, sizeof(http_400_hdr) - 1, NETCONN_NOCOPY);
 				}
 			}

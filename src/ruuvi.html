@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8"/>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+		<meta name="apple-mobile-web-app-capable" content="yes" />
+		<script src="jquery.js"></script>
+		<link rel="stylesheet" href="/ruuvi.css">
+		<script src="ruuvi.js"></script>
+		<title>ruuvidongle</title>
+	</head>
+	<body>
+		<div id="app">
+			<div id="app-wrap">
+				<div id="connect_manual">
+					<header>
+						<h1>Ruuvidongle config</h1>
+					</header>
+					<h2>HTTP</h2>
+					<section>
+						<input id="use_http" type="checkbox" placeholder="Use HTTP">Use HTTP
+						<input id="http_server" type="text" placeholder="HTTP server" value="">
+						<input id="http_user" type="text" placeholder="User" value="">
+						<input id="http_password" type="text" placeholder="Password" value="">
+					</section>
+					<h2>MQTT</h2>
+					<section>
+						<input id="use_mqtt" type="checkbox" placeholder="Use MQTT">Use MQTT
+						<input id="mqtt_server" type="text" placeholder="MQTT server" value="">
+						<input id="mqtt_user" type="text" placeholder="User" value="">
+						<input id="mqtt_password" type="text" placeholder="Password" value="">
+					</section>
+					<h2>Filtering</h2>
+					<section>
+						<input id="use_filtering" type="checkbox" placeholder="Scan only Ruuvitags">Scan only Ruuvitags
+					</section>
+					<h2>Location</h2>
+					<section>
+						<input id="coordinates" type="text" placeholder="Coordinates" value="">
+					</section>
+					<div class="buttons">
+							<input id="save_config" type="button" value="Save" data-connect="manual" />
+							<input id="manual_cancel" type="button" value="Cancel"/>
+					</div>
+				</div>
+			</div>
+		</div>
+
+	</body>
+<html>

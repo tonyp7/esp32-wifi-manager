@@ -571,7 +571,7 @@ void wifi_manager_filter_unique( wifi_ap_record_t * aplist, uint16_t * aps) {
 		/* remove the identical SSID+authmodes */
 		for(int j=i+1; j<*aps;j++) {
 			wifi_ap_record_t * ap1 = &aplist[j];
-			if ( (strcmp((const char *)ap->ssid, (const char *)ap1->ssid)==0) && 
+			if ( (strcmp((const char *)ap->ssid, (const char *)ap1->ssid)==0) &&
 			     (ap->authmode == ap1->authmode) ) { /* same SSID, different auth mode is skipped */
 				/* save the rssi for the display */
 				if ((ap1->rssi) > (ap->rssi)) ap->rssi=ap1->rssi;
@@ -635,7 +635,7 @@ void wifi_manager( void * pvParameters ){
 	queue_message msg;
 	BaseType_t xStatus;
 	EventBits_t uxBits;
-	uint8_t	retries = 0;
+	//uint8_t	retries = 0;
 
 
 
@@ -719,10 +719,6 @@ void wifi_manager( void * pvParameters ){
 	/* by default the mode is STA because wifi_manager will not start the access point unless it has to! */
 	ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
 	ESP_ERROR_CHECK(esp_wifi_start());
-
-
-	/* start http server */
-	http_server_start();
 
 	/* enqueue first event: load previous config */
 	wifi_manager_send_message(ORDER_LOAD_AND_RESTORE_STA, NULL);
@@ -878,6 +874,7 @@ void wifi_manager( void * pvParameters ){
 
 				uxBits = xEventGroupGetBits(wifi_manager_event_group);
 				if( uxBits & WIFI_MANAGER_REQUEST_STA_CONNECT_BIT ){
+					ESP_LOGI(TAG, "uxBits & WIFI_MANAGER_REQUEST_STA_CONNECT_BIT");
 					/* there are no retries when it's a user requested connection by design. This avoids a user hanging too much
 					 * in case they typed a wrong password for instance. Here we simply clear the request bit and move on */
 					xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_STA_CONNECT_BIT);
@@ -889,6 +886,7 @@ void wifi_manager( void * pvParameters ){
 
 				}
 				else if (uxBits & WIFI_MANAGER_REQUEST_DISCONNECT_BIT){
+					ESP_LOGI(TAG, "uxBits & WIFI_MANAGER_REQUEST_DISCONNECT_BIT");
 					/* user manually requested a disconnect so the lost connection is a normal event. Clear the flag and restart the AP */
 					xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_DISCONNECT_BIT);
 
@@ -909,34 +907,14 @@ void wifi_manager( void * pvParameters ){
 					wifi_manager_send_message(ORDER_START_AP, NULL);
 				}
 				else{
+					ESP_LOGI(TAG, "lost connection");
 					/* lost connection ? */
 					if(wifi_manager_lock_json_buffer( portMAX_DELAY )){
 						wifi_manager_generate_ip_info_json( UPDATE_LOST_CONNECTION );
 						wifi_manager_unlock_json_buffer();
 					}
 
-					if(retries < WIFI_MANAGER_MAX_RETRY){
-						retries++;
-						wifi_manager_send_message(ORDER_CONNECT_STA, (void*)CONNECTION_REQUEST_AUTO_RECONNECT);
-					}
-					else{
-						/* In this scenario the connection was lost beyond repair: kick start the AP! */
-						retries = 0;
-
-						/* if it was a restore attempt connection, we clear the bit */
-						xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_RESTORE_STA_BIT);
-
-						/* erase configuration that could not be used to connect */
-						if(wifi_manager_config_sta){
-							memset(wifi_manager_config_sta, 0x00, sizeof(wifi_config_t));
-						}
-
-						/* save empty connection info in NVS memory */
-						wifi_manager_save_sta_config();
-
-						/* start SoftAP */
-						wifi_manager_send_message(ORDER_START_AP, NULL);
-					}
+					wifi_manager_send_message(ORDER_CONNECT_STA, (void*)CONNECTION_REQUEST_AUTO_RECONNECT);
 				}
 
 				/* callback */
@@ -948,7 +926,7 @@ void wifi_manager( void * pvParameters ){
 				ESP_LOGI(TAG, "MESSAGE: ORDER_START_AP");
 				esp_wifi_set_mode(WIFI_MODE_APSTA);
 
-				//http_server_start();
+				http_server_start();
 				dns_server_start();
 
 				/* callback */
@@ -984,6 +962,7 @@ void wifi_manager( void * pvParameters ){
 				else { abort(); }
 
 				/* bring down DNS hijack */
+				http_server_stop();
 				dns_server_stop();
 
 				/* callback */
