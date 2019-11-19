@@ -102,7 +102,7 @@ const static char http_redirect_hdr_end[] = "/\n\n";
 
 void http_server_start(){
 	if(task_http_server == NULL){
-		xTaskCreate(&http_server, "http_server", 2*2048, NULL, WIFI_MANAGER_TASK_PRIORITY-1, &task_http_server);
+		xTaskCreate(&http_server, "http_server", 3*2048, NULL, WIFI_MANAGER_TASK_PRIORITY-1, &task_http_server);
 	}
 }
 
@@ -193,6 +193,7 @@ void parse_ruuvi_config_json(const char* body, struct dongle_config *c)
 	//TODO replace this parsing with generic implementation
 	cJSON* root = cJSON_Parse(body);
 	if (root) {
+		ESP_LOGD(TAG, "settings parsed from posted json:");
 		cJSON* um = cJSON_GetObjectItem(root, "use_mqtt");
 		if (um) {
 			bool use_mqtt = cJSON_IsTrue(um);
@@ -355,10 +356,13 @@ void http_server_netconn_serve(struct netconn *conn) {
 					netconn_write(conn, http_js_hdr, sizeof(http_js_hdr) - 1, NETCONN_NOCOPY);
 					netconn_write(conn, code_js_start, code_js_end - code_js_start, NETCONN_NOCOPY);
 				}
-				else if(strstr(line, "GET /ruuvi_conf.js ")) {
+				else if(strstr(line, "GET /ruuvi.json ")) {
+					ESP_LOGI(TAG, "GET /ruuvi.json");
 					netconn_write(conn, http_ok_json_no_cache_hdr, sizeof(http_ok_json_no_cache_hdr) - 1, NETCONN_NOCOPY);
-					char* buff = ruuvi_get_conf_json();
-					netconn_write(conn, buff, strlen(buff), NETCONN_NOCOPY);
+					char* ruuvi_json = ruuvi_get_conf_json();
+					ESP_LOGD(TAG, "configuration json to browser: %s", ruuvi_json);
+					netconn_write(conn, ruuvi_json, strlen(ruuvi_json), NETCONN_NOCOPY);
+					free(ruuvi_json);
 				}
 
 				else if(strstr(line, "GET /ap.json ")) {
@@ -434,6 +438,9 @@ void http_server_netconn_serve(struct netconn *conn) {
 					char* body = get_http_body(save_ptr, buflen - (save_ptr - buf));
 					struct dongle_config config = RUUVIDONGLE_DEFAULT_CONFIGURATION;
 					parse_ruuvi_config_json(body, &config);
+					ESP_LOGI(TAG, "settings got from browser:");
+					settings_print(&config);
+					settings_save_to_flash(&config);
 
 					free(body);
 
