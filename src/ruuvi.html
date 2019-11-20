@@ -18,17 +18,17 @@
 					</header>
 					<h2>HTTP</h2>
 					<section>
-						<input id="use_http" type="checkbox" placeholder="Use HTTP">Use HTTP
-						<input id="http_server" type="text" placeholder="HTTP server" value="">
-						<input id="http_user" type="text" placeholder="User" value="">
-						<input id="http_pass" type="text" placeholder="Password" value="">
+						<input id="use_http" type="checkbox" placeholder="Use HTTP">Use HTTP<br>
+						Server: <input id="http_server" type="text" placeholder="HTTP server" value="">
+						User:<input id="http_user" type="text" placeholder="User" value="">
+						Password:<input id="http_pass" type="text" placeholder="Password" value="">
 					</section>
 					<h2>MQTT</h2>
 					<section>
-						<input id="use_mqtt" type="checkbox" placeholder="Use MQTT">Use MQTT
-						<input id="mqtt_server" type="text" placeholder="MQTT server" value="">
-						<input id="mqtt_user" type="text" placeholder="User" value="">
-						<input id="mqtt_pass" type="text" placeholder="Password" value="">
+						<input id="use_mqtt" type="checkbox" placeholder="Use MQTT">Use MQTT<br>
+						Server:<input id="mqtt_server" type="text" placeholder="MQTT server" value="">
+						User:<input id="mqtt_user" type="text" placeholder="User" value="">
+						Password:<input id="mqtt_pass" type="text" placeholder="Password" value="">
 					</section>
 					<h2>Filtering</h2>
 					<section>
@@ -36,12 +36,14 @@
 					</section>
 					<h2>Location</h2>
 					<section>
+						<input id="get_location" type="button" value="Get location">
 						<input id="coordinates" type="text" placeholder="Coordinates" value="">
 					</section>
-					<div class="buttons">
-							<input id="save_config" type="button" value="Save" data-connect="manual" />
-							<input id="manual_cancel" type="button" value="Cancel"/>
-					</div>
+					<section>
+						<br><div class="buttons">
+							<input id="save_config" type="button" value="Save"/>
+						</div>
+					</section>
 				</div>
 			</div>
 		</div>

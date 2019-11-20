@@ -54,6 +54,50 @@ function get_config(){
 	});
 }
 
+function showError(error) {
+	switch(error.code) {
+	  case error.PERMISSION_DENIED:
+		msg ="Error: Geolocation not allowed."
+		console.log(msg)
+		alert(msg)
+		break;
+	  case error.POSITION_UNAVAILABLE:
+		msg = "Location information is unavailable."
+		console.log(msg)
+		alert(msg)
+		break;
+	  case error.TIMEOUT:
+		msg = "The request to get user location timed out."
+		console.log(msg)
+		alert(msg)
+		break;
+	  case error.UNKNOWN_ERROR:
+		msg = "An unknown error occurred."
+		console.log(msg)
+		alert(msg)
+		break;
+	}
+  }
+
+function round(x) {
+	var decimals = 5
+	return Number.parseFloat(x).toFixed(decimals);
+}
+
+function handlePosition(position) {
+	loc = round(position.coords.latitude) + "," + round(position.coords.longitude);
+	//console.log(loc)
+	$("#coordinates").val(loc)
+}
+
+function get_location() {
+	if (navigator.geolocation) {
+		navigator.geolocation.getCurrentPosition(handlePosition, showError);
+	  } else {
+		alert("Geolocation is not supported by this browser");
+	  }
+}
+
 $(document).ready(function() {
 	//get configuration from flash and fill the web page
 	get_config();
@@ -61,4 +105,8 @@ $(document).ready(function() {
 	$("#save_config").on("click", function() {
 		save_config();
 	});
+
+	$("#get_location").on("click", function() {
+		get_location();
+	})
 });
