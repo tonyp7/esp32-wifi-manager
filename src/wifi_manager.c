@@ -140,7 +140,7 @@ void wifi_manager_start(){
 	esp_log_level_set("wifi", ESP_LOG_NONE);
 
 	/* initialize flash memory */
-	nvs_flash_init();
+	//nvs_flash_init();
 
 	/* memory allocation */
 	wifi_manager_queue = xQueueCreate( 3, sizeof( queue_message) );
