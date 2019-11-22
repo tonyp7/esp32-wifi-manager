@@ -60,6 +60,7 @@ function to process requests, decode URLs, serve files, etc. etc.
 #include "../../main/includes/ruuvidongle.h"
 #include "cJSON.h"
 
+#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
 /* @brief tag used for ESP serial console messages */
 static const char TAG[] = "http_server";
 
@@ -102,7 +103,7 @@ const static char http_redirect_hdr_end[] = "/\n\n";
 
 void http_server_start(){
 	if(task_http_server == NULL){
-		xTaskCreate(&http_server, "http_server", 3*2048, NULL, WIFI_MANAGER_TASK_PRIORITY-1, &task_http_server);
+		xTaskCreate(&http_server, "http_server", 4*2048, NULL, WIFI_MANAGER_TASK_PRIORITY-1, &task_http_server);
 	}
 }
 
@@ -441,6 +442,8 @@ void http_server_netconn_serve(struct netconn *conn) {
 					ESP_LOGI(TAG, "settings got from browser:");
 					settings_print(&config);
 					settings_save_to_flash(&config);
+					m_dongle_config = config;
+					ruuvi_send_nrf_settings();
 
 					free(body);
 
