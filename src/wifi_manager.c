@@ -759,7 +759,13 @@ void wifi_manager( void * pvParameters ){
 				uxBits = xEventGroupGetBits(wifi_manager_event_group);
 				if(! (uxBits & WIFI_MANAGER_SCAN_BIT) ){
 					xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_SCAN_BIT);
-					ESP_ERROR_CHECK(esp_wifi_scan_start(&scan_config, false));
+					esp_err_t ret = esp_wifi_scan_start(&scan_config, false);
+					//sometimes when connecting to a network, a scan is started at the same time and then the scan will fail
+					//that's fine because we already have a network to connect and we don't need new scan results
+					//TODO: maybe fix this in the web page that scanning is stopped when connecting to a network
+					if (ret != 0) {
+						ESP_LOGW(TAG, "scan start return: %d", ret);
+					}
 				}
 
 				/* callback */
