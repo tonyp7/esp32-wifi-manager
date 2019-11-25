@@ -213,6 +213,17 @@ void parse_ruuvi_config_json(const char* body, struct dongle_config *c)
 			}
 		}
 
+		cJSON* mpo = cJSON_GetObjectItem(root, "mqtt_port");
+		if (cJSON_IsNumber(mpo)) {
+			uint32_t mqtt_port = mpo->valueint;
+			if (mqtt_port) {
+				c->mqtt_port = mqtt_port;
+				ESP_LOGD(TAG, "mqtt_port: %d", mqtt_port);
+			}
+		} else {
+			ESP_LOGE(TAG, "mqtt port not found");
+		}
+
 		cJSON* mu = cJSON_GetObjectItem(root, "mqtt_user");
 		if (mu) {
 			char* mqtt_user = cJSON_GetStringValue(mu);
@@ -253,6 +264,17 @@ void parse_ruuvi_config_json(const char* body, struct dongle_config *c)
 			}
 		} else {
 			ESP_LOGE(TAG, "http_server not found");
+		}
+
+		cJSON* hpo = cJSON_GetObjectItem(root, "http_port");
+		if (cJSON_IsNumber(hpo)) {
+			uint32_t http_port = hpo->valueint;
+			if (http_port) {
+				c->http_port = http_port;
+				ESP_LOGD(TAG, "http_port: %d", http_port);
+			}
+		} else {
+			ESP_LOGE(TAG, "http port not found");
 		}
 
 		cJSON* hu = cJSON_GetObjectItem(root, "http_user");
