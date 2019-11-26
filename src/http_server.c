@@ -213,6 +213,15 @@ void parse_ruuvi_config_json(const char* body, struct dongle_config *c)
 			}
 		}
 
+		cJSON* mpre = cJSON_GetObjectItem(root, "mqtt_prefix");
+		if (mpre) {
+			char* mqtt_prefix = cJSON_GetStringValue(mpre);
+			if (mqtt_prefix) {
+				strncpy(c->mqtt_prefix, mqtt_prefix, MAX_MQTTPREFIX_LEN-1);
+				ESP_LOGD(TAG, "mqtt_prefix: %s", mqtt_prefix);
+			}
+		}
+
 		cJSON* mpo = cJSON_GetObjectItem(root, "mqtt_port");
 		if (cJSON_IsNumber(mpo)) {
 			uint32_t mqtt_port = mpo->valueint;
@@ -255,48 +264,15 @@ void parse_ruuvi_config_json(const char* body, struct dongle_config *c)
 			ESP_LOGE(TAG, "use_http not found");
 		}
 
-		cJSON* hs = cJSON_GetObjectItem(root, "http_server");
-		if (hs) {
-			char* http_server = cJSON_GetStringValue(hs);
-			if (http_server) {
-				strncpy(c->http_server, http_server, MAX_HTTPSERVER_LEN-1);
-				ESP_LOGD(TAG, "http_server: %s", http_server);
+		cJSON* hurl = cJSON_GetObjectItem(root, "http_url");
+		if (hurl) {
+			char* http_url = cJSON_GetStringValue(hurl);
+			if (http_url) {
+				strncpy(c->http_url, http_url, MAX_HTTPURL_LEN-1);
+				ESP_LOGD(TAG, "http_url: %s", http_url);
 			}
 		} else {
-			ESP_LOGE(TAG, "http_server not found");
-		}
-
-		cJSON* hpo = cJSON_GetObjectItem(root, "http_port");
-		if (cJSON_IsNumber(hpo)) {
-			uint32_t http_port = hpo->valueint;
-			if (http_port) {
-				c->http_port = http_port;
-				ESP_LOGD(TAG, "http_port: %d", http_port);
-			}
-		} else {
-			ESP_LOGE(TAG, "http port not found");
-		}
-
-		cJSON* hu = cJSON_GetObjectItem(root, "http_user");
-		if (hu) {
-			char* http_user = cJSON_GetStringValue(hu);
-			if (http_user) {
-				strncpy(c->http_user, http_user, MAX_HTTPUSER_LEN-1);
-				ESP_LOGD(TAG, "http_user: %s", http_user);
-			}
-		} else {
-			ESP_LOGE(TAG, "http_user not found");
-		}
-
-		cJSON* hp = cJSON_GetObjectItem(root, "http_pass");
-		if (hp) {
-			char* http_pass = cJSON_GetStringValue(hp);
-			if (http_pass) {
-				strncpy(c->http_pass, http_pass, MAX_HTTPPASS_LEN-1);
-				ESP_LOGD(TAG, "http_pass: %s", http_pass);
-			}
-		} else {
-			ESP_LOGE(TAG, "http_pass not found");
+			ESP_LOGE(TAG, "http_url not found");
 		}
 
 		cJSON* uf = cJSON_GetObjectItem(root, "use_filtering");

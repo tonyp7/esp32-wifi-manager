@@ -5,26 +5,19 @@ function save_config()
 	var data = {};
 	data.use_mqtt = $("#use_mqtt")[0].checked;
 	data.mqtt_server = $("#mqtt_server").val();
+	data.mqtt_prefix = $("#mqtt_prefix").val();
 	data.mqtt_user = $("#mqtt_user").val();
 	data.mqtt_pass = $("#mqtt_pass").val();
 
 	data.use_http = $("#use_http")[0].checked;
-	data.http_server = $("#http_server").val();
-	data.http_user = $("#http_user").val();
-	data.http_pass = $("#http_pass").val();
+	data.http_url = $("#http_url").val();
 
 	mqtt_port = parseInt($("#mqtt_port").val())
 	if (mqtt_port == NaN) {
 		mqtt_port = 0;
 	}
 
-	http_port = parseInt($("#http_port").val())
-	if (http_port == NaN) {
-		http_port = 0;
-	}
-
 	data.mqtt_port = mqtt_port;
-	data.http_port = http_port;
 
 	data.use_filtering = $("#use_filtering")[0].checked;
 	data.coordinates = $("#coordinates").val();
