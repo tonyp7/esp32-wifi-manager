@@ -20,7 +20,7 @@ config DEFAULT_AP_SSID
 
 config DEFAULT_AP_PASSWORD
     string "Access Point Password"
-    default "ruuvi"
+    default "ruuvidongle"
     help
 	Password used for the Access Point. Leave empty and set AUTH MODE to WIFI_AUTH_OPEN for no password.
 
