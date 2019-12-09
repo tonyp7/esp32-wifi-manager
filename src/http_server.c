@@ -189,9 +189,10 @@ char* get_http_body(char* msg, int len)
 	return b;
 }
 
-void parse_ruuvi_config_json(const char* body, struct dongle_config *c)
+bool parse_ruuvi_config_json(const char* body, struct dongle_config *c)
 {
 	//TODO replace this parsing with generic implementation
+	bool ret = true;
 	cJSON* root = cJSON_Parse(body);
 	if (root) {
 		ESP_LOGD(TAG, "settings parsed from posted json:");
@@ -252,7 +253,7 @@ void parse_ruuvi_config_json(const char* body, struct dongle_config *c)
 				ESP_LOGD(TAG, "mqtt_pass: %s", mqtt_pass);
 			}
 		} else {
-			ESP_LOGE(TAG, "mqtt_pass not found");
+			ESP_LOGW(TAG, "mqtt_pass not found or not changed");
 		}
 
 		cJSON* uh = cJSON_GetObjectItem(root, "use_http");
@@ -296,9 +297,11 @@ void parse_ruuvi_config_json(const char* body, struct dongle_config *c)
 		}
 	} else {
 		ESP_LOGE(TAG, "Can't parse json: %s", body);
+		ret = false;
 	}
 
 	cJSON_Delete(root);
+	return ret;
 }
 
 void http_server_netconn_serve(struct netconn *conn) {
@@ -435,13 +438,12 @@ void http_server_netconn_serve(struct netconn *conn) {
 					ESP_LOGD(TAG, "http_server_netconn_serve: POST /ruuvi.json");
 
 					char* body = get_http_body(save_ptr, buflen - (save_ptr - buf));
-					struct dongle_config config = RUUVIDONGLE_DEFAULT_CONFIGURATION;
-					parse_ruuvi_config_json(body, &config);
-					ESP_LOGI(TAG, "settings got from browser:");
-					settings_print(&config);
-					settings_save_to_flash(&config);
-					m_dongle_config = config;
-					ruuvi_send_nrf_settings();
+					if (parse_ruuvi_config_json(body, &m_dongle_config)) {
+						ESP_LOGI(TAG, "settings got from browser:");
+						settings_print(&m_dongle_config);
+						settings_save_to_flash(&m_dongle_config);
+						ruuvi_send_nrf_settings(&m_dongle_config);
+					}
 
 					free(body);
 
