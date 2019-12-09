@@ -1,3 +1,5 @@
+var mqtt_pass_changed = false;
+
 function save_config()
 {
 	console.log("save_config");
@@ -7,7 +9,9 @@ function save_config()
 	data.mqtt_server = $("#mqtt_server").val();
 	data.mqtt_prefix = $("#mqtt_prefix").val();
 	data.mqtt_user = $("#mqtt_user").val();
-	data.mqtt_pass = $("#mqtt_pass").val();
+	if (mqtt_pass_changed) {
+		data.mqtt_pass = $("#mqtt_pass").val();
+	}
 
 	data.use_http = $("#use_http")[0].checked;
 	data.http_url = $("#http_url").val();
@@ -104,4 +108,8 @@ $(document).ready(function() {
 	$("#get_location").on("click", function() {
 		get_location();
 	})
+
+	$("#mqtt_pass").on("change", function() {
+		mqtt_pass_changed = true;
+	});
 });
