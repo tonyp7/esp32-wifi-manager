@@ -137,7 +137,7 @@ void wifi_manager_disconnect_async(){
 void wifi_manager_start(){
 
 	/* disable the default wifi logging */
-	esp_log_level_set("wifi", ESP_LOG_NONE);
+	esp_log_level_set("wifi_manager", ESP_LOG_DEBUG);
 
 	/* initialize flash memory */
 	//nvs_flash_init();
@@ -968,7 +968,7 @@ void wifi_manager( void * pvParameters ){
 				else { abort(); }
 
 				/* bring down DNS hijack */
-				http_server_stop();
+				//http_server_stop();
 				dns_server_stop();
 
 				/* callback */

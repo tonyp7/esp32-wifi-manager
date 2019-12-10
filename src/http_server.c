@@ -41,6 +41,7 @@ function to process requests, decode URLs, serve files, etc. etc.
 #include "esp_wifi.h"
 #include "esp_event.h"
 #include "esp_log.h"
+#include "lwip/netbuf.h"
 #include "mdns.h"
 #include "lwip/api.h"
 #include "lwip/err.h"
@@ -103,7 +104,7 @@ const static char http_redirect_hdr_end[] = "/\n\n";
 
 void http_server_start(){
 	if(task_http_server == NULL){
-		xTaskCreate(&http_server, "http_server", 4*2048, NULL, WIFI_MANAGER_TASK_PRIORITY-1, &task_http_server);
+		xTaskCreate(&http_server, "http_server", 20*1024, NULL, WIFI_MANAGER_TASK_PRIORITY-1, &task_http_server);
 	}
 }
 
@@ -304,24 +305,45 @@ bool parse_ruuvi_config_json(const char* body, struct dongle_config *c)
 	return ret;
 }
 
+#define FULLBUF_SIZE 4*1024
 void http_server_netconn_serve(struct netconn *conn) {
 
 	struct netbuf *inbuf;
 	char *buf = NULL;
+	char fullbuf[FULLBUF_SIZE];
+	uint fullsize = 0;
 	u16_t buflen;
 	err_t err;
 	const char new_line[2] = "\n";
 
-	err = netconn_recv(conn, &inbuf);
-	if (err == ERR_OK) {
+	while (conn->recv_avail > 0) {
+		ESP_LOGI(TAG, "recv_avail: %d", conn->recv_avail);
+		err = netconn_recv(conn, &inbuf);
+		if (err == ERR_OK) {
+			netbuf_data(inbuf, (void**)&buf, &buflen);
+			if (FULLBUF_SIZE > fullsize + buflen) {
+				memcpy(fullbuf+fullsize, buf, buflen);
+				fullsize += buflen;
+			} else {
+				ESP_LOGW(TAG, "fullbuf full, fullsize: %d, buflen: %d", fullsize, buflen);
+			}
+			netbuf_delete(inbuf);
+			inbuf = 0;
+		} else {
+			ESP_LOGW(TAG, "netconn recv: %02x", err);
+		}
+	}
 
-		netbuf_data(inbuf, (void**)&buf, &buflen);
+	buflen = fullsize;
+	ESP_LOGI(TAG, "buflen: %d", fullsize);
+	//ESP_LOG_BUFFER_HEXDUMP(TAG, fullbuf, fullsize, ESP_LOG_INFO);
 
-		/* extract the first line of the request */
-		char *save_ptr = buf;
+
+
+		char *save_ptr = fullbuf;
 		char *line = strtok_r(save_ptr, new_line, &save_ptr);
 
-		if(line) {
+		if(line && fullsize) {
 
 			/* captive portal functionality: redirect to access point IP for HOST that are not the access point IP OR the STA IP */
 			int lenH = 0;
@@ -390,6 +412,7 @@ void http_server_netconn_serve(struct netconn *conn) {
 					if(wifi_manager_lock_json_buffer(( TickType_t ) 10)){
 						char *buff = wifi_manager_get_ip_info_json();
 						if(buff){
+							ESP_LOGI(TAG, "ip json: %s", buff);
 							netconn_write(conn, http_ok_json_no_cache_hdr, sizeof(http_ok_json_no_cache_hdr) - 1, NETCONN_NOCOPY);
 							netconn_write(conn, buff, strlen(buff), NETCONN_NOCOPY);
 							wifi_manager_unlock_json_buffer();
@@ -436,7 +459,7 @@ void http_server_netconn_serve(struct netconn *conn) {
 
 				} else if(strstr(line, "POST /ruuvi.json ")) {
 					ESP_LOGD(TAG, "http_server_netconn_serve: POST /ruuvi.json");
-
+					ESP_LOGI(TAG, "POST: %s", save_ptr);
 					char* body = get_http_body(save_ptr, buflen - (save_ptr - buf));
 					if (parse_ruuvi_config_json(body, &m_dongle_config)) {
 						ESP_LOGI(TAG, "settings got from browser:");
@@ -447,6 +470,8 @@ void http_server_netconn_serve(struct netconn *conn) {
 
 					free(body);
 
+
+
 				} else{
 					netconn_write(conn, http_400_hdr, sizeof(http_400_hdr) - 1, NETCONN_NOCOPY);
 				}
@@ -455,8 +480,8 @@ void http_server_netconn_serve(struct netconn *conn) {
 		else{
 			netconn_write(conn, http_404_hdr, sizeof(http_404_hdr) - 1, NETCONN_NOCOPY);
 		}
-	}
+
 
 	/* free the buffer */
-	netbuf_delete(inbuf);
+	//netbuf_delete(inbuf);
 }
