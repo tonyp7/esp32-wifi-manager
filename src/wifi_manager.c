@@ -54,7 +54,7 @@ Contains the freeRTOS task and all necessary support
 #include "wifi_manager.h"
 #include "dns_server.h"
 
-
+#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
 
 /* objects used to manipulate the main queue of events */
 QueueHandle_t wifi_manager_queue;
@@ -452,6 +452,7 @@ void wifi_manager_event_handler(void *ctx, esp_event_base_t event_base, int32_t 
 	    case WIFI_EVENT_AP_START:
 		ESP_LOGI(TAG, "WIFI_EVENT_AP_START");
 		xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_AP_STARTED_BIT);
+		wifi_manager_scan_async();
 		break;
 	    case WIFI_EVENT_AP_STOP:
 		break;
@@ -732,6 +733,7 @@ void wifi_manager( void * pvParameters ){
 			switch(msg.code){
 
 			case EVENT_SCAN_DONE:
+				ESP_LOGD(TAG, "MESSAGE: EVENT_SCAN_DONE");
 				/* As input param, it stores max AP number ap_records can hold. As output param, it receives the actual AP number this API returns.
 				 * As a consequence, ap_num MUST be reset to MAX_AP_NUM at every scan */
 				ap_num = MAX_AP_NUM;
@@ -746,6 +748,9 @@ void wifi_manager( void * pvParameters ){
 				else{
 					ESP_LOGE(TAG, "could not get access to json mutex in wifi_scan");
 				}
+
+				http_server_start();
+				dns_server_start();
 
 				/* callback */
 				if(cb_ptr_arr[msg.code]) (*cb_ptr_arr[msg.code])(NULL);
@@ -932,8 +937,8 @@ void wifi_manager( void * pvParameters ){
 				ESP_LOGI(TAG, "MESSAGE: ORDER_START_AP");
 				esp_wifi_set_mode(WIFI_MODE_APSTA);
 
-				http_server_start();
-				dns_server_start();
+				//http_server_start();
+				//dns_server_start();
 
 				/* callback */
 				if(cb_ptr_arr[msg.code]) (*cb_ptr_arr[msg.code])(NULL);

@@ -38,6 +38,8 @@ function to process requests, decode URLs, serve files, etc. etc.
 extern "C" {
 #endif
 
+#include "lwip/api.h"
+
 /**
  * @brief RTOS task for the HTTP server. Do not start manually.
  * @see void http_server_start()

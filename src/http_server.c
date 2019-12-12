@@ -104,7 +104,7 @@ const static char http_redirect_hdr_end[] = "/\n\n";
 
 void http_server_start(){
 	if(task_http_server == NULL){
-		xTaskCreate(&http_server, "http_server", 20*1024, NULL, WIFI_MANAGER_TASK_PRIORITY-1, &task_http_server);
+		xTaskCreate(&http_server, "http_server", 30*1024, NULL, WIFI_MANAGER_TASK_PRIORITY-1, &task_http_server);
 	}
 }
 
@@ -127,13 +127,18 @@ void http_server(void *pvParameters) {
 		err = netconn_accept(conn, &newconn);
 		if (err == ERR_OK) {
 			http_server_netconn_serve(newconn);
+			netconn_close(newconn);
 			netconn_delete(newconn);
+			ESP_LOGI(TAG, "netconn delete");
 		}
 		else if(err == ERR_TIMEOUT){
 			ESP_LOGE(TAG, "http_server: netconn_accept ERR_TIMEOUT");
 		}
 		else if(err == ERR_ABRT){
 			ESP_LOGE(TAG, "http_server: netconn_accept ERR_ABRT");
+		}
+		else {
+			ESP_LOGE(TAG, "http_server: netconn_accept: %d", err);
 		}
 		taskYIELD();  /* allows the freeRTOS scheduler to take over if needed. */
 	}
@@ -175,6 +180,7 @@ char* get_http_body(char* msg, int len)
 	}
 
 	body_len = len - (p - msg);
+	ESP_LOGI(TAG, "len: %d, body_len: %d", len, body_len);
 
 	//copy body to a new buffer so we can have 0-terminated string
 	char* b = malloc(body_len+1);
@@ -307,7 +313,7 @@ bool parse_ruuvi_config_json(const char* body, struct dongle_config *c)
 
 #define FULLBUF_SIZE 4*1024
 void http_server_netconn_serve(struct netconn *conn) {
-
+	const int netconn_timeout = 200;
 	struct netbuf *inbuf;
 	char *buf = NULL;
 	char fullbuf[FULLBUF_SIZE];
@@ -316,34 +322,46 @@ void http_server_netconn_serve(struct netconn *conn) {
 	err_t err;
 	const char new_line[2] = "\n";
 
-	while (conn->recv_avail > 0) {
-		ESP_LOGI(TAG, "recv_avail: %d", conn->recv_avail);
+
+	while(1) {
+		conn->recv_timeout = netconn_timeout;
 		err = netconn_recv(conn, &inbuf);
 		if (err == ERR_OK) {
+			//ESP_LOGI(TAG, "payload, tot_len: %d, len: %d", inbuf->ptr->tot_len, inbuf->ptr->len);
+			//ESP_LOG_BUFFER_HEXDUMP(TAG, inbuf->ptr->payload, inbuf->ptr->len, ESP_LOG_INFO);
 			netbuf_data(inbuf, (void**)&buf, &buflen);
-			if (FULLBUF_SIZE > fullsize + buflen) {
-				memcpy(fullbuf+fullsize, buf, buflen);
-				fullsize += buflen;
-			} else {
+
+			if (fullsize + buflen > FULLBUF_SIZE) {
 				ESP_LOGW(TAG, "fullbuf full, fullsize: %d, buflen: %d", fullsize, buflen);
+			} else {
+				memcpy(fullbuf + fullsize, buf, buflen);
+				fullsize += buflen;
 			}
+
 			netbuf_delete(inbuf);
-			inbuf = 0;
+
+			// ret = netbuf_next(inbuf);
+			// if (ret == -1) {
+			// 	ESP_LOGI(TAG, "no next buf");
+			// 	//break;
+			// }
 		} else {
-			ESP_LOGW(TAG, "netconn recv: %02x", err);
+			ESP_LOGW(TAG, "netconn recv: %d", err);
+			//printf("%d", err);
+			break;
 		}
 	}
 
-	buflen = fullsize;
-	ESP_LOGI(TAG, "buflen: %d", fullsize);
-	//ESP_LOG_BUFFER_HEXDUMP(TAG, fullbuf, fullsize, ESP_LOG_INFO);
-
-
-
+		buf = fullbuf;
 		char *save_ptr = fullbuf;
+		buflen = fullsize;
+
+		//ESP_LOGI(TAG, "payload, tot_len: %d, len: %d", inbuf->ptr->tot_len, inbuf->ptr->len);
+		//ESP_LOG_BUFFER_HEXDUMP(TAG, buf, buflen, ESP_LOG_INFO);
+
 		char *line = strtok_r(save_ptr, new_line, &save_ptr);
 
-		if(line && fullsize) {
+		if(line) {
 
 			/* captive portal functionality: redirect to access point IP for HOST that are not the access point IP OR the STA IP */
 			int lenH = 0;
@@ -385,7 +403,7 @@ void http_server_netconn_serve(struct netconn *conn) {
 					netconn_write(conn, http_ok_json_no_cache_hdr, sizeof(http_ok_json_no_cache_hdr) - 1, NETCONN_NOCOPY);
 					char* ruuvi_json = ruuvi_get_conf_json();
 					ESP_LOGD(TAG, "configuration json to browser: %s", ruuvi_json);
-					netconn_write(conn, ruuvi_json, strlen(ruuvi_json), NETCONN_NOCOPY);
+					netconn_write(conn, ruuvi_json, strlen(ruuvi_json), NETCONN_COPY);
 					free(ruuvi_json);
 				}
 
@@ -402,7 +420,7 @@ void http_server_netconn_serve(struct netconn *conn) {
 						ESP_LOGD(TAG, "http_server_netconn_serve: GET /ap.json failed to obtain mutex");
 					}
 					/* request a wifi scan */
-					wifi_manager_scan_async();
+					//wifi_manager_scan_async();
 				}
 				else if(strstr(line, "GET /style.css ")) {
 					netconn_write(conn, http_css_hdr, sizeof(http_css_hdr) - 1, NETCONN_NOCOPY);
@@ -412,7 +430,6 @@ void http_server_netconn_serve(struct netconn *conn) {
 					if(wifi_manager_lock_json_buffer(( TickType_t ) 10)){
 						char *buff = wifi_manager_get_ip_info_json();
 						if(buff){
-							ESP_LOGI(TAG, "ip json: %s", buff);
 							netconn_write(conn, http_ok_json_no_cache_hdr, sizeof(http_ok_json_no_cache_hdr) - 1, NETCONN_NOCOPY);
 							netconn_write(conn, buff, strlen(buff), NETCONN_NOCOPY);
 							wifi_manager_unlock_json_buffer();
@@ -459,7 +476,7 @@ void http_server_netconn_serve(struct netconn *conn) {
 
 				} else if(strstr(line, "POST /ruuvi.json ")) {
 					ESP_LOGD(TAG, "http_server_netconn_serve: POST /ruuvi.json");
-					ESP_LOGI(TAG, "POST: %s", save_ptr);
+					//ESP_LOGI(TAG, "POST: %s", save_ptr);
 					char* body = get_http_body(save_ptr, buflen - (save_ptr - buf));
 					if (parse_ruuvi_config_json(body, &m_dongle_config)) {
 						ESP_LOGI(TAG, "settings got from browser:");
