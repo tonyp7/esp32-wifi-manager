@@ -5,6 +5,12 @@ function save_config()
 	console.log("save_config");
 
 	var data = {};
+
+	data.eth_dhcp = $("#eth_dhcp")[0].checked;
+	data.eth_static_ip = $("#eth_static_ip").val();
+	data.eth_gw = $("eth_gw").val();
+	data.eth_netmask = $("eth_netmask").val();
+
 	data.use_mqtt = $("#use_mqtt")[0].checked;
 	data.mqtt_server = $("#mqtt_server").val();
 	data.mqtt_prefix = $("#mqtt_prefix").val();

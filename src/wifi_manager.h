@@ -283,6 +283,7 @@ bool wifi_manager_fetch_wifi_sta_config();
 
 wifi_config_t* wifi_manager_get_wifi_sta_config();
 
+void wifi_manager_stop();
 
 /**
  * @brief A standard wifi event handler as recommended by Espressif

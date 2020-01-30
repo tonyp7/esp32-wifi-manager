@@ -63,7 +63,7 @@ function to process requests, decode URLs, serve files, etc. etc.
 
 #define FULLBUF_SIZE 4*1024
 
-#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
+//#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
 /* @brief tag used for ESP serial console messages */
 static const char TAG[] = "http_server";
 
@@ -105,6 +105,7 @@ const static char http_redirect_hdr_end[] = "/\n\n";
 
 
 void http_server_start(){
+	esp_log_level_set(TAG, ESP_LOG_DEBUG);
 	if(task_http_server == NULL){
 		xTaskCreate(&http_server, "http_server", 20*1024, NULL, WIFI_MANAGER_TASK_PRIORITY-1, &task_http_server);
 	}
@@ -193,6 +194,41 @@ bool parse_ruuvi_config_json(const char* body, struct dongle_config *c)
 	cJSON* root = cJSON_Parse(body);
 	if (root) {
 		ESP_LOGD(TAG, "settings parsed from posted json:");
+
+		cJSON* ed = cJSON_GetObjectItem(root, "eth_dhcp");
+		if (ed) {
+			bool eth_dhcp = cJSON_IsTrue(ed);
+			c->eth_dhcp = eth_dhcp;
+			ESP_LOGD(TAG, "eth_dhcp: %d", eth_dhcp);
+		}
+
+		cJSON* esip = cJSON_GetObjectItem(root, "eth_static_ip");
+		if (esip) {
+			char* eth_static_ip = cJSON_GetStringValue(esip);
+			if (eth_static_ip) {
+				strncpy(c->eth_static_ip, eth_static_ip, IP_STR_LEN-1);
+				ESP_LOGD(TAG, "eth_static_ip: %s", eth_static_ip);
+			}
+		}
+
+		cJSON* enm = cJSON_GetObjectItem(root, "eth_netmask");
+		if (enm) {
+			char* eth_netmask = cJSON_GetStringValue(enm);
+			if (eth_netmask) {
+				strncpy(c->eth_netmask, eth_netmask, IP_STR_LEN-1);
+				ESP_LOGD(TAG, "eth_netmask: %s", eth_netmask);
+			}
+		}
+
+		cJSON* egw = cJSON_GetObjectItem(root, "eth_gw");
+		if (egw) {
+			char* eth_gw = cJSON_GetStringValue(egw);
+			if (eth_gw) {
+				strncpy(c->eth_gw, eth_gw, IP_STR_LEN-1);
+				ESP_LOGD(TAG, "eth_gw: %s", eth_gw);
+			}
+		}
+
 		cJSON* um = cJSON_GetObjectItem(root, "use_mqtt");
 		if (um) {
 			bool use_mqtt = cJSON_IsTrue(um);

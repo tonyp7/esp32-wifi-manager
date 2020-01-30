@@ -53,6 +53,7 @@ Contains the freeRTOS task and all necessary support
 #include "http_server.h"
 #include "wifi_manager.h"
 #include "dns_server.h"
+#include "../../main/includes/ethernet.h"
 
 #define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
 
@@ -137,7 +138,7 @@ void wifi_manager_disconnect_async(){
 void wifi_manager_start(){
 
 	/* disable the default wifi logging */
-	esp_log_level_set("wifi_manager", ESP_LOG_DEBUG);
+	//esp_log_level_set(TAG, ESP_LOG_DEBUG);
 
 	/* initialize flash memory */
 	//nvs_flash_init();
@@ -522,37 +523,48 @@ char* wifi_manager_get_ip_info_json(){
 	return ip_info_json;
 }
 
+void wifi_manager_stop() {
+	ESP_LOGI(TAG, "%s",__func__);
+	esp_event_handler_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_manager_event_handler);
+	esp_event_handler_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, &wifi_manager_event_handler);
+
+	esp_wifi_disconnect();
+	esp_wifi_stop();
+	esp_wifi_deinit();
+
+	wifi_manager_destroy();
+}
 
 void wifi_manager_destroy(){
+	ESP_LOGI(TAG, "%s", __func__);
+	if (task_wifi_manager) {
+		vTaskDelete(task_wifi_manager);
+		task_wifi_manager = NULL;
 
-	vTaskDelete(task_wifi_manager);
-	task_wifi_manager = NULL;
+		/* heap buffers */
+		free(accessp_records);
+		accessp_records = NULL;
+		free(accessp_json);
+		accessp_json = NULL;
+		free(ip_info_json);
+		ip_info_json = NULL;
+		free(wifi_manager_sta_ip);
+		wifi_manager_sta_ip = NULL;
+		if(wifi_manager_config_sta){
+			free(wifi_manager_config_sta);
+			wifi_manager_config_sta = NULL;
+		}
 
-	/* heap buffers */
-	free(accessp_records);
-	accessp_records = NULL;
-	free(accessp_json);
-	accessp_json = NULL;
-	free(ip_info_json);
-	ip_info_json = NULL;
-	free(wifi_manager_sta_ip);
-	wifi_manager_sta_ip = NULL;
-	if(wifi_manager_config_sta){
-		free(wifi_manager_config_sta);
-		wifi_manager_config_sta = NULL;
+		/* RTOS objects */
+		vSemaphoreDelete(wifi_manager_json_mutex);
+		wifi_manager_json_mutex = NULL;
+		vSemaphoreDelete(wifi_manager_sta_ip_mutex);
+		wifi_manager_sta_ip_mutex = NULL;
+		vEventGroupDelete(wifi_manager_event_group);
+		wifi_manager_event_group = NULL;
+		vQueueDelete(wifi_manager_queue);
+		wifi_manager_queue = NULL;
 	}
-
-	/* RTOS objects */
-	vSemaphoreDelete(wifi_manager_json_mutex);
-	wifi_manager_json_mutex = NULL;
-	vSemaphoreDelete(wifi_manager_sta_ip_mutex);
-	wifi_manager_sta_ip_mutex = NULL;
-	vEventGroupDelete(wifi_manager_event_group);
-	wifi_manager_event_group = NULL;
-	vQueueDelete(wifi_manager_queue);
-	wifi_manager_queue = NULL;
-
-
 }
 
 
