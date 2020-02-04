@@ -8,8 +8,10 @@ function save_config()
 
 	data.eth_dhcp = $("#eth_dhcp")[0].checked;
 	data.eth_static_ip = $("#eth_static_ip").val();
-	data.eth_gw = $("eth_gw").val();
-	data.eth_netmask = $("eth_netmask").val();
+	data.eth_netmask = $("#eth_netmask").val();
+	data.eth_gw = $("#eth_gw").val();
+	data.eth_dns1 = $("#eth_dns1").val();
+	data.eth_dns2 = $("#eth_dns2").val();
 
 	data.use_mqtt = $("#use_mqtt")[0].checked;
 	data.mqtt_server = $("#mqtt_server").val();

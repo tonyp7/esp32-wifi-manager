@@ -59,6 +59,7 @@ function to process requests, decode URLs, serve files, etc. etc.
 #include "wifi_manager.h"
 
 #include "../../main/includes/ruuvidongle.h"
+#include "../../main/includes/ethernet.h"
 #include "cJSON.h"
 
 #define FULLBUF_SIZE 4*1024
@@ -206,7 +207,7 @@ bool parse_ruuvi_config_json(const char* body, struct dongle_config *c)
 		if (esip) {
 			char* eth_static_ip = cJSON_GetStringValue(esip);
 			if (eth_static_ip) {
-				strncpy(c->eth_static_ip, eth_static_ip, IP_STR_LEN-1);
+				strncpy(c->eth_static_ip, eth_static_ip, IP_STR_LEN);
 				ESP_LOGD(TAG, "eth_static_ip: %s", eth_static_ip);
 			}
 		}
@@ -215,7 +216,7 @@ bool parse_ruuvi_config_json(const char* body, struct dongle_config *c)
 		if (enm) {
 			char* eth_netmask = cJSON_GetStringValue(enm);
 			if (eth_netmask) {
-				strncpy(c->eth_netmask, eth_netmask, IP_STR_LEN-1);
+				strncpy(c->eth_netmask, eth_netmask, IP_STR_LEN);
 				ESP_LOGD(TAG, "eth_netmask: %s", eth_netmask);
 			}
 		}
@@ -224,8 +225,26 @@ bool parse_ruuvi_config_json(const char* body, struct dongle_config *c)
 		if (egw) {
 			char* eth_gw = cJSON_GetStringValue(egw);
 			if (eth_gw) {
-				strncpy(c->eth_gw, eth_gw, IP_STR_LEN-1);
+				strncpy(c->eth_gw, eth_gw, IP_STR_LEN);
 				ESP_LOGD(TAG, "eth_gw: %s", eth_gw);
+			}
+		}
+
+		cJSON* edns1 = cJSON_GetObjectItem(root, "eth_dns1");
+		if (edns1) {
+			char* eth_dns1 = cJSON_GetStringValue(edns1);
+			if (eth_dns1) {
+				strncpy(c->eth_dns1, eth_dns1, IP_STR_LEN);
+				ESP_LOGD(TAG, "eth_dns1: %s", eth_dns1);
+			}
+		}
+
+		cJSON* edns2 = cJSON_GetObjectItem(root, "eth_dns2");
+		if (edns2) {
+			char* eth_dns2 = cJSON_GetStringValue(edns2);
+			if (eth_dns2) {
+				strncpy(c->eth_dns2, eth_dns2, IP_STR_LEN);
+				ESP_LOGD(TAG, "eth_dns2: %s", eth_dns2);
 			}
 		}
 
@@ -524,6 +543,7 @@ void http_server_netconn_serve(struct netconn *conn) {
 					settings_print(&m_dongle_config);
 					settings_save_to_flash(&m_dongle_config);
 					ruuvi_send_nrf_settings(&m_dongle_config);
+					ethernet_update_ip();
 				}
 			} else{
 				netconn_write(conn, http_400_hdr, sizeof(http_400_hdr) - 1, NETCONN_NOCOPY);
