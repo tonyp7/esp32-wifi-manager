@@ -51,6 +51,7 @@ Contains the freeRTOS task and all necessary support
 
 #include "json.h"
 #include "http_server.h"
+#include "tcpip_adapter.h"
 #include "wifi_manager.h"
 #include "dns_server.h"
 #include "../../main/includes/ethernet.h"
@@ -533,6 +534,9 @@ void wifi_manager_stop() {
 	esp_wifi_deinit();
 
 	wifi_manager_destroy();
+
+	tcpip_adapter_stop(TCPIP_ADAPTER_IF_STA);
+	tcpip_adapter_stop(TCPIP_ADAPTER_IF_AP);
 }
 
 void wifi_manager_destroy(){
