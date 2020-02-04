@@ -32,6 +32,7 @@ function save_config()
 	data.mqtt_port = mqtt_port;
 
 	data.use_filtering = $("#use_filtering")[0].checked;
+	data.company_id = $("#company_id").val();
 	data.coordinates = $("#coordinates").val();
 
 	$.ajax({

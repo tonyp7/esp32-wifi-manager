@@ -337,6 +337,18 @@ bool parse_ruuvi_config_json(const char* body, struct dongle_config *c)
 			ESP_LOGE(TAG, "use_filtering not found");
 		}
 
+		cJSON* cid = cJSON_GetObjectItem(root, "company_id");
+		if (cid) {
+			char* company_id = cJSON_GetStringValue(cid);
+			if (company_id) {
+				uint16_t c_id = (uint16_t)strtol(company_id, NULL, 0);
+				ESP_LOGD(TAG, "company_id: 0x%02x", c_id);
+				c->company_id = c_id;
+			} else {
+				ESP_LOGE(TAG, "company id not found");
+			}
+		}
+
 		cJSON* co = cJSON_GetObjectItem(root, "coordinates");
 		if (co) {
 			char* coordinates = cJSON_GetStringValue(co);
