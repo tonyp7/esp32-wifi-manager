@@ -86,6 +86,7 @@ struct wifi_settings_t wifi_settings = {
 	.ap_channel = DEFAULT_AP_CHANNEL,
 	.ap_ssid_hidden = DEFAULT_AP_SSID_HIDDEN,
 	.ap_bandwidth = DEFAULT_AP_BANDWIDTH,
+	.ap_authmode = WIFI_AUTH_WPA2_PSK,
 	.sta_only = DEFAULT_STA_ONLY,
 	.sta_power_save = DEFAULT_STA_POWER_SAVE,
 	.sta_static_ip = 0,
@@ -133,6 +134,32 @@ void wifi_manager_disconnect_async(){
 	//xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_WIFI_DISCONNECT_BIT); TODO: delete
 }
 
+// Should not be exposed but synchronously deletes saved configs
+void wifi_manager_delete_config_sync(){
+	/* erase configuration */
+	if(wifi_manager_config_sta){
+		memset(wifi_manager_config_sta, 0x00, sizeof(wifi_config_t));
+		/* save empty connection info in NVS memory */
+		wifi_manager_save_sta_config();
+	}
+}
+
+// This is the public API of the above
+void wifi_manager_disconnect_and_delete_config_async(){
+	if(task_wifi_manager){
+		// If wifi_manager is running, send the async call
+		wifi_manager_send_message(ORDER_DISCONNECT_STA, (void*)true);
+	}
+	else{
+		// Otherwise do it right now
+		nvs_flash_init();
+		// malloc it and wifi_manager_delete_config_sync will zero it
+		if(!wifi_manager_config_sta)
+			wifi_manager_config_sta = (wifi_config_t*)malloc(sizeof(wifi_config_t));
+		wifi_manager_delete_config_sync();
+	}
+}
+
 
 void wifi_manager_start(){
 
@@ -150,7 +177,8 @@ void wifi_manager_start(){
 	wifi_manager_clear_access_points_json();
 	ip_info_json = (char*)malloc(sizeof(char) * JSON_IP_INFO_SIZE);
 	wifi_manager_clear_ip_info_json();
-	wifi_manager_config_sta = (wifi_config_t*)malloc(sizeof(wifi_config_t));
+	if (!wifi_manager_config_sta)
+		wifi_manager_config_sta = (wifi_config_t*)malloc(sizeof(wifi_config_t));
 	memset(wifi_manager_config_sta, 0x00, sizeof(wifi_config_t));
 	memset(&wifi_settings.sta_static_ip_config, 0x00, sizeof(tcpip_adapter_ip_info_t));
 	cb_ptr_arr = malloc(  sizeof(   sizeof( void (*)( void* ) )        ) * MESSAGE_CODE_COUNT);
@@ -177,10 +205,10 @@ esp_err_t wifi_manager_save_sta_config(){
 		esp_err = nvs_open(wifi_manager_nvs_namespace, NVS_READWRITE, &handle);
 		if (esp_err != ESP_OK) return esp_err;
 
-		esp_err = nvs_set_blob(handle, "ssid", wifi_manager_config_sta->sta.ssid, 32);
+		esp_err = nvs_set_blob(handle, "ssid", wifi_manager_config_sta->sta.ssid, MAX_SSID_SIZE);
 		if (esp_err != ESP_OK) return esp_err;
 
-		esp_err = nvs_set_blob(handle, "password", wifi_manager_config_sta->sta.password, 64);
+		esp_err = nvs_set_blob(handle, "password", wifi_manager_config_sta->sta.password, MAX_PASSWORD_SIZE);
 		if (esp_err != ESP_OK) return esp_err;
 
 		esp_err = nvs_set_blob(handle, "settings", &wifi_settings, sizeof(wifi_settings));
@@ -585,7 +613,7 @@ void wifi_manager_filter_unique( wifi_ap_record_t * aplist, uint16_t * aps) {
 		/* remove the identical SSID+authmodes */
 		for(int j=i+1; j<*aps;j++) {
 			wifi_ap_record_t * ap1 = &aplist[j];
-			if ( (strcmp((const char *)ap->ssid, (const char *)ap1->ssid)==0) && 
+			if ( (strcmp((const char *)ap->ssid, (const char *)ap1->ssid)==0) &&
 			     (ap->authmode == ap1->authmode) ) { /* same SSID, different auth mode is skipped */
 				/* save the rssi for the display */
 				if ((ap1->rssi) > (ap->rssi)) ap->rssi=ap1->rssi;
@@ -684,7 +712,7 @@ void wifi_manager( void * pvParameters ){
 		.ap = {
 			.ssid_len = 0,
 			.channel = wifi_settings.ap_channel,
-			.authmode = WIFI_AUTH_WPA2_PSK,
+			.authmode = wifi_settings.ap_authmode,
 			.ssid_hidden = wifi_settings.ap_ssid_hidden,
 			.max_connection = DEFAULT_AP_MAX_CONNECTIONS,
 			.beacon_interval = DEFAULT_AP_BEACON_INTERVAL,
@@ -692,6 +720,10 @@ void wifi_manager( void * pvParameters ){
 	};
 	memcpy(ap_config.ap.ssid, wifi_settings.ap_ssid , sizeof(wifi_settings.ap_ssid));
 	memcpy(ap_config.ap.password, wifi_settings.ap_pwd, sizeof(wifi_settings.ap_pwd));
+	// 0 length password means open network (closes #46)
+	if(ap_config.ap.password[0] == '\0'){
+		ap_config.ap.authmode = WIFI_AUTH_OPEN;
+	}
 
 	ESP_ERROR_CHECK(tcpip_adapter_dhcps_stop(TCPIP_ADAPTER_IF_AP)); 	/* stop AP DHCP server */
 	inet_pton(AF_INET, DEFAULT_AP_IP, &info.ip); /* access point is on a static IP */
@@ -1009,6 +1041,11 @@ void wifi_manager( void * pvParameters ){
 
 				/* order wifi discconect */
 				ESP_ERROR_CHECK(esp_wifi_disconnect());
+
+				if (msg.param) {
+					// If param is true, delete the saved config
+					wifi_manager_delete_config_sync();
+				}
 
 				/* callback */
 				if(cb_ptr_arr[msg.code]) (*cb_ptr_arr[msg.code])(NULL);

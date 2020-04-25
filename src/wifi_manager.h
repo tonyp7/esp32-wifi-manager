@@ -225,6 +225,7 @@ struct wifi_settings_t{
 	uint8_t ap_channel;
 	uint8_t ap_ssid_hidden;
 	wifi_bandwidth_t ap_bandwidth;
+	wifi_auth_mode_t ap_authmode;
 	bool sta_only;
 	wifi_ps_type_t sta_power_save;
 	bool sta_static_ip;
@@ -304,6 +305,15 @@ void wifi_manager_scan_async();
  * @brief requests to disconnect and forget about the access point.
  */
 void wifi_manager_disconnect_async();
+
+/**
+ * @brief Requests to disconnect and delete the access point in storage.
+ *
+ * If called before wifi_manager_start() this function is synchronous and
+ * immediately clears the stored credentials, otherwise it issues a disconnect
+ * order that will also clear stored credentails.
+ */
+void wifi_manager_disconnect_and_delete_config_async();
 
 /**
  * @brief Tries to get access to json buffer mutex.
