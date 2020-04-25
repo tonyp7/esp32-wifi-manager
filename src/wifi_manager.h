@@ -160,9 +160,17 @@ extern "C" {
 /**
  * @brief Defines the maximum length in bytes of a JSON representation of the IP information
  * assuming all ips are 4*3 digits, and all characters in the ssid require to be escaped.
- * example: {"ssid":"abcdefghijklmnopqrstuvwxyz012345","ip":"192.168.1.119","netmask":"255.255.255.0","gw":"192.168.1.1","urc":0}
+ * example: {"ssid":"abcdefghijklmnopqrstuvwxyz012345","ip":"192.168.1.119","netmask":"255.255.255.0","gw":"192.168.1.1","urc":99}
+ * Run this JS (browser console is easiest) to come to the conclusion that 159 is the worst case.
+ * ```
+ * var a = {"ssid":"abcdefghijklmnopqrstuvwxyz012345","ip":"255.255.255.255","netmask":"255.255.255.255","gw":"255.255.255.255","urc":99};
+ * // Replace all ssid characters with a double quote which will have to be escaped
+ * a.ssid = a.ssid.split('').map(() => '"').join('');
+ * console.log(JSON.stringify(a).length); // => 158 +1 for null
+ * console.log(JSON.stringify(a)); // print it
+ * ```
  */
-#define JSON_IP_INFO_SIZE 					150
+#define JSON_IP_INFO_SIZE 					159
 
 
 

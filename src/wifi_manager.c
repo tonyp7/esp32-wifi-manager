@@ -294,7 +294,7 @@ void wifi_manager_generate_ip_info_json(update_reason_code_t update_reason_code)
 	wifi_config_t *config = wifi_manager_get_wifi_sta_config();
 	if(config){
 
-		const char ip_info_json_format[] = ",\"ip\":\"%s\",\"netmask\":\"%s\",\"gw\":\"%s\",\"urc\":%d}\n";
+		const char *ip_info_json_format = ",\"ip\":\"%s\",\"netmask\":\"%s\",\"gw\":\"%s\",\"urc\":%d}\n";
 
 		memset(ip_info_json, 0x00, JSON_IP_INFO_SIZE);
 
@@ -302,6 +302,8 @@ void wifi_manager_generate_ip_info_json(update_reason_code_t update_reason_code)
 		strcpy(ip_info_json, "{\"ssid\":");
 		json_print_string(config->sta.ssid,  (unsigned char*)(ip_info_json+strlen(ip_info_json)) );
 
+		size_t ip_info_json_len = strlen(ip_info_json);
+		size_t remaining = JSON_IP_INFO_SIZE - ip_info_json_len;
 		if(update_reason_code == UPDATE_CONNECTION_OK){
 			/* rest of the information is copied after the ssid */
 			tcpip_adapter_ip_info_t ip_info;
@@ -313,7 +315,7 @@ void wifi_manager_generate_ip_info_json(update_reason_code_t update_reason_code)
 			strcpy(netmask, ip4addr_ntoa(&ip_info.netmask));
 			strcpy(gw, ip4addr_ntoa(&ip_info.gw));
 
-			snprintf( (ip_info_json + strlen(ip_info_json)), JSON_IP_INFO_SIZE, ip_info_json_format,
+			snprintf( (ip_info_json + ip_info_json_len), remaining, ip_info_json_format,
 					ip,
 					netmask,
 					gw,
@@ -321,7 +323,7 @@ void wifi_manager_generate_ip_info_json(update_reason_code_t update_reason_code)
 		}
 		else{
 			/* notify in the json output the reason code why this was updated without a connection */
-			snprintf( (ip_info_json + strlen(ip_info_json)), JSON_IP_INFO_SIZE, ip_info_json_format,
+			snprintf( (ip_info_json + ip_info_json_len), remaining, ip_info_json_format,
 								"0",
 								"0",
 								"0",
