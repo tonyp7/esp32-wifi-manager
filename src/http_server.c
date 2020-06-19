@@ -59,11 +59,12 @@ function to process requests, decode URLs, serve files, etc. etc.
 #include "wifi_manager.h"
 
 #include "../../main/includes/ruuvidongle.h"
+#include "../../main/includes/ethernet.h"
 #include "cJSON.h"
 
 #define FULLBUF_SIZE 4*1024
 
-#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
+//#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
 /* @brief tag used for ESP serial console messages */
 static const char TAG[] = "http_server";
 
@@ -105,6 +106,7 @@ const static char http_redirect_hdr_end[] = "/\n\n";
 
 
 void http_server_start(){
+	esp_log_level_set(TAG, ESP_LOG_DEBUG);
 	if(task_http_server == NULL){
 		xTaskCreate(&http_server, "http_server", 20*1024, NULL, WIFI_MANAGER_TASK_PRIORITY-1, &task_http_server);
 	}
@@ -193,6 +195,59 @@ bool parse_ruuvi_config_json(const char* body, struct dongle_config *c)
 	cJSON* root = cJSON_Parse(body);
 	if (root) {
 		ESP_LOGD(TAG, "settings parsed from posted json:");
+
+		cJSON* ed = cJSON_GetObjectItem(root, "eth_dhcp");
+		if (ed) {
+			bool eth_dhcp = cJSON_IsTrue(ed);
+			c->eth_dhcp = eth_dhcp;
+			ESP_LOGD(TAG, "eth_dhcp: %d", eth_dhcp);
+		}
+
+		cJSON* esip = cJSON_GetObjectItem(root, "eth_static_ip");
+		if (esip) {
+			char* eth_static_ip = cJSON_GetStringValue(esip);
+			if (eth_static_ip) {
+				strncpy(c->eth_static_ip, eth_static_ip, IP_STR_LEN);
+				ESP_LOGD(TAG, "eth_static_ip: %s", eth_static_ip);
+			}
+		}
+
+		cJSON* enm = cJSON_GetObjectItem(root, "eth_netmask");
+		if (enm) {
+			char* eth_netmask = cJSON_GetStringValue(enm);
+			if (eth_netmask) {
+				strncpy(c->eth_netmask, eth_netmask, IP_STR_LEN);
+				ESP_LOGD(TAG, "eth_netmask: %s", eth_netmask);
+			}
+		}
+
+		cJSON* egw = cJSON_GetObjectItem(root, "eth_gw");
+		if (egw) {
+			char* eth_gw = cJSON_GetStringValue(egw);
+			if (eth_gw) {
+				strncpy(c->eth_gw, eth_gw, IP_STR_LEN);
+				ESP_LOGD(TAG, "eth_gw: %s", eth_gw);
+			}
+		}
+
+		cJSON* edns1 = cJSON_GetObjectItem(root, "eth_dns1");
+		if (edns1) {
+			char* eth_dns1 = cJSON_GetStringValue(edns1);
+			if (eth_dns1) {
+				strncpy(c->eth_dns1, eth_dns1, IP_STR_LEN);
+				ESP_LOGD(TAG, "eth_dns1: %s", eth_dns1);
+			}
+		}
+
+		cJSON* edns2 = cJSON_GetObjectItem(root, "eth_dns2");
+		if (edns2) {
+			char* eth_dns2 = cJSON_GetStringValue(edns2);
+			if (eth_dns2) {
+				strncpy(c->eth_dns2, eth_dns2, IP_STR_LEN);
+				ESP_LOGD(TAG, "eth_dns2: %s", eth_dns2);
+			}
+		}
+
 		cJSON* um = cJSON_GetObjectItem(root, "use_mqtt");
 		if (um) {
 			bool use_mqtt = cJSON_IsTrue(um);
@@ -282,6 +337,18 @@ bool parse_ruuvi_config_json(const char* body, struct dongle_config *c)
 			ESP_LOGE(TAG, "use_filtering not found");
 		}
 
+		cJSON* cid = cJSON_GetObjectItem(root, "company_id");
+		if (cid) {
+			char* company_id = cJSON_GetStringValue(cid);
+			if (company_id) {
+				uint16_t c_id = (uint16_t)strtol(company_id, NULL, 0);
+				ESP_LOGD(TAG, "company_id: 0x%02x", c_id);
+				c->company_id = c_id;
+			} else {
+				ESP_LOGE(TAG, "company id not found");
+			}
+		}
+
 		cJSON* co = cJSON_GetObjectItem(root, "coordinates");
 		if (co) {
 			char* coordinates = cJSON_GetStringValue(co);
@@ -355,6 +422,12 @@ void http_server_netconn_serve(struct netconn *conn) {
 			ESP_LOGW(TAG, "netconn recv: %d", err);
 			break;
 		}
+	}
+
+	if (!request_ready)
+	{
+		ESP_LOGW(TAG, "the connection was closed by the client side");
+		return;
 	}
 
 	buf = fullbuf;
@@ -488,6 +561,7 @@ void http_server_netconn_serve(struct netconn *conn) {
 					settings_print(&m_dongle_config);
 					settings_save_to_flash(&m_dongle_config);
 					ruuvi_send_nrf_settings(&m_dongle_config);
+					ethernet_update_ip();
 				}
 			} else{
 				netconn_write(conn, http_400_hdr, sizeof(http_400_hdr) - 1, NETCONN_NOCOPY);

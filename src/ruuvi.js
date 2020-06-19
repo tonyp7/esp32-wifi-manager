@@ -5,6 +5,14 @@ function save_config()
 	console.log("save_config");
 
 	var data = {};
+
+	data.eth_dhcp = $("#eth_dhcp")[0].checked;
+	data.eth_static_ip = $("#eth_static_ip").val();
+	data.eth_netmask = $("#eth_netmask").val();
+	data.eth_gw = $("#eth_gw").val();
+	data.eth_dns1 = $("#eth_dns1").val();
+	data.eth_dns2 = $("#eth_dns2").val();
+
 	data.use_mqtt = $("#use_mqtt")[0].checked;
 	data.mqtt_server = $("#mqtt_server").val();
 	data.mqtt_prefix = $("#mqtt_prefix").val();
@@ -24,6 +32,7 @@ function save_config()
 	data.mqtt_port = mqtt_port;
 
 	data.use_filtering = $("#use_filtering")[0].checked;
+	data.company_id = $("#company_id").val();
 	data.coordinates = $("#coordinates").val();
 
 	$.ajax({
