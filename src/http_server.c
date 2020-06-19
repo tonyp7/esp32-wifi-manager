@@ -425,10 +425,10 @@ void http_server_netconn_serve(struct netconn *conn) {
 	}
 
 	if (!request_ready)
-    {
-        ESP_LOGW(TAG, "the connection was closed by the client side");
-	    return;
-    }
+	{
+		ESP_LOGW(TAG, "the connection was closed by the client side");
+		return;
+	}
 
 	buf = fullbuf;
 	char *save_ptr = fullbuf;
