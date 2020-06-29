@@ -1,0 +1,3 @@
+[submodule "ruuvi.gwui.html"]
+	path = ruuvi.gwui.html
+	url = https://github.com/ruuvi/ruuvi.gwui.html.git
