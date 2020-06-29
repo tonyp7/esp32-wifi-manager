@@ -556,6 +556,7 @@ void http_server_netconn_serve(struct netconn *conn) {
 				{
 					if (0 == strcmp(file_name, "ruuvi.json")) {
 						char *ruuvi_json = ruuvi_get_conf_json();
+						ESP_LOGI(TAG, "ruuvi.json: %s", ruuvi_json);
 						http_server_netconn_resp_200_json(conn, ruuvi_json);
 						free(ruuvi_json);
 					}
@@ -563,11 +564,13 @@ void http_server_netconn_serve(struct netconn *conn) {
 						/* if we can get the mutex, write the last version of the AP list */
 						if (wifi_manager_lock_json_buffer((TickType_t) 10)) {
 							char *buff = wifi_manager_get_ap_list_json();
+							ESP_LOGI(TAG, "ap.json: %s", buff);
 							http_server_netconn_resp_200_json(conn, buff);
 							wifi_manager_unlock_json_buffer();
 						}
 						else {
 							ESP_LOGD(TAG, "http_server_netconn_serve: GET /ap.json failed to obtain mutex");
+							ESP_LOGI(TAG, "ap.json: 503");
 							http_server_netconn_resp_503(conn);
 						}
 						/* request a wifi scan */
@@ -577,15 +580,18 @@ void http_server_netconn_serve(struct netconn *conn) {
 						if (wifi_manager_lock_json_buffer((TickType_t) 10)) {
 							char *buff = wifi_manager_get_ip_info_json();
 							if (buff) {
+								ESP_LOGI(TAG, "status.json: %s", buff);
 								http_server_netconn_resp_200_json(conn, buff);
 								wifi_manager_unlock_json_buffer();
 							}
 							else {
+								ESP_LOGI(TAG, "status.json: 503");
 								http_server_netconn_resp_503(conn);
 							}
 						}
 						else {
 							ESP_LOGD(TAG, "http_server_netconn_serve: GET /status failed to obtain mutex");
+							ESP_LOGI(TAG, "status.json: 503");
 							http_server_netconn_resp_503(conn);
 						}
 					}
