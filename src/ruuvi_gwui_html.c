@@ -71,12 +71,47 @@ const uint8_t* embed_files_find(const char* file_path, size_t* pLen, bool* pIsGz
         *pLen = embedded_code_js_gz_end - embedded_code_js_gz_start;
         return embedded_code_js_gz_start;
     }
+    if (0 == strcmp(file_path, "assets/images/wifi_icon.png"))
+    {
+        extern const uint8_t embedded_wifi_icon_png_start[] asm("_binary_wifi_icon_png_start");
+        extern const uint8_t embedded_wifi_icon_png_end[] asm("_binary_wifi_icon_png_end");
+        *pLen = embedded_wifi_icon_png_end - embedded_wifi_icon_png_start;
+        return embedded_wifi_icon_png_start;
+    }
+    if (0 == strcmp(file_path, "assets/images/ruuvi_logo.svg"))
+    {
+        extern const uint8_t embedded_ruuvi_logo_svg_start[] asm("_binary_ruuvi_logo_svg_start");
+        extern const uint8_t embedded_ruuvi_logo_svg_end[] asm("_binary_ruuvi_logo_svg_end");
+        *pLen = embedded_ruuvi_logo_svg_end - embedded_ruuvi_logo_svg_start;
+        return embedded_ruuvi_logo_svg_start;
+    }
     if (0 == strcmp(file_path, "assets/images/ruuvi_logo_nega.svg"))
     {
         extern const uint8_t embedded_ruuvi_logo_nega_svg_start[] asm("_binary_ruuvi_logo_nega_svg_start");
         extern const uint8_t embedded_ruuvi_logo_nega_svg_end[] asm("_binary_ruuvi_logo_nega_svg_end");
         *pLen = embedded_ruuvi_logo_nega_svg_end - embedded_ruuvi_logo_nega_svg_start;
         return embedded_ruuvi_logo_nega_svg_start;
+    }
+    if (0 == strcmp(file_path, "assets/fonts/montserrat_extrabold.woff2"))
+    {
+        extern const uint8_t embedded_montserrat_extrabold_woff2_start[] asm("_binary_montserrat_extrabold_woff2_start");
+        extern const uint8_t embedded_montserrat_extrabold_woff2_end[] asm("_binary_montserrat_extrabold_woff2_end");
+        *pLen = embedded_montserrat_extrabold_woff2_end - embedded_montserrat_extrabold_woff2_start;
+        return embedded_montserrat_extrabold_woff2_start;
+    }
+    if (0 == strcmp(file_path, "assets/fonts/muli_regular.woff2"))
+    {
+        extern const uint8_t embedded_muli_regular_woff2_start[] asm("_binary_muli_regular_woff2_start");
+        extern const uint8_t embedded_muli_regular_woff2_end[] asm("_binary_muli_regular_woff2_end");
+        *pLen = embedded_muli_regular_woff2_end - embedded_muli_regular_woff2_start;
+        return embedded_muli_regular_woff2_start;
+    }
+    if (0 == strcmp(file_path, "assets/fonts/muli_semibold.woff2"))
+    {
+        extern const uint8_t embedded_muli_semibold_woff2_start[] asm("_binary_muli_semibold_woff2_start");
+        extern const uint8_t embedded_muli_semibold_woff2_end[] asm("_binary_muli_semibold_woff2_end");
+        *pLen = embedded_muli_semibold_woff2_end - embedded_muli_semibold_woff2_start;
+        return embedded_muli_semibold_woff2_start;
     }
     if (0 == strcmp(file_path, "assets/css/effects.css"))
     {

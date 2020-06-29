@@ -5,7 +5,12 @@ set(EMBED_FILES
         ruuvi.gwui.html/src/ruuvi.js.gz
         ruuvi.gwui.html/src/jquery.js.gz
         ruuvi.gwui.html/src/code.js.gz
+        ruuvi.gwui.html/src/assets/images/wifi_icon.png
+        ruuvi.gwui.html/src/assets/images/ruuvi_logo.svg
         ruuvi.gwui.html/src/assets/images/ruuvi_logo_nega.svg
+        ruuvi.gwui.html/src/assets/fonts/montserrat_extrabold.woff2
+        ruuvi.gwui.html/src/assets/fonts/muli_regular.woff2
+        ruuvi.gwui.html/src/assets/fonts/muli_semibold.woff2
         ruuvi.gwui.html/src/assets/css/effects.css.gz
         ruuvi.gwui.html/src/assets/js/interactions.js.gz
         ruuvi.gwui.html/src/css/style.css.gz
