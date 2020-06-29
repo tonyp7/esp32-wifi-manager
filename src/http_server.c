@@ -1,3 +1,4 @@
+#include <limits.h>
 /*
 Copyright (c) 2017-2019 Tony Pottier
 
@@ -61,6 +62,9 @@ function to process requests, decode URLs, serve files, etc. etc.
 #include "../../main/includes/ruuvidongle.h"
 #include "../../main/includes/ethernet.h"
 #include "cJSON.h"
+#include "ruuvi_gwui_html.h"
+
+#define RUUVI_GWUI_HTML_ENABLE  1
 
 #define FULLBUF_SIZE 4*1024
 
@@ -72,53 +76,134 @@ static const char TAG[] = "http_server";
 static TaskHandle_t task_http_server = NULL;
 
 
-/**
- * @brief embedded binary data.
- * @see file "component.mk"
- * @see https://docs.espressif.com/projects/esp-idf/en/latest/api-guides/build-system.html#embedding-binary-data
- */
-extern const uint8_t style_css_start[] asm("_binary_style_css_start");
-extern const uint8_t style_css_end[]   asm("_binary_style_css_end");
-extern const uint8_t jquery_gz_start[] asm("_binary_jquery_gz_start");
-extern const uint8_t jquery_gz_end[] asm("_binary_jquery_gz_end");
-extern const uint8_t code_js_start[] asm("_binary_code_js_start");
-extern const uint8_t code_js_end[] asm("_binary_code_js_end");
-extern const uint8_t index_html_start[] asm("_binary_index_html_start");
-extern const uint8_t index_html_end[] asm("_binary_index_html_end");
-extern const uint8_t ruuvi_html_start[] asm("_binary_ruuvi_html_start");
-extern const uint8_t ruuvi_html_end[] asm("_binary_ruuvi_html_end");
-extern const uint8_t ruuvi_js_start[] asm("_binary_ruuvi_js_start");
-extern const uint8_t ruuvi_js_end[] asm("_binary_ruuvi_js_end");
+static char *http_server_strdupVprintf(size_t *pLen, const char *fmt, va_list args) {
+	const int len = vsnprintf(NULL, 0, fmt, args);
+	char *buf = malloc(len + 1);
+	vsnprintf(buf, len + 1, fmt, args);
+	if (NULL != pLen) {
+		*pLen = len;
+	}
+	return buf;
+}
 
+__attribute__((format(printf, 2, 3)))
+static void http_server_netconn_printf(struct netconn *conn, const char *fmt, ...) {
+	size_t len = 0;
+	va_list args;
+	va_start(args, fmt);
+	char *buf = http_server_strdupVprintf(&len, fmt, args);
+	va_end(args);
+	netconn_write(conn, buf, len, NETCONN_COPY);
+	free(buf);
+}
 
-/* const http headers stored in ROM */
-const static char http_html_hdr[] = "HTTP/1.1 200 OK\nContent-type: text/html\n\n";
-const static char http_css_hdr[] = "HTTP/1.1 200 OK\nContent-type: text/css\nCache-Control: public, max-age=31536000\n\n";
-const static char http_js_hdr[] = "HTTP/1.1 200 OK\nContent-type: text/javascript\n\n";
-const static char http_jquery_gz_hdr[] = "HTTP/1.1 200 OK\nContent-type: text/javascript\nAccept-Ranges: bytes\nContent-Length: 29995\nContent-Encoding: gzip\n\n";
-const static char http_400_hdr[] = "HTTP/1.1 400 Bad Request\nContent-Length: 0\n\n";
-const static char http_404_hdr[] = "HTTP/1.1 404 Not Found\nContent-Length: 0\n\n";
-const static char http_503_hdr[] = "HTTP/1.1 503 Service Unavailable\nContent-Length: 0\n\n";
-const static char http_ok_json_no_cache_hdr[] = "HTTP/1.1 200 OK\nContent-type: application/json\nCache-Control: no-store, no-cache, must-revalidate, max-age=0\nPragma: no-cache\n\n";
-const static char http_redirect_hdr_start[] = "HTTP/1.1 302 Found\nLocation: http://";
-const static char http_redirect_hdr_end[] = "/\n\n";
+static void http_server_netconn_resp_404(struct netconn *conn) {
+	http_server_netconn_printf(
+			conn,
+			"HTTP/1.1 404 Not Found\r\n"
+			"Content-Length: 0\r\n"
+			"\r\n");
+}
 
+static void http_server_netconn_resp_400(struct netconn *conn) {
+	http_server_netconn_printf(
+			conn,
+			"HTTP/1.1 400 Bad Request\r\n"
+			"Content-Length: 0\r\n"
+			"\r\n");
+}
 
+static void http_server_netconn_resp_503(struct netconn *conn) {
+	http_server_netconn_printf(
+			conn,
+			"HTTP/1.1 503 Service Unavailable\r\n"
+			"Content-Length: 0\r\n"
+			"\r\n");
+}
 
-void http_server_start(){
+static void http_server_netconn_resp_200_json(struct netconn *conn, const char* json_content) {
+	http_server_netconn_printf(
+			conn,
+			"HTTP/1.1 200 OK\r\n"
+			"Content-type: application/json\r\n"
+			"Cache-Control: no-store, no-cache, must-revalidate, max-age=0\r\n"
+			"Pragma: no-cache\r\n"
+			"\r\n");
+	ESP_LOGD(TAG, "Send json to browser: %s", json_content);
+	netconn_write(conn, json_content, strlen(json_content), NETCONN_COPY);
+}
+
+static void http_server_netconn_resp_file(struct netconn *conn, const char *file_path) {
+	size_t file_len = 0;
+	bool is_gzipped = false;
+	const uint8_t* file_content = embed_files_find(file_path, &file_len, &is_gzipped);
+	if (NULL == file_content) {
+		http_server_netconn_resp_404(conn);
+		return;
+	}
+	char* file_ext = strrchr(file_path, '.');
+	if (NULL == file_ext)
+	{
+		http_server_netconn_resp_404(conn);
+		return;
+	}
+	char* content_type = NULL;
+	if (0 == strcmp(file_ext, ".html"))
+	{
+		content_type = "text/html";
+	}
+	else if ((0 == strcmp(file_ext, ".css")) || (0 == strcmp(file_ext, ".scss")))
+	{
+		content_type = "text/css";
+	}
+	else if (0 == strcmp(file_ext, ".js"))
+	{
+		content_type = "text/javascript";
+	}
+	else if (0 == strcmp(file_ext, ".png"))
+	{
+		content_type = "image/png";
+	}
+	else if (0 == strcmp(file_ext, ".svg"))
+	{
+		content_type = "image/svg+xml";
+	}
+	else if (0 == strcmp(file_ext, ".ttf"))
+	{
+		content_type = "application/octet-stream";
+	}
+	if (NULL == content_type)
+	{
+		content_type = "application/octet-stream";
+	}
+	http_server_netconn_printf(
+			conn,
+			"HTTP/1.1 200 OK\n"
+			"Content-type: %s\n"
+			"Content-Length: %u\n"
+			"%s"
+			"\n",
+			content_type,
+			(unsigned)file_len,
+			is_gzipped ? "Content-Encoding: gzip\n" : "");
+	netconn_write(conn, file_content, file_len, NETCONN_NOCOPY);
+}
+
+void http_server_start(void) {
 	esp_log_level_set(TAG, ESP_LOG_DEBUG);
-	if(task_http_server == NULL){
-		xTaskCreate(&http_server, "http_server", 20*1024, NULL, WIFI_MANAGER_TASK_PRIORITY-1, &task_http_server);
+	if (task_http_server == NULL) {
+		xTaskCreate(&http_server, "http_server", 20 * 1024, NULL, WIFI_MANAGER_TASK_PRIORITY - 1, &task_http_server);
 	}
 }
 
-void http_server_stop() {
+void http_server_stop(void) {
 	if (task_http_server) {
 		vTaskDelete(task_http_server);
 		task_http_server = NULL;
 	}
 }
 
+_Noreturn
 void http_server(void *pvParameters) {
 
 	struct netconn *conn, *newconn;
@@ -438,7 +523,7 @@ void http_server_netconn_serve(struct netconn *conn) {
 
 	char *line = strtok_r(save_ptr, new_line, &save_ptr);
 
-	if(line) {
+	if (line) {
 		/* captive portal functionality: redirect to access point IP for HOST that are not the access point IP OR the STA IP */
 		int lenH = 0;
 		char *host = http_server_get_header(save_ptr, "Host: ", &lenH);
@@ -448,127 +533,142 @@ void http_server_netconn_serve(struct netconn *conn) {
 		wifi_manager_unlock_sta_ip_string();
 
 		if (lenH > 0 && !strstr(host, DEFAULT_AP_IP) && !access_from_sta_ip) {
-			netconn_write(conn, http_redirect_hdr_start, sizeof(http_redirect_hdr_start) - 1, NETCONN_NOCOPY);
-			netconn_write(conn, DEFAULT_AP_IP, sizeof(DEFAULT_AP_IP) - 1, NETCONN_NOCOPY);
-			netconn_write(conn, http_redirect_hdr_end, sizeof(http_redirect_hdr_end) - 1, NETCONN_NOCOPY);
+			http_server_netconn_printf(
+					conn,
+					"HTTP/1.1 302 Found\n"
+					"Location: http://%s/\n"
+					"\n",
+					DEFAULT_AP_IP);
 		}
 		else{
-			/* default page */
-			if(strstr(line, "GET / ")) {
-				netconn_write(conn, http_html_hdr, sizeof(http_html_hdr) - 1, NETCONN_NOCOPY);
-				netconn_write(conn, index_html_start, index_html_end - index_html_start, NETCONN_NOCOPY);
-			}
-			else if(strstr(line, "GET /ruuvi.html ")) {
-				netconn_write(conn, http_html_hdr, sizeof(http_html_hdr) - 1, NETCONN_NOCOPY);
-				netconn_write(conn, ruuvi_html_start, ruuvi_html_end - ruuvi_html_start, NETCONN_NOCOPY);
-			}
-			else if(strstr(line, "GET /ruuvi.js ")) {
-				netconn_write(conn, http_js_hdr, sizeof(http_js_hdr) - 1, NETCONN_NOCOPY);
-				netconn_write(conn, ruuvi_js_start, ruuvi_js_end - ruuvi_js_start, NETCONN_NOCOPY);
-			}
-			else if(strstr(line, "GET /jquery.js ")) {
-				netconn_write(conn, http_jquery_gz_hdr, sizeof(http_jquery_gz_hdr) - 1, NETCONN_NOCOPY);
-				netconn_write(conn, jquery_gz_start, jquery_gz_end - jquery_gz_start, NETCONN_NOCOPY);
-			}
-			else if(strstr(line, "GET /code.js ")) {
-				netconn_write(conn, http_js_hdr, sizeof(http_js_hdr) - 1, NETCONN_NOCOPY);
-				netconn_write(conn, code_js_start, code_js_end - code_js_start, NETCONN_NOCOPY);
-			}
-			else if(strstr(line, "GET /ruuvi.json ")) {
-				ESP_LOGI(TAG, "GET /ruuvi.json");
-				netconn_write(conn, http_ok_json_no_cache_hdr, sizeof(http_ok_json_no_cache_hdr) - 1, NETCONN_NOCOPY);
-				char* ruuvi_json = ruuvi_get_conf_json();
-				ESP_LOGD(TAG, "configuration json to browser: %s", ruuvi_json);
-				netconn_write(conn, ruuvi_json, strlen(ruuvi_json), NETCONN_COPY);
-				free(ruuvi_json);
-			}
-
-			else if(strstr(line, "GET /ap.json ")) {
-				/* if we can get the mutex, write the last version of the AP list */
-				if(wifi_manager_lock_json_buffer(( TickType_t ) 10)){
-					netconn_write(conn, http_ok_json_no_cache_hdr, sizeof(http_ok_json_no_cache_hdr) - 1, NETCONN_NOCOPY);
-					char *buff = wifi_manager_get_ap_list_json();
-					netconn_write(conn, buff, strlen(buff), NETCONN_NOCOPY);
-					wifi_manager_unlock_json_buffer();
+			if (strstr(line, "GET /")) {
+				char *file_name = &line[sizeof("GET /") - 1];
+				char *p = strchr(file_name, ' ');
+				if (NULL == p)
+				{
+					http_server_netconn_resp_404(conn);
+					return;
 				}
-				else{
-					netconn_write(conn, http_503_hdr, sizeof(http_503_hdr) - 1, NETCONN_NOCOPY);
-					ESP_LOGD(TAG, "http_server_netconn_serve: GET /ap.json failed to obtain mutex");
-				}
-				/* request a wifi scan */
-				//wifi_manager_scan_async();
-			}
-			else if(strstr(line, "GET /style.css ")) {
-				netconn_write(conn, http_css_hdr, sizeof(http_css_hdr) - 1, NETCONN_NOCOPY);
-				netconn_write(conn, style_css_start, style_css_end - style_css_start, NETCONN_NOCOPY);
-			}
-			else if(strstr(line, "GET /status.json ")){
-				if(wifi_manager_lock_json_buffer(( TickType_t ) 10)){
-					char *buff = wifi_manager_get_ip_info_json();
-					if(buff){
-						netconn_write(conn, http_ok_json_no_cache_hdr, sizeof(http_ok_json_no_cache_hdr) - 1, NETCONN_NOCOPY);
-						netconn_write(conn, buff, strlen(buff), NETCONN_NOCOPY);
-						wifi_manager_unlock_json_buffer();
+				*p = '\0';
+				char* file_ext = strrchr(file_name, '.');
+				ESP_LOGI(TAG, "GET /%s", file_name);
+				if ((NULL != file_ext) && (0 == strcmp(file_ext, ".json")))
+				{
+					if (0 == strcmp(file_name, "ruuvi.json")) {
+						char *ruuvi_json = ruuvi_get_conf_json();
+						http_server_netconn_resp_200_json(conn, ruuvi_json);
+						free(ruuvi_json);
 					}
-					else{
-						netconn_write(conn, http_503_hdr, sizeof(http_503_hdr) - 1, NETCONN_NOCOPY);
+					else if (0 == strcmp(file_name, "ap.json")) {
+						/* if we can get the mutex, write the last version of the AP list */
+						if (wifi_manager_lock_json_buffer((TickType_t) 10)) {
+							char *buff = wifi_manager_get_ap_list_json();
+							http_server_netconn_resp_200_json(conn, buff);
+							wifi_manager_unlock_json_buffer();
+						}
+						else {
+							ESP_LOGD(TAG, "http_server_netconn_serve: GET /ap.json failed to obtain mutex");
+							http_server_netconn_resp_503(conn);
+						}
+						/* request a wifi scan */
+						//wifi_manager_scan_async();
+					}
+					else if (0 == strcmp(file_name, "status.json")) {
+						if (wifi_manager_lock_json_buffer((TickType_t) 10)) {
+							char *buff = wifi_manager_get_ip_info_json();
+							if (buff) {
+								http_server_netconn_resp_200_json(conn, buff);
+								wifi_manager_unlock_json_buffer();
+							}
+							else {
+								http_server_netconn_resp_503(conn);
+							}
+						}
+						else {
+							ESP_LOGD(TAG, "http_server_netconn_serve: GET /status failed to obtain mutex");
+							http_server_netconn_resp_503(conn);
+						}
+					}
+					else {
+						http_server_netconn_resp_404(conn);
 					}
 				}
-				else{
-					netconn_write(conn, http_503_hdr, sizeof(http_503_hdr) - 1, NETCONN_NOCOPY);
-					ESP_LOGD(TAG, "http_server_netconn_serve: GET /status failed to obtain mutex");
+				else
+				{
+					if ('\0' == file_name[0])
+					{
+						file_name = "index.html";
+					}
+					http_server_netconn_resp_file(conn, file_name);
 				}
 			}
-			else if(strstr(line, "DELETE /connect.json ")) {
-				ESP_LOGD(TAG, "http_server_netconn_serve: DELETE /connect.json");
-				/* request a disconnection from wifi and forget about it */
-				wifi_manager_disconnect_async();
-				netconn_write(conn, http_ok_json_no_cache_hdr, sizeof(http_ok_json_no_cache_hdr) - 1, NETCONN_NOCOPY); /* 200 ok */
+			else if (strstr(line, "DELETE /")) {
+				char *file_name = &line[sizeof("DELETE /") - 1];
+				char *p = strchr(file_name, ' ');
+				if (NULL == p)
+				{
+					http_server_netconn_resp_400(conn);
+					return;
+				}
+				*p = '\0';
+				ESP_LOGI(TAG, "DELETE /%s", file_name);
+				if (0 == strcmp(file_name, "connect.json")) {
+					ESP_LOGD(TAG, "http_server_netconn_serve: DELETE /connect.json");
+					/* request a disconnection from wifi and forget about it */
+					wifi_manager_disconnect_async();
+					http_server_netconn_resp_200_json(conn, "");
+				}
 			}
-			else if(strstr(line, "POST /connect.json ")) {
-				ESP_LOGD(TAG, "http_server_netconn_serve: POST /connect.json");
-
-				bool found = false;
-				int lenS = 0, lenP = 0;
-				char *ssid = NULL, *password = NULL;
-				ssid = http_server_get_header(save_ptr, "X-Custom-ssid: ", &lenS);
-				password = http_server_get_header(save_ptr, "X-Custom-pwd: ", &lenP);
-
-				if(ssid && lenS <= MAX_SSID_SIZE && password && lenP <= MAX_PASSWORD_SIZE){
-					wifi_config_t* config = wifi_manager_get_wifi_sta_config();
-					memset(config, 0x00, sizeof(wifi_config_t));
-					memcpy(config->sta.ssid, ssid, lenS);
-					memcpy(config->sta.password, password, lenP);
-					ESP_LOGD(TAG, "http_server_netconn_serve: wifi_manager_connect_async() call");
-					wifi_manager_connect_async();
-					netconn_write(conn, http_ok_json_no_cache_hdr, sizeof(http_ok_json_no_cache_hdr) - 1, NETCONN_NOCOPY); //200ok
-					found = true;
+			else if (strstr(line, "POST /")) {
+				char *file_name = &line[sizeof("POST /") - 1];
+				char *p = strchr(file_name, ' ');
+				if (NULL == p)
+				{
+					http_server_netconn_resp_400(conn);
+					return;
 				}
-
-				if(!found){
-					/* bad request the authentification header is not complete/not the correct format */
-					netconn_write(conn, http_400_hdr, sizeof(http_400_hdr) - 1, NETCONN_NOCOPY);
+				*p = '\0';
+				ESP_LOGI(TAG, "POST /%s", file_name);
+				if (0 == strcmp(file_name, "connect.json")) {
+					ESP_LOGD(TAG, "http_server_netconn_serve: POST /connect.json");
+					int lenS = 0, lenP = 0;
+					char* ssid = http_server_get_header(save_ptr, "X-Custom-ssid: ", &lenS);
+					char *password = http_server_get_header(save_ptr, "X-Custom-pwd: ", &lenP);
+					if (ssid && lenS <= MAX_SSID_SIZE && password && lenP <= MAX_PASSWORD_SIZE) {
+						wifi_config_t *config = wifi_manager_get_wifi_sta_config();
+						memset(config, 0x00, sizeof(wifi_config_t));
+						memcpy(config->sta.ssid, ssid, lenS);
+						memcpy(config->sta.password, password, lenP);
+						ESP_LOGD(TAG, "http_server_netconn_serve: wifi_manager_connect_async() call");
+						wifi_manager_connect_async();
+						http_server_netconn_resp_200_json(conn, "");
+					}
+					else
+					{
+						/* bad request the authentification header is not complete/not the correct format */
+						http_server_netconn_resp_400(conn);
+					}
+				} else if (0 == strcmp(file_name, "ruuvi.json")) {
+					ESP_LOGD(TAG, "http_server_netconn_serve: POST /ruuvi.json");
+					char* body = get_http_body(save_ptr, buflen - (save_ptr - buf), 0);
+					if (parse_ruuvi_config_json(body, &m_dongle_config)) {
+						ESP_LOGI(TAG, "settings got from browser:");
+						settings_print(&m_dongle_config);
+						settings_save_to_flash(&m_dongle_config);
+						ruuvi_send_nrf_settings(&m_dongle_config);
+						ethernet_update_ip();
+						http_server_netconn_resp_200_json(conn, "");
+					}
+					else {
+						http_server_netconn_resp_400(conn);
+					}
+				} else{
+					http_server_netconn_resp_400(conn);
 				}
-
-			} else if(strstr(line, "POST /ruuvi.json ")) {
-				ESP_LOGD(TAG, "http_server_netconn_serve: POST /ruuvi.json");
-				//ESP_LOGI(TAG, "POST: %s", save_ptr);
-				//char* body = get_http_body(save_ptr, buflen - (save_ptr - buf));
-
-				char* body = get_http_body(save_ptr, buflen - (save_ptr - buf), 0);
-				if (parse_ruuvi_config_json(body, &m_dongle_config)) {
-					ESP_LOGI(TAG, "settings got from browser:");
-					settings_print(&m_dongle_config);
-					settings_save_to_flash(&m_dongle_config);
-					ruuvi_send_nrf_settings(&m_dongle_config);
-					ethernet_update_ip();
-				}
-			} else{
-				netconn_write(conn, http_400_hdr, sizeof(http_400_hdr) - 1, NETCONN_NOCOPY);
 			}
 		}
 	}
-	else{
-		netconn_write(conn, http_404_hdr, sizeof(http_404_hdr) - 1, NETCONN_NOCOPY);
+	else {
+		http_server_netconn_resp_404(conn);
 	}
 }

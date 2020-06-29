@@ -1,3 +1,4 @@
+#include <limits.h>
 /*
 Copyright (c) 2017-2019 Tony Pottier
 
@@ -44,16 +45,17 @@ extern "C" {
  * @brief RTOS task for the HTTP server. Do not start manually.
  * @see void http_server_start()
  */
+_Noreturn
 void http_server(void *pvParameters);
 
 /* @brief helper function that processes one HTTP request at a time */
 void http_server_netconn_serve(struct netconn *conn);
 
 /* @brief stop the http server task */
-void http_server_stop();
+void http_server_stop(void);
 
 /* @brief create the task for the http server */
-void http_server_start();
+void http_server_start(void);
 
 /**
  * @brief gets a char* pointer to the first occurence of header_name withing the complete http request request.
