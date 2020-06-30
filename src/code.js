@@ -1,21 +1,11 @@
 // save some bytes
 const gel = (e) => document.getElementById(e);
 
-const wifi = gel("wifi");
-const connect = gel("connect");
-const connect_manual = gel("connect_manual");
-const connect_wait = gel("connect-wait");
-const connect_details = gel("connect-details");
-
-// First, checks if it isn't implemented yet.
-if (!String.prototype.format) {
-  String.prototype.format = function () {
-    var args = arguments;
-    return this.replace(/{(\d+)}/g, function (match, number) {
-      return typeof args[number] != "undefined" ? args[number] : match;
-    });
-  };
-}
+const wifi_div = gel("wifi");
+const connect_div = gel("connect");
+const connect_manual_div = gel("connect_manual");
+const connect_wait_div = gel("connect-wait");
+const connect_details_div = gel("connect-details");
 
 function docReady(fn) {
   // see if DOM is already available
@@ -30,7 +20,6 @@ function docReady(fn) {
   }
 }
 
-var apList = null;
 var selectedSSID = "";
 var refreshAPInterval = null;
 var checkStatusInterval = null;
@@ -60,8 +49,8 @@ function startRefreshAPInterval() {
 docReady(async function () {
   gel("wifi-status").addEventListener(
     "click",
-    function (e) {
-      gel("wifi").style.display = "none";
+    () => {
+      wifi_div.style.display = "none";
       document.getElementById("connect-details").style.display = "block";
     },
     false
@@ -69,13 +58,13 @@ docReady(async function () {
 
   gel("manual_add").addEventListener(
     "click",
-    function (e) {
+    (e) => {
       selectedSSID = e.target.innerText;
 
       gel("ssid-pwd").textContent = selectedSSID;
-      gel("wifi").style.display = "none";
-      gel("connect_manual").style.display = "block";
-      gel("connect").style.display = "none";
+      wifi_div.style.display = "none";
+      connect_manual_div.style.display = "block";
+      connect_div.style.display = "none";
 
       gel("connect-success").display = "none";
       gel("connect-fail").display = "none";
@@ -85,56 +74,49 @@ docReady(async function () {
 
   gel("wifi-list").addEventListener(
     "click",
-    function (e) {
+    (e) => {
       selectedSSID = e.target.innerText;
-      console.log("selected", selectedSSID);
       gel("ssid-pwd").textContent = selectedSSID;
-      gel("connect").style.display = "block";
-      gel("wifi").style.display = "none";
+      connect_div.style.display = "block";
+      wifi_div.style.display = "none";
       // init_cancel();
     },
     false
   );
 
-  function cancel(e) {
+  function cancel() {
     selectedSSID = "";
-    connect.style.display = "none";
-    connect_manual.style.display = "none";
-    wifi.style.display = "block";
+    connect_div.style.display = "none";
+    connect_manual_div.style.display = "none";
+    wifi_div.style.display = "block";
   }
 
   gel("cancel").addEventListener("click", cancel, false);
 
   gel("manual_cancel").addEventListener("click", cancel, false);
 
-  gel("join").addEventListener(
-    "click",
-    function (e) {
-      performConnect();
-    },
-    false
-  );
+  gel("join").addEventListener("click", performConnect, false);
 
   gel("manual_join").addEventListener(
     "click",
-    function (e) {
-      performConnect($(this).data("connect"));
+    (e) => {
+      performConnect(e.data("connect"));
     },
     false
   );
 
   gel("ok-details").addEventListener(
     "click",
-    function (e) {
-      gel("connect-details").style.display = "none";
-      gel("wifi").style.display = "block";
+    () => {
+      connect_details_div.style.display = "none";
+      wifi_div.style.display = "block";
     },
     false
   );
 
   gel("ok-credits").addEventListener(
     "click",
-    function (e) {
+    () => {
       gel("credits").style.display = "none";
       gel("app").style.display = "block";
     },
@@ -143,7 +125,7 @@ docReady(async function () {
 
   gel("acredits").addEventListener(
     "click",
-    function (e) {
+    () => {
       event.preventDefault();
       gel("app").style.display = "none";
       gel("credits").style.display = "block";
@@ -153,16 +135,16 @@ docReady(async function () {
 
   gel("ok-connect").addEventListener(
     "click",
-    function (e) {
-      gel("connect-wait").style.display = "none";
-      gel("wifi").style.display = "block";
+    () => {
+      connect_wait_div.style.display = "none";
+      wifi_div.style.display = "block";
     },
     false
   );
 
   gel("disconnect").addEventListener(
     "click",
-    function (e) {
+    () => {
       gel("connect-details-wrap").addClass("blur");
       gel("diag-disconnect").style.display = "block";
     },
@@ -171,34 +153,32 @@ docReady(async function () {
 
   gel("no-disconnect").addEventListener(
     "click",
-    function (e) {
+    () => {
       gel("diag-disconnect").style.display = "none";
       gel("connect-details-wrap").removeClass("blur");
     },
     false
   );
 
-  gel("yes-disconnect").addEventListener("click", async function (e) {
+  gel("yes-disconnect").addEventListener("click", async () => {
     stopCheckStatusInterval();
     selectedSSID = "";
 
     document.getElementById("diag-disconnect").style.display = "none";
     gel("connect-details-wrap").removeClass("blur");
 
-    const response = await fetch("/connect.json", {
+    await fetch("/connect_div.json", {
       method: "DELETE",
       headers: {
         "Content-Type": "application/json",
-        "X-Custom-ssid": selectedSSID,
-        "X-Custom-pwd": pwd,
       },
       body: { timestamp: Date.now() },
     });
 
     startCheckStatusInterval();
 
-    connect_details.style.display = "none";
-    wifi.style.display = "block";
+    connect_details_div.style.display = "none";
+    wifi_div.style.display = "block";
   });
 
   //first time the page loads: attempt get the connection status and start the wifi scan
@@ -231,11 +211,11 @@ async function performConnect(conntype) {
 
   gel("ok-connect").disabled = true;
   gel("ssid-wait").textContent = selectedSSID;
-  connect.style.display = "none";
-  connect_manual.style.display = "none";
-  gel("connect-wait").style.display = "block";
+  connect_div.style.display = "none";
+  connect_manual_div.style.display = "none";
+  connect_wait_div.style.display = "block";
 
-  const response = await fetch("/connect.json", {
+  await fetch("/connect_div.json", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -283,13 +263,10 @@ async function refreshAP(url = "/ap.json") {
 function refreshAPHTML(data) {
   var h = "";
   data.forEach(function (e, idx, array) {
-    h += '<div class="ape{0}"><div class="{1}"><div class="{2}">{3}</div></div></div>'.format(
-      idx === array.length - 1 ? "" : " brdb",
-      rssiToIcon(e.rssi),
-      e.auth == 0 ? "" : "pw",
-      e.ssid
-    );
-    h += "\n";
+    let ap_class = idx === array.length - 1 ? "" : " brdb";
+    let rssicon = rssiToIcon(e.rssi);
+    let auth = e.auth == 0 ? "" : "pw";
+    h += `<div class="ape${ap_class}"><div class="${rssicon}"><div class="${auth}">${e.ssid}</div></div></div>\n`;
   });
 
   gel("wifi-list").innerHTML = h;
@@ -301,51 +278,53 @@ async function checkStatus(url = "/status.json") {
     var data = await response.json();
     if (data && data.hasOwnProperty("ssid") && data["ssid"] != "") {
       if (data["ssid"] === selectedSSID) {
-        //that's a connection attempt
-        if (data["urc"] === 0) {
-          //got connection
-          document.querySelector("#connected-to div div div span").textContent =
-            data["ssid"];
-          document.querySelector("#connect-details h1").textContent =
-            data["ssid"];
-          gel("ip").textContent = data["ip"];
-          gel("netmask").textContent = data["netmask"];
-          gel("gw").textContent = data["gw"];
-          gel("wifi-status").style.display = "none";
+        // Attempting connection
+        switch (data["urc"]) {
+          case 0:
+            console.info("Got connection!");
+            document.querySelector(
+              "#connected-to div div div span"
+            ).textContent = data["ssid"];
+            document.querySelector("#connect-details h1").textContent =
+              data["ssid"];
+            gel("ip").textContent = data["ip"];
+            gel("netmask").textContent = data["netmask"];
+            gel("gw").textContent = data["gw"];
+            gel("wifi-status").style.display = "block";
 
-          //unlock the wait screen if needed
-          gel("ok-connect").disabled = false;
+            //unlock the wait screen if needed
+            gel("ok-connect").disabled = false;
 
-          //update wait screen
-          gel("loading").style.display = "none";
-          gel("connect-success").style.display = "block";
-          gel("connect-fail").style.display = "none";
+            //update wait screen
+            gel("loading").style.display = "none";
+            gel("connect-success").style.display = "block";
+            gel("connect-fail").style.display = "none";
+            break;
+          case 1:
+            console.info("Connection attempt failed!");
+            document.querySelector(
+              "#connected-to div div div span"
+            ).textContent = data["ssid"];
+            document.querySelector("#connect-details h1").textContent =
+              data["ssid"];
+            gel("ip").textContent = "0.0.0.0";
+            gel("netmask").textContent = "0.0.0.0";
+            gel("gw").textContent = "0.0.0.0";
 
-          //           var link = gel("outbound_a_href_on_success");
-          //           link.setAttribute("href", "http://" + data["ip"]);
-        } else if (data["urc"] === 1) {
-          //failed attempt
-          document.querySelector("#connected-to div div div span").textContent =
-            data["ssid"];
-          document.querySelector("#connect-details h1").textContent =
-            data["ssid"];
-          gel("ip").textContent = "0.0.0.0";
-          gel("netmask").textContent = "0.0.0.0";
-          gel("gw").textContent = "0.0.0.0";
+            //don't show any connection
+            gel("wifi-status").display = "none";
 
-          //don't show any connection
-          gel("wifi-status").display = "none";
+            //unlock the wait screen
+            gel("ok-connect").disabled = false;
 
-          //unlock the wait screen
-          gel("ok-connect").disabled = false;
-
-          //update wait screen
-          gel("loading").display = "none";
-          gel("connect-fail").style.display = "block";
-          gel("connect-success").style.display = "none";
+            //update wait screen
+            gel("loading").display = "none";
+            gel("connect-fail").style.display = "block";
+            gel("connect-success").style.display = "none";
+            break;
         }
       } else if (data.hasOwnProperty("urc") && data["urc"] === 0) {
-        console.log("Connected!");
+        console.info("Connection established");
         //ESP32 is already connected to a wifi without having the user do anything
         if (
           gel("wifi-status").style.display == "" ||
@@ -359,18 +338,13 @@ async function checkStatus(url = "/status.json") {
           gel("netmask").textContent = data["netmask"];
           gel("gw").textContent = data["gw"];
           gel("wifi-status").style.display = "block";
-
-          //           var link = gel("outbound_a_href");
-          //           link.setAttribute("href", "http://" + data["ip"]);
         }
       }
-    } else if (data && data.hasOwnProperty("urc") && data["urc"] === 2) {
-      //that's a manual disconnect
+    } else if (data.hasOwnProperty("urc") && data["urc"] === 2) {
+      console.log("Manual disconnect requested...");
       if (gel("wifi-status").style.display == "block") {
         gel("wifi-status").style.display == "none";
       }
-    } else {
-      console.info("Status returned empty from /status.json!");
     }
   } catch (e) {
     console.info("Was not able to fetch /status.json");
