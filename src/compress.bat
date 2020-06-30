@@ -1,2 +1,2 @@
-gzip index.html style.css jquery.js --best --keep --force
+gzip index.html style.css --best --keep --force
 pause
