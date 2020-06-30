@@ -263,18 +263,20 @@ function rssiToIcon(rssi) {
 }
 
 async function refreshAP(url = "/ap.json") {
-  var access_points = await fetch(url)
-    .then((response) => response.json())
-    .catch((err) => console.info("Was not able to fetch access points from /ap.json"));
-
-  if (access_points.length > 0) {
-    //sort by signal strength
-    access_points.sort((a, b) => {
-      var x = a["rssi"];
-      var y = b["rssi"];
-      return x < y ? 1 : x > y ? -1 : 0;
-    });
-    refreshAPHTML(access_points);
+  try {
+    var res = await fetch(url);
+    var access_points = await res.json();
+    if (access_points.length > 0) {
+      //sort by signal strength
+      access_points.sort((a, b) => {
+        var x = a["rssi"];
+        var y = b["rssi"];
+        return x < y ? 1 : x > y ? -1 : 0;
+      });
+      refreshAPHTML(access_points);
+    }
+  } catch (e) {
+    console.info("Access points returned empty from /ap.json!");
   }
 }
 
@@ -294,79 +296,83 @@ function refreshAPHTML(data) {
 }
 
 async function checkStatus(url = "/status.json") {
-  var data = await fetch(url)
-    .then((response) => response.json())
-    .catch((err) => console.info("Was not able to fetch /status.json"));
+  try {
+    var response = await fetch(url);
+    var data = await response.json();
+    if (data && data.hasOwnProperty("ssid") && data["ssid"] != "") {
+      if (data["ssid"] === selectedSSID) {
+        //that's a connection attempt
+        if (data["urc"] === 0) {
+          //got connection
+          document.querySelector("#connected-to div div div span").textContent =
+            data["ssid"];
+          document.querySelector("#connect-details h1").textContent =
+            data["ssid"];
+          gel("ip").textContent = data["ip"];
+          gel("netmask").textContent = data["netmask"];
+          gel("gw").textContent = data["gw"];
+          gel("wifi-status").style.display = "none";
 
-  if (data.hasOwnProperty("ssid") && data["ssid"] != "") {
-    if (data["ssid"] === selectedSSID) {
-      //that's a connection attempt
-      if (data["urc"] === 0) {
-        //got connection
-        document.querySelector("#connected-to div div div span").textContent =
-          data["ssid"];
-        document.querySelector("#connect-details h1").textContent =
-          data["ssid"];
-        gel("ip").textContent = data["ip"];
-        gel("netmask").textContent = data["netmask"];
-        gel("gw").textContent = data["gw"];
-        gel("wifi-status").style.display = "none";
+          //unlock the wait screen if needed
+          gel("ok-connect").disabled = false;
 
-        //unlock the wait screen if needed
-        gel("ok-connect").disabled = false;
+          //update wait screen
+          gel("loading").style.display = "none";
+          gel("connect-success").style.display = "block";
+          gel("connect-fail").style.display = "none";
 
-        //update wait screen
-        gel("loading").style.display = "none";
-        gel("connect-success").style.display = "block";
-        gel("connect-fail").style.display = "none";
+          //           var link = gel("outbound_a_href_on_success");
+          //           link.setAttribute("href", "http://" + data["ip"]);
+        } else if (data["urc"] === 1) {
+          //failed attempt
+          document.querySelector("#connected-to div div div span").textContent =
+            data["ssid"];
+          document.querySelector("#connect-details h1").textContent =
+            data["ssid"];
+          gel("ip").textContent = "0.0.0.0";
+          gel("netmask").textContent = "0.0.0.0";
+          gel("gw").textContent = "0.0.0.0";
 
-        //           var link = gel("outbound_a_href_on_success");
-        //           link.setAttribute("href", "http://" + data["ip"]);
-      } else if (data["urc"] === 1) {
-        //failed attempt
-        document.querySelector("#connected-to div div div span").textContent =
-          data["ssid"];
-        document.querySelector("#connect-details h1").textContent =
-          data["ssid"];
-        gel("ip").textContent = "0.0.0.0";
-        gel("netmask").textContent = "0.0.0.0";
-        gel("gw").textContent = "0.0.0.0";
+          //don't show any connection
+          gel("wifi-status").display = "none";
 
-        //don't show any connection
-        gel("wifi-status").display = "none";
+          //unlock the wait screen
+          gel("ok-connect").disabled = false;
 
-        //unlock the wait screen
-        gel("ok-connect").disabled = false;
+          //update wait screen
+          gel("loading").display = "none";
+          gel("connect-fail").style.display = "block";
+          gel("connect-success").style.display = "none";
+        }
+      } else if (data.hasOwnProperty("urc") && data["urc"] === 0) {
+        console.log("Connected!");
+        //ESP32 is already connected to a wifi without having the user do anything
+        if (
+          gel("wifi-status").style.display == "" ||
+          gel("wifi-status").style.display == "none"
+        ) {
+          document.querySelector("#connected-to div div div span").textContent =
+            data["ssid"];
+          document.querySelector("#connect-details h1").textContent =
+            data["ssid"];
+          gel("ip").textContent = data["ip"];
+          gel("netmask").textContent = data["netmask"];
+          gel("gw").textContent = data["gw"];
+          gel("wifi-status").style.display = "block";
 
-        //update wait screen
-        gel("loading").display = "none";
-        gel("connect-fail").style.display = "block";
-        gel("connect-success").style.display = "none";
+          //           var link = gel("outbound_a_href");
+          //           link.setAttribute("href", "http://" + data["ip"]);
+        }
       }
-    } else if (data.hasOwnProperty("urc") && data["urc"] === 0) {
-      console.log("Connected!");
-      //ESP32 is already connected to a wifi without having the user do anything
-      if (
-        gel("wifi-status").style.display == "" ||
-        gel("wifi-status").style.display == "none"
-      ) {
-        document.querySelector("#connected-to div div div span").textContent =
-          data["ssid"];
-        document.querySelector("#connect-details h1").textContent =
-          data["ssid"];
-        gel("ip").textContent = data["ip"];
-        gel("netmask").textContent = data["netmask"];
-        gel("gw").textContent = data["gw"];
-        gel("wifi-status").style.display = "block";
-
-        //           var link = gel("outbound_a_href");
-        //           link.setAttribute("href", "http://" + data["ip"]);
+    } else if (data && data.hasOwnProperty("urc") && data["urc"] === 2) {
+      //that's a manual disconnect
+      if (gel("wifi-status").style.display == "block") {
+        gel("wifi-status").style.display == "none";
       }
+    } else {
+      console.info("Status returned empty from /status.json!");
     }
-  } else if (data.hasOwnProperty("urc") && data["urc"] === 2) {
-    //that's a manual disconnect
-    if (gel("wifi-status").style.display == "block") {
-      gel("wifi-status").style.display == "none";
-    }
+  } catch (e) {
+    console.info("Was not able to fetch /status.json");
   }
 }
