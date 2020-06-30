@@ -71,20 +71,6 @@ const uint8_t* embed_files_find(const char* file_path, size_t* pLen, bool* pIsGz
         *pLen = embedded_code_js_gz_end - embedded_code_js_gz_start;
         return embedded_code_js_gz_start;
     }
-    if (0 == strcmp(file_path, "assets/images/wifi_icon.png"))
-    {
-        extern const uint8_t embedded_wifi_icon_png_start[] asm("_binary_wifi_icon_png_start");
-        extern const uint8_t embedded_wifi_icon_png_end[] asm("_binary_wifi_icon_png_end");
-        *pLen = embedded_wifi_icon_png_end - embedded_wifi_icon_png_start;
-        return embedded_wifi_icon_png_start;
-    }
-    if (0 == strcmp(file_path, "assets/images/ruuvi_logo.svg"))
-    {
-        extern const uint8_t embedded_ruuvi_logo_svg_start[] asm("_binary_ruuvi_logo_svg_start");
-        extern const uint8_t embedded_ruuvi_logo_svg_end[] asm("_binary_ruuvi_logo_svg_end");
-        *pLen = embedded_ruuvi_logo_svg_end - embedded_ruuvi_logo_svg_start;
-        return embedded_ruuvi_logo_svg_start;
-    }
     if (0 == strcmp(file_path, "assets/images/ruuvi_logo_nega.svg"))
     {
         extern const uint8_t embedded_ruuvi_logo_nega_svg_start[] asm("_binary_ruuvi_logo_nega_svg_start");
