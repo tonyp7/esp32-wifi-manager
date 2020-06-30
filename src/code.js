@@ -167,7 +167,7 @@ docReady(async function () {
     document.getElementById("diag-disconnect").style.display = "none";
     gel("connect-details-wrap").removeClass("blur");
 
-    await fetch("/connect_div.json", {
+    await fetch("/connect.json", {
       method: "DELETE",
       headers: {
         "Content-Type": "application/json",
@@ -215,7 +215,7 @@ async function performConnect(conntype) {
   connect_manual_div.style.display = "none";
   connect_wait_div.style.display = "block";
 
-  await fetch("/connect_div.json", {
+  await fetch("/connect.json", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
