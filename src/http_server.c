@@ -84,7 +84,6 @@ const static char http_pragma_no_cache[] = "no-cache";
 
 
 
-
 static esp_err_t http_server_delete_handler(httpd_req_t *req){
 
 	ESP_LOGI(TAG, "DELETE %s", req->uri);
