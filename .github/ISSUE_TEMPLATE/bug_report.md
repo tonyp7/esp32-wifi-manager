@@ -7,32 +7,21 @@ assignees: ''
 
 ---
 
-**Describe the bug**
-A clear and concise description of what the bug is.
+### Prerequisites
 
-**To Reproduce**
-Steps to reproduce the behavior:
-1. Go to '...'
-2. Click on '....'
-3. Scroll down to '....'
-4. See error
+- [x] I have written a descriptive issue title
+- [ ] I have verified that I am using the latest version of esp32-wifi-manager
+- [ ] I have searched [open](https://github.com/tonyp7/esp32-wifi-manager/issues) and [closed](https://github.com/tonyp7/esp32-wifi-manager/issues?q=is%3Aissue+is%3Aclosed) issues to ensure it has not already been reported
 
-**Expected behavior**
-A clear and concise description of what you expected to happen.
+### Description
+<!-- A description of the bug -->
 
-**Screenshots**
-If applicable, add screenshots to help explain your problem.
+### Steps to Reproduce
+<!-- List of steps, sample code, failing test or link to a project that reproduces the behavior.
+     Make sure you place a stack trace inside a code (```) block to avoid linking unrelated issues -->
 
-**Desktop (please complete the following information):**
- - OS: [e.g. iOS]
- - Browser [e.g. chrome, safari]
- - Version [e.g. 22]
+### System Configuration
+<!-- Tell us about the environment where you are experiencing the bug -->
 
-**Smartphone (please complete the following information):**
- - Device: [e.g. iPhone6]
- - OS: [e.g. iOS8.1]
- - Browser [e.g. stock browser, safari]
- - Version [e.g. 22]
-
-**Additional context**
-Add any other context about the problem here.
+- Environment (Operating system, version and so on):
+- Additional information:
