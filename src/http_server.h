@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2017-2019 Tony Pottier
+Copyright (c) 2017-2020 Tony Pottier
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -38,30 +38,11 @@ function to process requests, decode URLs, serve files, etc. etc.
 extern "C" {
 #endif
 
-/**
- * @brief RTOS task for the HTTP server. Do not start manually.
- * @see void http_server_start()
- */
-void http_server(void *pvParameters);
 
-/* @brief helper function that processes one HTTP request at a time */
-void http_server_netconn_serve(struct netconn *conn);
-
-/* @brief create the task for the http server */
+/* @brief spawns the http server */
 void http_server_start();
 
-/**
- * @brief gets a char* pointer to the first occurence of header_name withing the complete http request request.
- *
- * For optimization purposes, no local copy is made. memcpy can then be used in coordination with len to extract the
- * data.
- *
- * @param request the full HTTP raw request.
- * @param header_name the header that is being searched.
- * @param len the size of the header value if found.
- * @return pointer to the beginning of the header value.
- */
-char* http_server_get_header(char *request, char *header_name, int *len);
+
 
 #ifdef __cplusplus
 }
