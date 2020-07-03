@@ -146,7 +146,7 @@ docReady(async function () {
     "click",
     () => {
       gel("diag-disconnect").style.display = "block";
-      gel("connect-details-wrap").addClass("blur");
+      gel("connect-details-wrap").classList.add("blur");
     },
     false
   );
@@ -155,7 +155,7 @@ docReady(async function () {
     "click",
     () => {
       gel("diag-disconnect").style.display = "none";
-      gel("connect-details-wrap").removeClass("blur");
+      gel("connect-details-wrap").classList.remove("blur");
     },
     false
   );
@@ -165,7 +165,7 @@ docReady(async function () {
     selectedSSID = "";
 
     document.getElementById("diag-disconnect").style.display = "none";
-    gel("connect-details-wrap").removeClass("blur");
+    gel("connect-details-wrap").classList.remove("blur");
 
     await fetch("/connect.json", {
       method: "DELETE",
