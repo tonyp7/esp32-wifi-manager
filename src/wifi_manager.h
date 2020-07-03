@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2017-2019 Tony Pottier
+Copyright (c) 2017-2020 Tony Pottier
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -32,12 +32,11 @@ Contains the freeRTOS task and all necessary support
 #ifndef WIFI_MANAGER_H_INCLUDED
 #define WIFI_MANAGER_H_INCLUDED
 
-#include "esp_wifi.h"
+
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
 
 
 /**
@@ -276,6 +275,7 @@ char* wifi_manager_get_ap_list_json();
 char* wifi_manager_get_ip_info_json();
 
 
+void wifi_manager_scan_async();
 
 
 /**
@@ -306,7 +306,7 @@ void wifi_manager_connect_async();
 /**
  * @brief requests a wifi scan
  */
-void wifi_manager_scan_async();
+void wifi_manager_scan_awifi_manager_send_messagesync();
 
 /**
  * @brief requests to disconnect and forget about the access point.

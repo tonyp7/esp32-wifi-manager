@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2017-2019 Tony Pottier
+Copyright (c) 2017-2020 Tony Pottier
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -33,10 +33,13 @@ Contains the freeRTOS task and all necessary support
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include "esp_system.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "freertos/event_groups.h"
+#include <freertos/FreeRTOS.h>
+#include <freertos/queue.h>
+#include <freertos/task.h>
+#include <freertos/event_groups.h>
+#include <esp_wifi.h>
 #include "esp_event_loop.h"
 #include "esp_wifi.h"
 #include "esp_wifi_types.h"
@@ -48,11 +51,13 @@ Contains the freeRTOS task and all necessary support
 #include "lwip/err.h"
 #include "lwip/netdb.h"
 #include "lwip/ip4_addr.h"
+#include "tcpip_adapter.h"
+
 
 #include "json.h"
 #include "http_server.h"
-#include "wifi_manager.h"
 #include "dns_server.h"
+#include "wifi_manager.h"
 
 
 
@@ -69,6 +74,7 @@ char *accessp_json = NULL;
 char *ip_info_json = NULL;
 wifi_config_t* wifi_manager_config_sta = NULL;
 
+/* @brief Array of callback function pointers */
 void (**cb_ptr_arr)(void*) = NULL;
 
 /* @brief tag used for ESP serial console messages */
@@ -130,7 +136,6 @@ void wifi_manager_scan_async(){
 
 void wifi_manager_disconnect_async(){
 	wifi_manager_send_message(ORDER_DISCONNECT_STA, NULL);
-	//xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_WIFI_DISCONNECT_BIT); TODO: delete
 }
 
 

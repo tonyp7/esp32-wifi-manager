@@ -28,10 +28,12 @@ SOFTWARE.
 
 #include <stdio.h>
 #include <string.h>
+#include <esp_wifi.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_system.h"
 #include "esp_log.h"
+
 #include "wifi_manager.h"
 
 /* @brief tag used for ESP serial console messages */

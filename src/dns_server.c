@@ -33,6 +33,7 @@ Contains the freeRTOS task for the DNS server that processes the requests.
 
 #include <lwip/sockets.h>
 #include <string.h>
+#include <stdint.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <freertos/event_groups.h>
