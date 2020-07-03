@@ -15,9 +15,9 @@ matrix:
     - env:
       - PROJECT_TARGET="esp32"
       - PROJECT_SDK_BRANCH="master"
-    - env:
-      - PROJECT_TARGET="esp8266"
-      - PROJECT_SDK_BRANCH="master"
+#    - env:
+#      - PROJECT_TARGET="esp8266"
+#      - PROJECT_SDK_BRANCH="master"
 
 addons:
   apt:
