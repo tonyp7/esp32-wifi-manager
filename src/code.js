@@ -145,8 +145,8 @@ docReady(async function () {
   gel("disconnect").addEventListener(
     "click",
     () => {
-      gel("connect-details-wrap").addClass("blur");
       gel("diag-disconnect").style.display = "block";
+      gel("connect-details-wrap").addClass("blur");
     },
     false
   );
