@@ -78,7 +78,7 @@ void dns_server(void *pvParameters) {
 
 
 
-    struct sockaddr_in sa, ra;
+    struct sockaddr_in ra;
 
     /* Set redirection DNS hijack to the access point IP */
     ip4_addr_t ip_resolved;
@@ -91,7 +91,6 @@ void dns_server(void *pvParameters) {
         ESP_LOGE(TAG, "Failed to create socket");
         exit(0);
     }
-    memset(&sa, 0, sizeof(struct sockaddr_in));
 
     /* Bind to port 53 (typical DNS Server port) */
     tcpip_adapter_ip_info_t ip;

@@ -286,7 +286,7 @@ static esp_err_t http_server_get_handler(httpd_req_t *req){
 
 /* URI wild card for any GET request */
 static const httpd_uri_t http_server_get_request = {
-    .uri       = "/*",
+    .uri       = "*",
     .method    = HTTP_GET,
     .handler   = http_server_get_handler
 };
