@@ -170,6 +170,7 @@ static esp_err_t http_server_get_handler(httpd_req_t *req){
     char* host = NULL;
     size_t buf_len;
 
+    ESP_LOGI(TAG, "GET %s", req->uri);
 
     /* Get header value string length and allocate memory for length + 1,
      * extra byte for null termination */
