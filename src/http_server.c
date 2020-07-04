@@ -622,7 +622,7 @@ void http_server_netconn_serve(struct netconn *conn) {
 					ESP_LOGD(TAG, "http_server_netconn_serve: DELETE /connect.json");
 					/* request a disconnection from wifi and forget about it */
 					wifi_manager_disconnect_async();
-					http_server_netconn_resp_200_json(conn, "");
+					http_server_netconn_resp_200_json(conn, "{}");
 				}
 			}
 			else if (strstr(line, "POST /")) {
@@ -647,7 +647,7 @@ void http_server_netconn_serve(struct netconn *conn) {
 						memcpy(config->sta.password, password, lenP);
 						ESP_LOGD(TAG, "http_server_netconn_serve: wifi_manager_connect_async() call");
 						wifi_manager_connect_async();
-						http_server_netconn_resp_200_json(conn, "");
+						http_server_netconn_resp_200_json(conn, "{}");
 					}
 					else
 					{
@@ -663,7 +663,7 @@ void http_server_netconn_serve(struct netconn *conn) {
 						settings_save_to_flash(&m_dongle_config);
 						ruuvi_send_nrf_settings(&m_dongle_config);
 						ethernet_update_ip();
-						http_server_netconn_resp_200_json(conn, "");
+						http_server_netconn_resp_200_json(conn, "{}");
 					}
 					else {
 						http_server_netconn_resp_400(conn);
