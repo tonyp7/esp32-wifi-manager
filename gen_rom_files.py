@@ -21,8 +21,12 @@ def main():
         fd.write('\n')
         fd.write('set(EMBED_FILES\n')
         for root, subdirs, files in os.walk(base_path):
+            if root.startswith('ruuvi.gwui.html/src/.idea'):
+                continue
             for file in files:
                 if file.endswith('.json'):
+                    continue
+                if file.endswith('.min.js'):
                     continue
                 if os.path.splitext(file)[1] == '':
                     continue
@@ -47,8 +51,12 @@ def main():
         fd.write('{\n')
         fd.write(f'    *pIsGzipped = false;\n')
         for root, subdirs, files in os.walk(base_path):
+            if root.startswith('ruuvi.gwui.html/src/.idea'):
+                continue
             for file in files:
                 if file.endswith('.json'):
+                    continue
+                if file.endswith('.min.js'):
                     continue
                 if os.path.splitext(file)[1] == '':
                     continue

@@ -11,6 +11,13 @@
 const uint8_t* embed_files_find(const char* file_path, size_t* pLen, bool* pIsGzipped)
 {
     *pIsGzipped = false;
+    if (0 == strcmp(file_path, "jquery-3.5.1.js.gz"))
+    {
+        extern const uint8_t embedded_jquery_3_5_1_js_gz_start[] asm("_binary_jquery_3_5_1_js_gz_start");
+        extern const uint8_t embedded_jquery_3_5_1_js_gz_end[] asm("_binary_jquery_3_5_1_js_gz_end");
+        *pLen = embedded_jquery_3_5_1_js_gz_end - embedded_jquery_3_5_1_js_gz_start;
+        return embedded_jquery_3_5_1_js_gz_start;
+    }
     if (0 == strcmp(file_path, "index.html.gz"))
     {
         extern const uint8_t embedded_index_html_gz_start[] asm("_binary_index_html_gz_start");
@@ -32,21 +39,6 @@ const uint8_t* embed_files_find(const char* file_path, size_t* pLen, bool* pIsGz
         *pIsGzipped = true;
         *pLen = embedded_index_html_end - embedded_index_html_start;
         return embedded_index_html_start;
-    }
-    if (0 == strcmp(file_path, "jquery.js.gz"))
-    {
-        extern const uint8_t embedded_jquery_js_gz_start[] asm("_binary_jquery_js_gz_start");
-        extern const uint8_t embedded_jquery_js_gz_end[] asm("_binary_jquery_js_gz_end");
-        *pLen = embedded_jquery_js_gz_end - embedded_jquery_js_gz_start;
-        return embedded_jquery_js_gz_start;
-    }
-    if (0 == strcmp(file_path, "jquery.js"))
-    {
-        extern const uint8_t embedded_jquery_js_start[] asm("_binary_jquery_js_gz_start");
-        extern const uint8_t embedded_jquery_js_end[] asm("_binary_jquery_js_gz_end");
-        *pIsGzipped = true;
-        *pLen = embedded_jquery_js_end - embedded_jquery_js_start;
-        return embedded_jquery_js_start;
     }
     if (0 == strcmp(file_path, "code.js"))
     {
@@ -70,6 +62,14 @@ const uint8_t* embed_files_find(const char* file_path, size_t* pLen, bool* pIsGz
         extern const uint8_t embedded_code_js_gz_end[] asm("_binary_code_js_gz_end");
         *pLen = embedded_code_js_gz_end - embedded_code_js_gz_start;
         return embedded_code_js_gz_start;
+    }
+    if (0 == strcmp(file_path, "jquery-3.5.1.js"))
+    {
+        extern const uint8_t embedded_jquery_3_5_1_js_start[] asm("_binary_jquery_3_5_1_js_gz_start");
+        extern const uint8_t embedded_jquery_3_5_1_js_end[] asm("_binary_jquery_3_5_1_js_gz_end");
+        *pIsGzipped = true;
+        *pLen = embedded_jquery_3_5_1_js_end - embedded_jquery_3_5_1_js_start;
+        return embedded_jquery_3_5_1_js_start;
     }
     if (0 == strcmp(file_path, "assets/images/ruuvi_logo_nega.svg"))
     {
@@ -158,21 +158,6 @@ const uint8_t* embed_files_find(const char* file_path, size_t* pLen, bool* pIsGz
         extern const uint8_t embedded_ruuvi_css_gz_end[] asm("_binary_ruuvi_css_gz_end");
         *pLen = embedded_ruuvi_css_gz_end - embedded_ruuvi_css_gz_start;
         return embedded_ruuvi_css_gz_start;
-    }
-    if (0 == strcmp(file_path, "sass/ruuvi.scss.gz"))
-    {
-        extern const uint8_t embedded_ruuvi_scss_gz_start[] asm("_binary_ruuvi_scss_gz_start");
-        extern const uint8_t embedded_ruuvi_scss_gz_end[] asm("_binary_ruuvi_scss_gz_end");
-        *pLen = embedded_ruuvi_scss_gz_end - embedded_ruuvi_scss_gz_start;
-        return embedded_ruuvi_scss_gz_start;
-    }
-    if (0 == strcmp(file_path, "sass/ruuvi.scss"))
-    {
-        extern const uint8_t embedded_ruuvi_scss_start[] asm("_binary_ruuvi_scss_gz_start");
-        extern const uint8_t embedded_ruuvi_scss_end[] asm("_binary_ruuvi_scss_gz_end");
-        *pIsGzipped = true;
-        *pLen = embedded_ruuvi_scss_end - embedded_ruuvi_scss_start;
-        return embedded_ruuvi_scss_start;
     }
     *pLen = 0;
     return NULL;
