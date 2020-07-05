@@ -39,7 +39,7 @@ function to process requests, decode URLs, serve files, etc. etc.
 #include <esp_event.h>
 #include <esp_log.h>
 #include <esp_system.h>
-#include "tcpip_adapter.h"
+#include "esp_netif.h"
 #include <esp_http_server.h>
 
 #include "http_server.h"
