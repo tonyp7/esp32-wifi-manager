@@ -49,13 +49,13 @@ git clone https://github.com/tonyp7/esp32-wifi-manager.git
 
 Navigate under the included example:
 
-```
+```bash
 cd esp32-wifi-manager/examples/default_demo
 ```
 
 Compile the code and load it on your esp32:
 
-```
+```bash
 idf.py build flash monitor
 ```
 
@@ -67,7 +67,7 @@ Now, using any wifi capable device, you will see a new wifi access point named *
 
 esp32-wifi-manager can be configured without touching its code. At the project level use:
 
-```
+```bash
 idf.py menuconfig
 ```
 
@@ -96,13 +96,13 @@ Under eclipse, this is what a typical project looks like:
 
 Once this is done, you need to edit the CMakeLists.txt file at the root of your project to register the components folder. This is done by adding the following line:
 
-```
+```cmake
 set(EXTRA_COMPONENTS_DIRS components/)
 ```
 
 A typical CmakeLists.txt file should look like this:
 
-```
+```cmake
 cmake_minimum_required(VERSION 3.5)
 set(EXTRA_COMPONENT_DIRS components/)
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
@@ -111,7 +111,7 @@ project(name_of_your_project)
 
 If you are using the old build system with make instead, you should edit the Makefile instead such as:
 
-```
+```make
 PROJECT_NAME := name_of_your_project
 EXTRA_COMPONENT_DIRS := components/
 include $(IDF_PATH)/make/project.mk
