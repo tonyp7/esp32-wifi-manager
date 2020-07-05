@@ -17,8 +17,9 @@
    - [Requirements](#requirements)
    - [Hello World](#hello-world)
    - [Configuring the Wifi Manager](#configuring-the-wifi-manager)
-  - [Adding esp32-wifi-manager to your code](#adding-esp32-wifi-manager-to-your-code)
-  - [License](#license)
+ - [Adding esp32-wifi-manager to your code](#adding-esp32-wifi-manager-to-your-code)
+   - [Interacting with the manager](#interacting-with-the-manager)
+ - [License](#license)
    
 
 # Demo
@@ -82,6 +83,50 @@ In order to use esp32-wifi-manager effectively in your esp-idf projects, copy th
 
 Your project should look like this:
 
+  - project_folder
+    - build
+    - components
+      - esp32-wifi-manager
+    - main
+      - main.c
+
+Under eclipse, this is what a typical project looks like:
+
+![eclipse project with esp32-wifi-manager](https://idyl.io/wp-content/uploads/2020/07/eclipse-idf-project.png "eclipse project with esp32-wifi-manager")
+
+Once this is done, you need to edit the CMakeLists.txt file at the root of your project to register the components folder. This is done by adding the following line:
+
+```
+set(EXTRA_COMPONENTS_DIRS components/)
+```
+
+A typical CmakeLists.txt file should look like this:
+
+```
+cmake_minimum_required(VERSION 3.5)
+set(EXTRA_COMPONENT_DIRS components/)
+include($ENV{IDF_PATH}/tools/cmake/project.cmake)
+project(name_of_your_project)
+```
+
+If you are using the old build system with make instead, you should edit the Makefile instead such as:
+
+```
+PROJECT_NAME := name_of_your_project
+EXTRA_COMPONENT_DIRS := components/
+include $(IDF_PATH)/make/project.mk
+```
+
+Once this is done, you can now in your user code add the header:
+
+```c
+#include "wifi_manager.h"
+```
+
+All you need to do now is to call wifi_manager_start(); in your code. See [examples/default_demo](examples/default_demo) if you are uncertain.
+
+
+## Interacting with the manager
 
 Ther are effectively three different ways you can embed esp32-wifi-manager with your code:
 * Just forget about it and poll in your code for wifi connectivity status
@@ -102,8 +147,7 @@ Then just register it by calling:
 wifi_manager_set_callback(EVENT_STA_GOT_IP, &cb_connection_ok);
 ```
 
-That's it! Now everytime the event is triggered it will call this function.
-See [examples/default_demo](examples/default_demo).
+That's it! Now everytime the event is triggered it will call this function. The [examples/default_demo](examples/default_demo) contains sample code using callbacks.
 
 # License
 *esp32-wifi-manager* is MIT licensed. As such, it can be included in any project, commercial or not, as long as you retain original copyright. Please make sure to read the license file.
