@@ -6,9 +6,9 @@
 
 *esp32-wifi-manager* is is an all in one wifi scanner, http server & dns daemon living in the least amount of RAM possible.
 
-*esp32-wifi-manager* will automatically attempt to re-connect to a previously saved network on boot, and if cannot find a saved wifi it will start its own access point through which you can manage wifi networks if a saved network cannot be found and/or if the connection is lost.
+*esp32-wifi-manager* will automatically attempt to re-connect to a previously saved network on boot, and if it cannot find a saved wifi it will start its own access point through which you can manage and connect to wifi networks.
 
-*esp32-wifi-manager* is an esp-idf project that compiles successfully with the esp-idf 3.2 release. You can simply copy the project and start adding your own code to it.
+*esp32-wifi-manager* is an esp-idf project that compiles with esp-idf 4.1 and above. See [Getting Started](#getting-started) to guide you through your first setup.
 
 # Content
  - [Demo](#demo)
