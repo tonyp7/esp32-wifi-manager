@@ -77,6 +77,12 @@ Navigate in "Component config" then pick "Wifi Manager Configuration". You will 
 You can change the ssid and password of the access point at your convenience, but it is highly recommended to keep default values.
 
 # Adding esp32-wifi-manager to your code
+
+In order to use esp32-wifi-manager effectively in your esp-idf projects, copy the whole esp32-wifi-manager repository (or git clone) into a components subfolder.
+
+Your project should look like this:
+
+
 Ther are effectively three different ways you can embed esp32-wifi-manager with your code:
 * Just forget about it and poll in your code for wifi connectivity status
 * Use event callbacks
