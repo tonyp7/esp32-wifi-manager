@@ -40,19 +40,19 @@ Due to breaking changes in esp-idf 4.1, most notably the complete revision on ho
 
 ## Hello World
 
-Clone the repository where you want it to be. If you are unfamiliar with Git, you can use Github Desktop on Windows.
+Clone the repository where you want it to be. If you are unfamiliar with Git, you can use Github Desktop on Windows:
 
 ```bash 
 git clone https://github.com/tonyp7/esp32-wifi-manager.git
 ```
 
-Navigate under the included example
+Navigate under the included example:
 
 ```
 cd esp32-wifi-manager/examples/default_demo
 ```
 
-Compile the code and load it on your esp32
+Compile the code and load it on your esp32:
 
 ```
 idf.py build flash monitor
@@ -72,7 +72,9 @@ idf.py menuconfig
 
 Navigate in "Component config" then pick "Wifi Manager Configuration". You will be greeted by the following screen:
 
+![esp32-wifi-manager-menuconfig](https://idyl.io/wp-content/uploads/2020/07/esp32-wifi-manager-menuconfig-800px.png "menuconfig screen")
 
+You can change the ssid and password of the access point at your convenience, but it is highly recommended to keep default values.
 
 # Adding esp32-wifi-manager to your code
 Ther are effectively three different ways you can embed esp32-wifi-manager with your code:
