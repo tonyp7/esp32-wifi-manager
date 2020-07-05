@@ -39,7 +39,7 @@ function to process requests, decode URLs, serve files, etc. etc.
 #include <esp_event.h>
 #include <esp_log.h>
 #include <esp_system.h>
-#include "tcpip_adapter.h"
+#include "esp_netif.h"
 #include <esp_http_server.h>
 
 #include "http_server.h"
@@ -170,6 +170,7 @@ static esp_err_t http_server_get_handler(httpd_req_t *req){
     char* host = NULL;
     size_t buf_len;
 
+    ESP_LOGI(TAG, "GET %s", req->uri);
 
     /* Get header value string length and allocate memory for length + 1,
      * extra byte for null termination */

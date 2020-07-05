@@ -293,12 +293,6 @@ wifi_config_t* wifi_manager_get_wifi_sta_config();
 
 
 /**
- * @brief A standard wifi event handler as recommended by Espressif
- */
-esp_err_t wifi_manager_event_handler(void *ctx, system_event_t *event);
-
-
-/**
  * @brief requests a connection to an access point that will be process in the main task thread.
  */
 void wifi_manager_connect_async();
