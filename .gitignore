@@ -73,3 +73,6 @@ wifi_manager/doc/
 .vscode/
 
 .idea/
+
+# Mac OSX files
+.DS_Store
