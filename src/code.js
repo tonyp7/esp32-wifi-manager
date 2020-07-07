@@ -43,7 +43,7 @@ function startCheckStatusInterval() {
 }
 
 function startRefreshAPInterval() {
-  refreshAPInterval = setInterval(refreshAP, 2800);
+  refreshAPInterval = setInterval(refreshAP, 3800);
 }
 
 docReady(async function () {
@@ -343,7 +343,7 @@ async function checkStatus(url = "/status.json") {
     } else if (data.hasOwnProperty("urc") && data["urc"] === 2) {
       console.log("Manual disconnect requested...");
       if (gel("wifi-status").style.display == "block") {
-        gel("wifi-status").style.display == "none";
+        gel("wifi-status").style.display = "none";
       }
     }
   } catch (e) {
