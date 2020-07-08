@@ -32,6 +32,7 @@ Contains the freeRTOS task and all necessary support
 #ifndef WIFI_MANAGER_H_INCLUDED
 #define WIFI_MANAGER_H_INCLUDED
 
+#include <stdbool.h>
 
 
 #ifdef __cplusplus
@@ -235,7 +236,7 @@ struct wifi_settings_t{
 	bool sta_only;
 	wifi_ps_type_t sta_power_save;
 	bool sta_static_ip;
-	tcpip_adapter_ip_info_t sta_static_ip_config;
+	esp_netif_ip_info_t sta_static_ip_config;
 };
 extern struct wifi_settings_t wifi_settings;
 
@@ -248,6 +249,16 @@ typedef struct{
 	void *param;
 } queue_message;
 
+
+/**
+ * @brief returns the current esp_netif object for the STAtion
+ */
+esp_netif_t* wifi_manager_get_esp_netif_sta();
+
+/**
+ * @brief returns the current esp_netif object for the Access Point
+ */
+esp_netif_t* wifi_manager_get_esp_netif_ap();
 
 
 /**

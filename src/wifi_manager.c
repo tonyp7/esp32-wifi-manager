@@ -82,6 +82,12 @@ static const char TAG[] = "wifi_manager";
 /* @brief task handle for the main wifi_manager task */
 static TaskHandle_t task_wifi_manager = NULL;
 
+/* @brief netif object for the STATION */
+static esp_netif_t* esp_netif_sta = NULL;
+
+/* @brief netif object for the ACCESS POINT */
+static esp_netif_t* esp_netif_ap = NULL;
+
 /**
  * The actual WiFi settings in use
  */
@@ -156,7 +162,7 @@ void wifi_manager_start(){
 	wifi_manager_clear_ip_info_json();
 	wifi_manager_config_sta = (wifi_config_t*)malloc(sizeof(wifi_config_t));
 	memset(wifi_manager_config_sta, 0x00, sizeof(wifi_config_t));
-	memset(&wifi_settings.sta_static_ip_config, 0x00, sizeof(tcpip_adapter_ip_info_t));
+	memset(&wifi_settings.sta_static_ip_config, 0x00, sizeof(esp_netif_ip_info_t));
 	cb_ptr_arr = malloc(  sizeof(   sizeof( void (*)( void* ) )        ) * MESSAGE_CODE_COUNT);
 	for(int i=0; i<MESSAGE_CODE_COUNT; i++){
 		cb_ptr_arr[i] = NULL;
@@ -203,10 +209,12 @@ esp_err_t wifi_manager_save_sta_config(){
 		ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: SoftAP_bandwidth (1 = 20MHz, 2 = 40MHz): %i",wifi_settings.ap_bandwidth);
 		ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: sta_only (0 = APSTA, 1 = STA when connected): %i",wifi_settings.sta_only);
 		ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: sta_power_save (1 = yes): %i",wifi_settings.sta_power_save);
-		ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: sta_static_ip (0 = dhcp client, 1 = static ip): %i",wifi_settings.sta_static_ip);
-		ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: sta_ip_addr: %s", ip4addr_ntoa(&wifi_settings.sta_static_ip_config.ip));
-		ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: sta_gw_addr: %s", ip4addr_ntoa(&wifi_settings.sta_static_ip_config.gw));
-		ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: sta_netmask: %s", ip4addr_ntoa(&wifi_settings.sta_static_ip_config.netmask));
+
+		//TODO: suport for static IP
+		//ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: sta_static_ip (0 = dhcp client, 1 = static ip): %i",wifi_settings.sta_static_ip);
+		//ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: sta_ip_addr: %s", IP2STR(&wifi_settings.sta_static_ip_config.ip));
+		//ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: sta_gw_addr: %s", IP2STR(&wifi_settings.sta_static_ip_config.gw));
+		//ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: sta_netmask: %s", IP2STR(&wifi_settings.sta_static_ip_config.netmask));
 
 	}
 
@@ -223,8 +231,6 @@ bool wifi_manager_fetch_wifi_sta_config(){
 			wifi_manager_config_sta = (wifi_config_t*)malloc(sizeof(wifi_config_t));
 		}
 		memset(wifi_manager_config_sta, 0x00, sizeof(wifi_config_t));
-
-		//memset(&wifi_settings, 0x00, sizeof(struct wifi_settings_t));
 
 		/* allocate buffer */
 		size_t sz = sizeof(wifi_settings);
@@ -272,10 +278,15 @@ bool wifi_manager_fetch_wifi_sta_config(){
 		ESP_LOGD(TAG, "wifi_manager_fetch_wifi_settings: sta_only (0 = APSTA, 1 = STA when connected):%i",wifi_settings.sta_only);
 		ESP_LOGD(TAG, "wifi_manager_fetch_wifi_settings: sta_power_save (1 = yes):%i",wifi_settings.sta_power_save);
 		ESP_LOGD(TAG, "wifi_manager_fetch_wifi_settings: sta_static_ip (0 = dhcp client, 1 = static ip):%i",wifi_settings.sta_static_ip);
-		ESP_LOGD(TAG, "wifi_manager_fetch_wifi_settings: sta_static_ip_config: IP: %s , GW: %s , Mask: %s", ip4addr_ntoa(&wifi_settings.sta_static_ip_config.ip), ip4addr_ntoa(&wifi_settings.sta_static_ip_config.gw), ip4addr_ntoa(&wifi_settings.sta_static_ip_config.netmask));
-		ESP_LOGD(TAG, "wifi_manager_fetch_wifi_settings: sta_ip_addr: %s", ip4addr_ntoa(&wifi_settings.sta_static_ip_config.ip));
-		ESP_LOGD(TAG, "wifi_manager_fetch_wifi_settings: sta_gw_addr: %s", ip4addr_ntoa(&wifi_settings.sta_static_ip_config.gw));
-		ESP_LOGD(TAG, "wifi_manager_fetch_wifi_settings: sta_netmask: %s", ip4addr_ntoa(&wifi_settings.sta_static_ip_config.netmask));
+
+		//TODO: support for static IP
+		//ESP_LOGD(TAG, "wifi_manager_fetch_wifi_settings: sta_static_ip_config: IP: %s , GW: %s , Mask: %s", IP2STR(&wifi_settings.sta_static_ip_config.ip), IP2STR(&wifi_settings.sta_static_ip_config.gw), IP2STR(&wifi_settings.sta_static_ip_config.netmask));
+		//ESP_LOGD(TAG, "wifi_manager_fetch_wifi_settings: sta_ip_addr: %s", IP2STR(&wifi_settings.sta_static_ip_config.ip));
+		//ESP_LOGD(TAG, "wifi_manager_fetch_wifi_settings: sta_gw_addr: %s", IP2STR(&wifi_settings.sta_static_ip_config.gw));
+		//ESP_LOGD(TAG, "wifi_manager_fetch_wifi_settings: sta_netmask: %s", IP2STR(&wifi_settings.sta_static_ip_config.netmask));
+
+
+
 
 		return wifi_manager_config_sta->sta.ssid[0] != '\0';
 
@@ -310,14 +321,17 @@ void wifi_manager_generate_ip_info_json(update_reason_code_t update_reason_code)
 		size_t remaining = JSON_IP_INFO_SIZE - ip_info_json_len;
 		if(update_reason_code == UPDATE_CONNECTION_OK){
 			/* rest of the information is copied after the ssid */
-			tcpip_adapter_ip_info_t ip_info;
-			ESP_ERROR_CHECK(tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_STA, &ip_info));
+			esp_netif_ip_info_t ip_info;
+			ESP_ERROR_CHECK(esp_netif_get_ip_info(esp_netif_sta, &ip_info));
+
 			char ip[IP4ADDR_STRLEN_MAX]; /* note: IP4ADDR_STRLEN_MAX is defined in lwip */
 			char gw[IP4ADDR_STRLEN_MAX];
 			char netmask[IP4ADDR_STRLEN_MAX];
-			strcpy(ip, ip4addr_ntoa(&ip_info.ip));
-			strcpy(netmask, ip4addr_ntoa(&ip_info.netmask));
-			strcpy(gw, ip4addr_ntoa(&ip_info.gw));
+
+			esp_ip4addr_ntoa(&ip_info.ip, ip, IP4ADDR_STRLEN_MAX);
+			esp_ip4addr_ntoa(&ip_info.gw, gw, IP4ADDR_STRLEN_MAX);
+			esp_ip4addr_ntoa(&ip_info.netmask, netmask, IP4ADDR_STRLEN_MAX);
+
 
 			snprintf( (ip_info_json + ip_info_json_len), remaining, ip_info_json_format,
 					ip,
@@ -399,10 +413,16 @@ void wifi_manager_safe_update_sta_ip_string(uint32_t ip){
 
 	if(wifi_manager_lock_sta_ip_string(portMAX_DELAY)){
 
-		struct ip4_addr ip4;
+		esp_ip4_addr_t ip4;
 		ip4.addr = ip;
 
-		strcpy(wifi_manager_sta_ip, ip4addr_ntoa(&ip4));
+		//char* str_ip = (char*)malloc(sizeof(char) * IP4ADDR_STRLEN_MAX);
+		char str_ip[IP4ADDR_STRLEN_MAX];
+		esp_ip4addr_ntoa(&ip4, str_ip, IP4ADDR_STRLEN_MAX);
+
+		strcpy(wifi_manager_sta_ip, str_ip);
+
+		//free(str_ip);
 
 		ESP_LOGI(TAG, "Set STA IP String to: %s", wifi_manager_sta_ip);
 
@@ -469,7 +489,7 @@ static void wifi_manager_event_handler(void* arg, esp_event_base_t event_base, i
 			the Wi-Fi driver to free the internal memory which is allocated during the scan (do not forget to do this)!
 		 */
 		case WIFI_EVENT_SCAN_DONE:
-			ESP_LOGI(TAG, "WIFI_EVENT_SCAN_DONE");
+			ESP_LOGD(TAG, "WIFI_EVENT_SCAN_DONE");
 	    	xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_SCAN_BIT);
 	    	wifi_manager_send_message(EVENT_SCAN_DONE, NULL);
 			break;
@@ -551,7 +571,7 @@ static void wifi_manager_event_handler(void* arg, esp_event_base_t event_base, i
 			xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_WIFI_CONNECTED_BIT | WIFI_MANAGER_SCAN_BIT);
 
 			/* post disconnect event with reason code */
-			wifi_manager_send_message(EVENT_STA_DISCONNECTED, (void*)( (uint32_t) &event->reason) );
+			wifi_manager_send_message(EVENT_STA_DISCONNECTED, (void*)( (uint32_t) event->reason) );
 			break;
 
 		/* This event arises when the AP to which the station is connected changes its authentication mode, e.g., from no auth
@@ -616,7 +636,7 @@ static void wifi_manager_event_handler(void* arg, esp_event_base_t event_base, i
 			ESP_LOGI(TAG, "IP_EVENT_STA_GOT_IP");
 	        xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_WIFI_CONNECTED_BIT);
 	        ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
-	        wifi_manager_send_message(EVENT_STA_GOT_IP, (void*)&event->ip_info.ip.addr );
+	        wifi_manager_send_message(EVENT_STA_GOT_IP, (void*)event->ip_info.ip.addr);
 			break;
 
 		/* This event arises when the IPV6 SLAAC support auto-configures an address for the ESP32, or when this address changes.
@@ -771,6 +791,14 @@ void wifi_manager_set_callback(message_code_t message_code, void (*func_ptr)(voi
 	}
 }
 
+esp_netif_t* wifi_manager_get_esp_netif_ap(){
+	return esp_netif_ap;
+}
+
+esp_netif_t* wifi_manager_get_esp_netif_sta(){
+	return esp_netif_sta;
+}
+
 void wifi_manager( void * pvParameters ){
 
 
@@ -786,8 +814,8 @@ void wifi_manager( void * pvParameters ){
 	/* event loop for the wifi driver */
 	ESP_ERROR_CHECK(esp_event_loop_create_default());
 
-	esp_netif_t* esp_netif_sta = esp_netif_create_default_wifi_sta();
-	esp_netif_t* esp_netif_ap = esp_netif_create_default_wifi_ap();
+	esp_netif_sta = esp_netif_create_default_wifi_sta();
+	esp_netif_ap = esp_netif_create_default_wifi_ap();
 
 
 	/* default wifi config */
@@ -990,7 +1018,7 @@ void wifi_manager( void * pvParameters ){
 				 *  5		ASSOC_TOOMANY				too many devices already connected to the AP => AP fails to respond
 				 *  6		NOT_AUTHED
 				 *  7		NOT_ASSOCED
-				 *  8		ASSOC_LEAVE
+				 *  8		ASSOC_LEAVE					tested as manual disconnect by user
 				 *  9		ASSOC_NOT_AUTHED
 				 *  10		DISASSOC_PWRCAP_BAD
 				 *  11		DISASSOC_SUPCHAN_BAD
