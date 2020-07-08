@@ -2,13 +2,13 @@
 
 ### Build status [![Build Status](https://travis-ci.com/tonyp7/esp32-wifi-manager.svg?branch=master)](https://travis-ci.com/tonyp7/esp32-wifi-manager)
 
-*esp32-wifi-manager* is an esp-idf component for ESP32 that enables easy management of wifi networks through a web portal.
+*esp32-wifi-manager* is a pure C esp-idf component for ESP32 that enables easy management of wifi networks through a web portal.
 
 *esp32-wifi-manager* is is an all in one wifi scanner, http server & dns daemon living in the least amount of RAM possible.
 
 *esp32-wifi-manager* will automatically attempt to re-connect to a previously saved network on boot, and if it cannot find a saved wifi it will start its own access point through which you can manage and connect to wifi networks.
 
-*esp32-wifi-manager* is an esp-idf project that compiles with esp-idf 4.1 and above. See [Getting Started](#getting-started) to guide you through your first setup.
+*esp32-wifi-manager* compiles with esp-idf 4.1 and above. See [Getting Started](#getting-started) to guide you through your first setup.
 
 # Content
  - [Demo](#demo)
