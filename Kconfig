@@ -14,13 +14,13 @@ config WIFI_MANAGER_MAX_RETRY
 
 config DEFAULT_AP_SSID
     string "Access Point SSID"
-    default "RuuviConfiguration"
+    default "RuuviGateway"
     help
 	SSID (network name) the the esp32 will broadcast.
 
 config DEFAULT_AP_PASSWORD
     string "Access Point Password"
-    default "ruuvidongle"
+    default "12345678"
     help
 	Password used for the Access Point. Leave empty and set AUTH MODE to WIFI_AUTH_OPEN for no password.
 
