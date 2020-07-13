@@ -59,7 +59,7 @@ Compile the code and load it on your esp32:
 idf.py build flash monitor
 ```
 
-_Note: while it is encouraged to use the newer build system with idf.py and cmake, esp32-wifi-manager still supports the legacy build system. If you are using make on Linux or make using MSYS2 on Windows, you can still use "make build flash monitor if you prefer"_
+_Note: while it is encouraged to use the newer build system with idf.py and cmake, esp32-wifi-manager still supports the legacy build system. If you are using make on Linux or make using MSYS2 on Windows, you can still use "make build flash monitor" if you prefer_
 
 Now, using any wifi capable device, you will see a new wifi access point named *esp32*. Connect to it using the default password *esp32pwd*. If the captive portal does not pop up on your device, you can access the wifi manager at its default IP address: http://10.10.0.1.
 
@@ -75,7 +75,7 @@ Navigate in "Component config" then pick "Wifi Manager Configuration". You will 
 
 ![esp32-wifi-manager-menuconfig](https://idyl.io/wp-content/uploads/2020/07/esp32-wifi-manager-menuconfig-800px.png "menuconfig screen")
 
-You can change the ssid and password of the access point at your convenience, but it is highly recommended to keep default values.
+You can change the ssid and password of the access point at your convenience, but it is highly recommended to keep default values. Your password should be between 8 and 63 characters long, to comply with the WPA2 standard.
 
 # Adding esp32-wifi-manager to your code
 
