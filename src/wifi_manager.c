@@ -1062,14 +1062,15 @@ void wifi_manager( void * pvParameters ){
 					/* user manually requested a disconnect so the lost connection is a normal event. Clear the flag and restart the AP */
 					xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_DISCONNECT_BIT);
 
-					if(wifi_manager_lock_json_buffer( portMAX_DELAY )){
-						wifi_manager_generate_ip_info_json( UPDATE_USER_DISCONNECT );
-						wifi_manager_unlock_json_buffer();
-					}
-
 					/* erase configuration */
 					if(wifi_manager_config_sta){
 						memset(wifi_manager_config_sta, 0x00, sizeof(wifi_config_t));
+					}
+
+					/* regenerate json status */
+					if(wifi_manager_lock_json_buffer( portMAX_DELAY )){
+						wifi_manager_generate_ip_info_json( UPDATE_USER_DISCONNECT );
+						wifi_manager_unlock_json_buffer();
 					}
 
 					/* save NVS memory */
