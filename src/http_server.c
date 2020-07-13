@@ -361,14 +361,14 @@ bool parse_ruuvi_config_json(const char* body, struct dongle_config *c)
 		}
 
 		cJSON* mpo = cJSON_GetObjectItem(root, "mqtt_port");
-		if (cJSON_IsNumber(mpo)) {
-			uint32_t mqtt_port = mpo->valueint;
+		if (cJSON_IsNumber(mpo) && (mpo->valueint > 0) && (mpo->valueint < 65536)) {
+			uint16_t mqtt_port = (uint16_t)mpo->valueint;
 			if (mqtt_port) {
 				c->mqtt_port = mqtt_port;
-				ESP_LOGD(TAG, "mqtt_port: %d", mqtt_port);
+				ESP_LOGD(TAG, "mqtt_port: %u", (unsigned)mqtt_port);
 			}
 		} else {
-			ESP_LOGE(TAG, "mqtt port not found");
+			ESP_LOGE(TAG, "mqtt port %d is invalid", mpo->valueint);
 		}
 
 		cJSON* mu = cJSON_GetObjectItem(root, "mqtt_user");
