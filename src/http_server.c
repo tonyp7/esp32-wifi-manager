@@ -292,7 +292,7 @@ bool parse_ruuvi_config_json(const char* body, struct dongle_config *c)
 		if (esip) {
 			char* eth_static_ip = cJSON_GetStringValue(esip);
 			if (eth_static_ip) {
-				strncpy(c->eth_static_ip, eth_static_ip, IP_STR_LEN);
+				snprintf(c->eth_static_ip, sizeof(c->eth_static_ip), "%s", eth_static_ip);
 				ESP_LOGD(TAG, "eth_static_ip: %s", eth_static_ip);
 			}
 		}
@@ -301,7 +301,7 @@ bool parse_ruuvi_config_json(const char* body, struct dongle_config *c)
 		if (enm) {
 			char* eth_netmask = cJSON_GetStringValue(enm);
 			if (eth_netmask) {
-				strncpy(c->eth_netmask, eth_netmask, IP_STR_LEN);
+				snprintf(c->eth_netmask, sizeof(c->eth_netmask), "%s", eth_netmask);
 				ESP_LOGD(TAG, "eth_netmask: %s", eth_netmask);
 			}
 		}
@@ -310,7 +310,7 @@ bool parse_ruuvi_config_json(const char* body, struct dongle_config *c)
 		if (egw) {
 			char* eth_gw = cJSON_GetStringValue(egw);
 			if (eth_gw) {
-				strncpy(c->eth_gw, eth_gw, IP_STR_LEN);
+				snprintf(c->eth_gw, sizeof(c->eth_gw), "%s", eth_gw);
 				ESP_LOGD(TAG, "eth_gw: %s", eth_gw);
 			}
 		}
@@ -319,7 +319,7 @@ bool parse_ruuvi_config_json(const char* body, struct dongle_config *c)
 		if (edns1) {
 			char* eth_dns1 = cJSON_GetStringValue(edns1);
 			if (eth_dns1) {
-				strncpy(c->eth_dns1, eth_dns1, IP_STR_LEN);
+				snprintf(c->eth_dns1, sizeof(c->eth_dns1), "%s", eth_dns1);
 				ESP_LOGD(TAG, "eth_dns1: %s", eth_dns1);
 			}
 		}
@@ -328,7 +328,7 @@ bool parse_ruuvi_config_json(const char* body, struct dongle_config *c)
 		if (edns2) {
 			char* eth_dns2 = cJSON_GetStringValue(edns2);
 			if (eth_dns2) {
-				strncpy(c->eth_dns2, eth_dns2, IP_STR_LEN);
+				snprintf(c->eth_dns2, sizeof(c->eth_dns2), "%s", eth_dns2);
 				ESP_LOGD(TAG, "eth_dns2: %s", eth_dns2);
 			}
 		}
@@ -346,7 +346,7 @@ bool parse_ruuvi_config_json(const char* body, struct dongle_config *c)
 		if (ms) {
 			char* mqtt_server = cJSON_GetStringValue(ms);
 			if (mqtt_server) {
-				strncpy(c->mqtt_server, mqtt_server, MAX_MQTTUSER_LEN-1);
+				snprintf(c->mqtt_server, sizeof(c->mqtt_server), "%s", mqtt_server);
 				ESP_LOGD(TAG, "mqtt_server: %s", mqtt_server);
 			}
 		}
@@ -355,7 +355,7 @@ bool parse_ruuvi_config_json(const char* body, struct dongle_config *c)
 		if (mpre) {
 			char* mqtt_prefix = cJSON_GetStringValue(mpre);
 			if (mqtt_prefix) {
-				strncpy(c->mqtt_prefix, mqtt_prefix, MAX_MQTTPREFIX_LEN-1);
+				snprintf(c->mqtt_prefix, sizeof(c->mqtt_prefix), "%s", mqtt_prefix);
 				ESP_LOGD(TAG, "mqtt_prefix: %s", mqtt_prefix);
 			}
 		}
@@ -375,7 +375,7 @@ bool parse_ruuvi_config_json(const char* body, struct dongle_config *c)
 		if (mu) {
 			char* mqtt_user = cJSON_GetStringValue(mu);
 			if (mqtt_user) {
-				strncpy(c->mqtt_user, mqtt_user, MAX_MQTTUSER_LEN-1);
+				snprintf(c->mqtt_user, sizeof(c->mqtt_user), "%s", mqtt_user);
 				ESP_LOGD(TAG, "mqtt_user: %s", mqtt_user);
 			}
 		} else {
@@ -386,7 +386,7 @@ bool parse_ruuvi_config_json(const char* body, struct dongle_config *c)
 		if (mp) {
 			char* mqtt_pass = cJSON_GetStringValue(mp);
 			if (mqtt_pass) {
-				strncpy(c->mqtt_pass, mqtt_pass, MAX_MQTTPASS_LEN-1);
+				snprintf(c->mqtt_pass, sizeof(c->mqtt_pass), "%s", mqtt_pass);
 				ESP_LOGD(TAG, "mqtt_pass: %s", mqtt_pass);
 			}
 		} else {
@@ -406,11 +406,33 @@ bool parse_ruuvi_config_json(const char* body, struct dongle_config *c)
 		if (hurl) {
 			char* http_url = cJSON_GetStringValue(hurl);
 			if (http_url) {
-				strncpy(c->http_url, http_url, MAX_HTTPURL_LEN-1);
+				snprintf(c->http_url, sizeof(c->http_url), "%s", http_url);
 				ESP_LOGD(TAG, "http_url: %s", http_url);
 			}
 		} else {
 			ESP_LOGE(TAG, "http_url not found");
+		}
+
+		cJSON* huser = cJSON_GetObjectItem(root, "http_user");
+		if (huser) {
+			char* http_user = cJSON_GetStringValue(huser);
+			if (http_user) {
+				snprintf(c->http_user, sizeof(c->http_user), "%s", http_user);
+				ESP_LOGD(TAG, "http_user: %s", http_user);
+			}
+		} else {
+			ESP_LOGE(TAG, "http_user not found");
+		}
+
+		cJSON* hpass = cJSON_GetObjectItem(root, "http_pass");
+		if (hpass) {
+			char* http_pass = cJSON_GetStringValue(hpass);
+			if (http_pass) {
+				snprintf(c->http_pass, sizeof(c->http_pass), "%s", http_pass);
+				ESP_LOGD(TAG, "http_pass: %s", http_pass);
+			}
+		} else {
+			ESP_LOGE(TAG, "http_pass not found");
 		}
 
 		cJSON* uf = cJSON_GetObjectItem(root, "use_filtering");
@@ -438,7 +460,7 @@ bool parse_ruuvi_config_json(const char* body, struct dongle_config *c)
 		if (co) {
 			char* coordinates = cJSON_GetStringValue(co);
 			if (coordinates) {
-				strncpy(c->coordinates, coordinates, MAX_CONFIG_STR_LEN-1);
+				snprintf(c->coordinates, sizeof(c->coordinates), "%s", coordinates);
 				ESP_LOGD(TAG, "coordinates: %s", coordinates);
 			}
 		} else {

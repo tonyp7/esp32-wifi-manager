@@ -11,139 +11,13 @@
 const uint8_t* embed_files_find(const char* file_path, size_t* pLen, bool* pIsGzipped)
 {
     *pIsGzipped = false;
-    if (0 == strcmp(file_path, "ruuvi.js.gz"))
-    {
-        extern const uint8_t embedded_ruuvi_js_gz_start[] asm("_binary_ruuvi_js_gz_start");
-        extern const uint8_t embedded_ruuvi_js_gz_end[] asm("_binary_ruuvi_js_gz_end");
-        *pLen = embedded_ruuvi_js_gz_end - embedded_ruuvi_js_gz_start;
-        return embedded_ruuvi_js_gz_start;
-    }
-    if (0 == strcmp(file_path, "index.html"))
-    {
-        extern const uint8_t embedded_index_html_start[] asm("_binary_index_html_gz_start");
-        extern const uint8_t embedded_index_html_end[] asm("_binary_index_html_gz_end");
-        *pIsGzipped = true;
-        *pLen = embedded_index_html_end - embedded_index_html_start;
-        return embedded_index_html_start;
-    }
-    if (0 == strcmp(file_path, "code.js"))
-    {
-        extern const uint8_t embedded_code_js_start[] asm("_binary_code_js_gz_start");
-        extern const uint8_t embedded_code_js_end[] asm("_binary_code_js_gz_end");
-        *pIsGzipped = true;
-        *pLen = embedded_code_js_end - embedded_code_js_start;
-        return embedded_code_js_start;
-    }
-    if (0 == strcmp(file_path, "code.js.gz"))
-    {
-        extern const uint8_t embedded_code_js_gz_start[] asm("_binary_code_js_gz_start");
-        extern const uint8_t embedded_code_js_gz_end[] asm("_binary_code_js_gz_end");
-        *pLen = embedded_code_js_gz_end - embedded_code_js_gz_start;
-        return embedded_code_js_gz_start;
-    }
-    if (0 == strcmp(file_path, "jquery-3.5.1.js"))
-    {
-        extern const uint8_t embedded_jquery_3_5_1_js_start[] asm("_binary_jquery_3_5_1_js_gz_start");
-        extern const uint8_t embedded_jquery_3_5_1_js_end[] asm("_binary_jquery_3_5_1_js_gz_end");
-        *pIsGzipped = true;
-        *pLen = embedded_jquery_3_5_1_js_end - embedded_jquery_3_5_1_js_start;
-        return embedded_jquery_3_5_1_js_start;
-    }
-    if (0 == strcmp(file_path, "jquery-3.5.1.js.gz"))
-    {
-        extern const uint8_t embedded_jquery_3_5_1_js_gz_start[] asm("_binary_jquery_3_5_1_js_gz_start");
-        extern const uint8_t embedded_jquery_3_5_1_js_gz_end[] asm("_binary_jquery_3_5_1_js_gz_end");
-        *pLen = embedded_jquery_3_5_1_js_gz_end - embedded_jquery_3_5_1_js_gz_start;
-        return embedded_jquery_3_5_1_js_gz_start;
-    }
-    if (0 == strcmp(file_path, "ruuvi.js"))
-    {
-        extern const uint8_t embedded_ruuvi_js_start[] asm("_binary_ruuvi_js_gz_start");
-        extern const uint8_t embedded_ruuvi_js_end[] asm("_binary_ruuvi_js_gz_end");
-        *pIsGzipped = true;
-        *pLen = embedded_ruuvi_js_end - embedded_ruuvi_js_start;
-        return embedded_ruuvi_js_start;
-    }
-    if (0 == strcmp(file_path, "index.html.gz"))
-    {
-        extern const uint8_t embedded_index_html_gz_start[] asm("_binary_index_html_gz_start");
-        extern const uint8_t embedded_index_html_gz_end[] asm("_binary_index_html_gz_end");
-        *pLen = embedded_index_html_gz_end - embedded_index_html_gz_start;
-        return embedded_index_html_gz_start;
-    }
-    if (0 == strcmp(file_path, "css/style.css"))
-    {
-        extern const uint8_t embedded_style_css_start[] asm("_binary_style_css_gz_start");
-        extern const uint8_t embedded_style_css_end[] asm("_binary_style_css_gz_end");
-        *pIsGzipped = true;
-        *pLen = embedded_style_css_end - embedded_style_css_start;
-        return embedded_style_css_start;
-    }
-    if (0 == strcmp(file_path, "css/ruuvi.css.gz"))
-    {
-        extern const uint8_t embedded_ruuvi_css_gz_start[] asm("_binary_ruuvi_css_gz_start");
-        extern const uint8_t embedded_ruuvi_css_gz_end[] asm("_binary_ruuvi_css_gz_end");
-        *pLen = embedded_ruuvi_css_gz_end - embedded_ruuvi_css_gz_start;
-        return embedded_ruuvi_css_gz_start;
-    }
-    if (0 == strcmp(file_path, "css/style.css.gz"))
-    {
-        extern const uint8_t embedded_style_css_gz_start[] asm("_binary_style_css_gz_start");
-        extern const uint8_t embedded_style_css_gz_end[] asm("_binary_style_css_gz_end");
-        *pLen = embedded_style_css_gz_end - embedded_style_css_gz_start;
-        return embedded_style_css_gz_start;
-    }
-    if (0 == strcmp(file_path, "css/ruuvi.css"))
-    {
-        extern const uint8_t embedded_ruuvi_css_start[] asm("_binary_ruuvi_css_gz_start");
-        extern const uint8_t embedded_ruuvi_css_end[] asm("_binary_ruuvi_css_gz_end");
-        *pIsGzipped = true;
-        *pLen = embedded_ruuvi_css_end - embedded_ruuvi_css_start;
-        return embedded_ruuvi_css_start;
-    }
-    if (0 == strcmp(file_path, "assets/css/effects.css.gz"))
+    if (0 == strcmp(file_path, "assets/css/effects.css"))
     {
         extern const uint8_t embedded_effects_css_gz_start[] asm("_binary_effects_css_gz_start");
         extern const uint8_t embedded_effects_css_gz_end[] asm("_binary_effects_css_gz_end");
+        *pIsGzipped = true;
         *pLen = embedded_effects_css_gz_end - embedded_effects_css_gz_start;
         return embedded_effects_css_gz_start;
-    }
-    if (0 == strcmp(file_path, "assets/css/effects.css"))
-    {
-        extern const uint8_t embedded_effects_css_start[] asm("_binary_effects_css_gz_start");
-        extern const uint8_t embedded_effects_css_end[] asm("_binary_effects_css_gz_end");
-        *pIsGzipped = true;
-        *pLen = embedded_effects_css_end - embedded_effects_css_start;
-        return embedded_effects_css_start;
-    }
-    if (0 == strcmp(file_path, "assets/images/ruuvi_logo_nega.svg"))
-    {
-        extern const uint8_t embedded_ruuvi_logo_nega_svg_start[] asm("_binary_ruuvi_logo_nega_svg_start");
-        extern const uint8_t embedded_ruuvi_logo_nega_svg_end[] asm("_binary_ruuvi_logo_nega_svg_end");
-        *pLen = embedded_ruuvi_logo_nega_svg_end - embedded_ruuvi_logo_nega_svg_start;
-        return embedded_ruuvi_logo_nega_svg_start;
-    }
-    if (0 == strcmp(file_path, "assets/js/interactions.js.gz"))
-    {
-        extern const uint8_t embedded_interactions_js_gz_start[] asm("_binary_interactions_js_gz_start");
-        extern const uint8_t embedded_interactions_js_gz_end[] asm("_binary_interactions_js_gz_end");
-        *pLen = embedded_interactions_js_gz_end - embedded_interactions_js_gz_start;
-        return embedded_interactions_js_gz_start;
-    }
-    if (0 == strcmp(file_path, "assets/js/interactions.js"))
-    {
-        extern const uint8_t embedded_interactions_js_start[] asm("_binary_interactions_js_gz_start");
-        extern const uint8_t embedded_interactions_js_end[] asm("_binary_interactions_js_gz_end");
-        *pIsGzipped = true;
-        *pLen = embedded_interactions_js_end - embedded_interactions_js_start;
-        return embedded_interactions_js_start;
-    }
-    if (0 == strcmp(file_path, "assets/fonts/muli_semibold.woff2"))
-    {
-        extern const uint8_t embedded_muli_semibold_woff2_start[] asm("_binary_muli_semibold_woff2_start");
-        extern const uint8_t embedded_muli_semibold_woff2_end[] asm("_binary_muli_semibold_woff2_end");
-        *pLen = embedded_muli_semibold_woff2_end - embedded_muli_semibold_woff2_start;
-        return embedded_muli_semibold_woff2_start;
     }
     if (0 == strcmp(file_path, "assets/fonts/montserrat_extrabold.woff2"))
     {
@@ -158,6 +32,76 @@ const uint8_t* embed_files_find(const char* file_path, size_t* pLen, bool* pIsGz
         extern const uint8_t embedded_muli_regular_woff2_end[] asm("_binary_muli_regular_woff2_end");
         *pLen = embedded_muli_regular_woff2_end - embedded_muli_regular_woff2_start;
         return embedded_muli_regular_woff2_start;
+    }
+    if (0 == strcmp(file_path, "assets/fonts/muli_semibold.woff2"))
+    {
+        extern const uint8_t embedded_muli_semibold_woff2_start[] asm("_binary_muli_semibold_woff2_start");
+        extern const uint8_t embedded_muli_semibold_woff2_end[] asm("_binary_muli_semibold_woff2_end");
+        *pLen = embedded_muli_semibold_woff2_end - embedded_muli_semibold_woff2_start;
+        return embedded_muli_semibold_woff2_start;
+    }
+    if (0 == strcmp(file_path, "assets/images/ruuvi_logo_nega.svg"))
+    {
+        extern const uint8_t embedded_ruuvi_logo_nega_svg_start[] asm("_binary_ruuvi_logo_nega_svg_start");
+        extern const uint8_t embedded_ruuvi_logo_nega_svg_end[] asm("_binary_ruuvi_logo_nega_svg_end");
+        *pLen = embedded_ruuvi_logo_nega_svg_end - embedded_ruuvi_logo_nega_svg_start;
+        return embedded_ruuvi_logo_nega_svg_start;
+    }
+    if (0 == strcmp(file_path, "assets/js/interactions.js"))
+    {
+        extern const uint8_t embedded_interactions_js_gz_start[] asm("_binary_interactions_js_gz_start");
+        extern const uint8_t embedded_interactions_js_gz_end[] asm("_binary_interactions_js_gz_end");
+        *pIsGzipped = true;
+        *pLen = embedded_interactions_js_gz_end - embedded_interactions_js_gz_start;
+        return embedded_interactions_js_gz_start;
+    }
+    if (0 == strcmp(file_path, "code.js"))
+    {
+        extern const uint8_t embedded_code_js_gz_start[] asm("_binary_code_js_gz_start");
+        extern const uint8_t embedded_code_js_gz_end[] asm("_binary_code_js_gz_end");
+        *pIsGzipped = true;
+        *pLen = embedded_code_js_gz_end - embedded_code_js_gz_start;
+        return embedded_code_js_gz_start;
+    }
+    if (0 == strcmp(file_path, "css/ruuvi.css"))
+    {
+        extern const uint8_t embedded_ruuvi_css_gz_start[] asm("_binary_ruuvi_css_gz_start");
+        extern const uint8_t embedded_ruuvi_css_gz_end[] asm("_binary_ruuvi_css_gz_end");
+        *pIsGzipped = true;
+        *pLen = embedded_ruuvi_css_gz_end - embedded_ruuvi_css_gz_start;
+        return embedded_ruuvi_css_gz_start;
+    }
+    if (0 == strcmp(file_path, "css/style.css"))
+    {
+        extern const uint8_t embedded_style_css_gz_start[] asm("_binary_style_css_gz_start");
+        extern const uint8_t embedded_style_css_gz_end[] asm("_binary_style_css_gz_end");
+        *pIsGzipped = true;
+        *pLen = embedded_style_css_gz_end - embedded_style_css_gz_start;
+        return embedded_style_css_gz_start;
+    }
+    if (0 == strcmp(file_path, "index.html"))
+    {
+        extern const uint8_t embedded_index_html_gz_start[] asm("_binary_index_html_gz_start");
+        extern const uint8_t embedded_index_html_gz_end[] asm("_binary_index_html_gz_end");
+        *pIsGzipped = true;
+        *pLen = embedded_index_html_gz_end - embedded_index_html_gz_start;
+        return embedded_index_html_gz_start;
+    }
+    if (0 == strcmp(file_path, "jquery-3.5.1.js"))
+    {
+        extern const uint8_t embedded_jquery_3_5_1_js_gz_start[] asm("_binary_jquery_3_5_1_js_gz_start");
+        extern const uint8_t embedded_jquery_3_5_1_js_gz_end[] asm("_binary_jquery_3_5_1_js_gz_end");
+        *pIsGzipped = true;
+        *pLen = embedded_jquery_3_5_1_js_gz_end - embedded_jquery_3_5_1_js_gz_start;
+        return embedded_jquery_3_5_1_js_gz_start;
+    }
+    if (0 == strcmp(file_path, "ruuvi.js"))
+    {
+        extern const uint8_t embedded_ruuvi_js_gz_start[] asm("_binary_ruuvi_js_gz_start");
+        extern const uint8_t embedded_ruuvi_js_gz_end[] asm("_binary_ruuvi_js_gz_end");
+        *pIsGzipped = true;
+        *pLen = embedded_ruuvi_js_gz_end - embedded_ruuvi_js_gz_start;
+        return embedded_ruuvi_js_gz_start;
     }
     *pLen = 0;
     return NULL;
