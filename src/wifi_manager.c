@@ -163,7 +163,7 @@ void wifi_manager_start(){
 	wifi_manager_config_sta = (wifi_config_t*)malloc(sizeof(wifi_config_t));
 	memset(wifi_manager_config_sta, 0x00, sizeof(wifi_config_t));
 	memset(&wifi_settings.sta_static_ip_config, 0x00, sizeof(esp_netif_ip_info_t));
-	cb_ptr_arr = malloc(  sizeof(   sizeof( void (*)( void* ) )        ) * MESSAGE_CODE_COUNT);
+	cb_ptr_arr = malloc(sizeof(void (*)(void*)) * MESSAGE_CODE_COUNT);
 	for(int i=0; i<MESSAGE_CODE_COUNT; i++){
 		cb_ptr_arr[i] = NULL;
 	}
