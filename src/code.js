@@ -100,7 +100,7 @@ docReady(async function () {
   gel("manual_join").addEventListener(
     "click",
     (e) => {
-      performConnect(e.data("connect"));
+      performConnect("manual");
     },
     false
   );
