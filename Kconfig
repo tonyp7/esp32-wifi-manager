@@ -6,11 +6,17 @@ config WIFI_MANAGER_TASK_PRIORITY
     help
 	Tasks spawn by the manager will have a priority of WIFI_MANAGER_TASK_PRIORITY-1. For this particular reason, minimum recommended task priority is 2.
 
-config WIFI_MANAGER_MAX_RETRY
-	int "Max Retry on failed connection"
-    default 2
+config WIFI_MANAGER_RETRY_TIMER
+	int "Time (in ms) between each retry attempt"
+	default 5000
+	help
+	Defines the time to wait before an attempt to re-connect to a saved wifi is made after connection is lost or another unsuccesful attempt is made.
+
+config WIFI_MANAGER_MAX_RETRY_START_AP
+	int "Max Retry before starting the AP"
+    default 3
     help
-	Defines when a connection is lost/attempt to connect is made, how many retries should be made before giving up.
+	Defines the maximum number of failed retries allowed before the WiFi manager starts its own access point.  
 
 config DEFAULT_AP_SSID
     string "Access Point SSID"

@@ -305,6 +305,14 @@ static const httpd_uri_t http_server_delete_request = {
 };
 
 
+void http_server_stop(){
+
+	if(httpd_handle != NULL){
+		httpd_stop(httpd_handle);
+		httpd_handle = NULL;
+	}
+}
+
 void http_server_start(){
 
 	esp_err_t err;

@@ -58,7 +58,9 @@ static TaskHandle_t task_dns_server = NULL;
 int socket_fd;
 
 void dns_server_start() {
-    xTaskCreate(&dns_server, "dns_server", 3072, NULL, WIFI_MANAGER_TASK_PRIORITY-1, &task_dns_server);
+	if(task_dns_server == NULL){
+		xTaskCreate(&dns_server, "dns_server", 3072, NULL, WIFI_MANAGER_TASK_PRIORITY-1, &task_dns_server);
+	}
 }
 
 void dns_server_stop(){

@@ -42,6 +42,9 @@ extern "C" {
 /* @brief spawns the http server */
 void http_server_start();
 
+/* @brief stops the http server */
+void http_server_stop();
+
 
 
 #ifdef __cplusplus

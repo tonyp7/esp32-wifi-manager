@@ -62,12 +62,17 @@ extern "C" {
 #define MAX_AP_NUM 							15
 
 
-
 /**
- * @brief Defines when a connection is lost/attempt to connect is made, how many retries should be made before giving up.
+ * @brief Defines the maximum number of failed retries allowed before the WiFi manager starts its own access point.
  * Setting it to 2 for instance means there will be 3 attempts in total (original request + 2 retries)
  */
-#define	WIFI_MANAGER_MAX_RETRY				CONFIG_WIFI_MANAGER_MAX_RETRY
+#define WIFI_MANAGER_MAX_RETRY_START_AP		CONFIG_WIFI_MANAGER_MAX_RETRY_START_AP
+
+/**
+ * @brief Time (in ms) between each retry attempt
+ * Defines the time to wait before an attempt to re-connect to a saved wifi is made after connection is lost or another unsuccesful attempt is made.
+ */
+#define WIFI_MANAGER_RETRY_TIMER			CONFIG_WIFI_MANAGER_RETRY_TIMER
 
 /** @brief Defines the task priority of the wifi_manager.
  *
