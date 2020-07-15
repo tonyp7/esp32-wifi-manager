@@ -39,6 +39,7 @@ Contains the freeRTOS task and all necessary support
 #include <freertos/queue.h>
 #include <freertos/task.h>
 #include <freertos/event_groups.h>
+#include <freertos/timers.h>
 #include "esp_wifi.h"
 #include "esp_event.h"
 #include "esp_netif.h"
@@ -63,6 +64,9 @@ Contains the freeRTOS task and all necessary support
 /* objects used to manipulate the main queue of events */
 QueueHandle_t wifi_manager_queue;
 
+/* @brief software timer to wait between each connection retry.
+ * There is no point hogging a hardware timer for a functionality like this which only needs to be 'accurate enough' */
+TimerHandle_t wifi_manager_retry_timer = NULL;
 
 SemaphoreHandle_t wifi_manager_json_mutex = NULL;
 SemaphoreHandle_t wifi_manager_sta_ip_mutex = NULL;
@@ -134,6 +138,18 @@ const int WIFI_MANAGER_REQUEST_DISCONNECT_BIT = BIT8;
 
 
 
+void wifi_manager_timer_cb( TimerHandle_t xTimer ){
+
+	ESP_LOGI(TAG, "Retry Timer Tick! Sending ORDER_CONNECT_STA with reason CONNECTION_REQUEST_AUTO_RECONNECT");
+
+	/* stop the timer */
+	xTimerStop( xTimer, (TickType_t) 0 );
+
+	/* Attempt to reconnect */
+	wifi_manager_send_message(ORDER_CONNECT_STA, (void*)CONNECTION_REQUEST_AUTO_RECONNECT);
+
+}
+
 
 void wifi_manager_scan_async(){
 	wifi_manager_send_message(ORDER_START_WIFI_SCAN, NULL);
@@ -172,6 +188,9 @@ void wifi_manager_start(){
 	wifi_manager_safe_update_sta_ip_string((uint32_t)0);
 	wifi_manager_event_group = xEventGroupCreate();
 
+	/* create timer for to keep track of retries */
+	wifi_manager_retry_timer = xTimerCreate( NULL, pdMS_TO_TICKS(WIFI_MANAGER_RETRY_TIMER), pdFALSE, ( void * ) 0, wifi_manager_timer_cb);
+
 	/* start wifi manager task */
 	xTaskCreate(&wifi_manager, "wifi_manager", 4096, NULL, WIFI_MANAGER_TASK_PRIORITY, &task_wifi_manager);
 }
@@ -180,6 +199,15 @@ esp_err_t wifi_manager_save_sta_config(){
 
 	nvs_handle handle;
 	esp_err_t esp_err;
+	size_t sz;
+
+	/* variables used to check if write is really needed */
+	wifi_config_t tmp_conf;
+	struct wifi_settings_t tmp_settings;
+	memset(&tmp_conf, 0x00, sizeof(tmp_conf));
+	memset(&tmp_settings, 0x00, sizeof(tmp_settings));
+	bool change = false;
+
 	ESP_LOGI(TAG, "About to save config to flash");
 
 	if(wifi_manager_config_sta){
@@ -187,34 +215,66 @@ esp_err_t wifi_manager_save_sta_config(){
 		esp_err = nvs_open(wifi_manager_nvs_namespace, NVS_READWRITE, &handle);
 		if (esp_err != ESP_OK) return esp_err;
 
-		esp_err = nvs_set_blob(handle, "ssid", wifi_manager_config_sta->sta.ssid, 32);
-		if (esp_err != ESP_OK) return esp_err;
+		sz = sizeof(tmp_conf.sta.ssid);
+		esp_err = nvs_get_blob(handle, "ssid", tmp_conf.sta.ssid, &sz);
+		if( (esp_err == ESP_OK  || esp_err == ESP_ERR_NVS_NOT_FOUND) && strcmp( (char*)tmp_conf.sta.ssid, (char*)wifi_manager_config_sta->sta.ssid) != 0){
+			/* different ssid or ssid does not exist in flash: save new ssid */
+			esp_err = nvs_set_blob(handle, "ssid", wifi_manager_config_sta->sta.ssid, 32);
+			if (esp_err != ESP_OK) return esp_err;
+			change = true;
+			ESP_LOGI(TAG, "wifi_manager_wrote wifi_sta_config: ssid:%s",wifi_manager_config_sta->sta.ssid);
 
-		esp_err = nvs_set_blob(handle, "password", wifi_manager_config_sta->sta.password, 64);
-		if (esp_err != ESP_OK) return esp_err;
+		}
 
-		esp_err = nvs_set_blob(handle, "settings", &wifi_settings, sizeof(wifi_settings));
-		if (esp_err != ESP_OK) return esp_err;
+		sz = sizeof(tmp_conf.sta.password);
+		esp_err = nvs_get_blob(handle, "password", tmp_conf.sta.password, &sz);
+		if( (esp_err == ESP_OK  || esp_err == ESP_ERR_NVS_NOT_FOUND) && strcmp( (char*)tmp_conf.sta.password, (char*)wifi_manager_config_sta->sta.password) != 0){
+			/* different password or password does not exist in flash: save new password */
+			esp_err = nvs_set_blob(handle, "password", wifi_manager_config_sta->sta.password, 64);
+			if (esp_err != ESP_OK) return esp_err;
+			change = true;
+			ESP_LOGI(TAG, "wifi_manager_wrote wifi_sta_config: password:%s",wifi_manager_config_sta->sta.password);
+		}
 
-		esp_err = nvs_commit(handle);
+		sz = sizeof(tmp_settings);
+		esp_err = nvs_get_blob(handle, "settings", &tmp_settings, &sz);
+		if( (esp_err == ESP_OK  || esp_err == ESP_ERR_NVS_NOT_FOUND) &&
+				(
+				strcmp( (char*)tmp_settings.ap_ssid, (char*)wifi_settings.ap_ssid) != 0 ||
+				strcmp( (char*)tmp_settings.ap_pwd, (char*)wifi_settings.ap_pwd) != 0 ||
+				tmp_settings.ap_ssid_hidden != wifi_settings.ap_ssid_hidden ||
+				tmp_settings.ap_bandwidth != wifi_settings.ap_bandwidth ||
+				tmp_settings.sta_only != wifi_settings.sta_only ||
+				tmp_settings.sta_power_save != wifi_settings.sta_power_save ||
+				tmp_settings.ap_channel != wifi_settings.ap_channel
+				)
+		){
+			esp_err = nvs_set_blob(handle, "settings", &wifi_settings, sizeof(wifi_settings));
+			if (esp_err != ESP_OK) return esp_err;
+			change = true;
+
+			ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: SoftAP_ssid: %s",wifi_settings.ap_ssid);
+			ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: SoftAP_pwd: %s",wifi_settings.ap_pwd);
+			ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: SoftAP_channel: %i",wifi_settings.ap_channel);
+			ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: SoftAP_hidden (1 = yes): %i",wifi_settings.ap_ssid_hidden);
+			ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: SoftAP_bandwidth (1 = 20MHz, 2 = 40MHz): %i",wifi_settings.ap_bandwidth);
+			ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: sta_only (0 = APSTA, 1 = STA when connected): %i",wifi_settings.sta_only);
+			ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: sta_power_save (1 = yes): %i",wifi_settings.sta_power_save);
+		}
+
+		if(change){
+			esp_err = nvs_commit(handle);
+		}
+		else{
+			ESP_LOGI(TAG, "Wifi config was not saved to flash because no change has been detected.");
+		}
+
 		if (esp_err != ESP_OK) return esp_err;
 
 		nvs_close(handle);
 
-		ESP_LOGI(TAG, "wifi_manager_wrote wifi_sta_config: ssid:%s password:%s",wifi_manager_config_sta->sta.ssid,wifi_manager_config_sta->sta.password);
-		ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: SoftAP_ssid: %s",wifi_settings.ap_ssid);
-		ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: SoftAP_pwd: %s",wifi_settings.ap_pwd);
-		ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: SoftAP_channel: %i",wifi_settings.ap_channel);
-		ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: SoftAP_hidden (1 = yes): %i",wifi_settings.ap_ssid_hidden);
-		ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: SoftAP_bandwidth (1 = 20MHz, 2 = 40MHz): %i",wifi_settings.ap_bandwidth);
-		ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: sta_only (0 = APSTA, 1 = STA when connected): %i",wifi_settings.sta_only);
-		ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: sta_power_save (1 = yes): %i",wifi_settings.sta_power_save);
 
-		//TODO: suport for static IP
-		//ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: sta_static_ip (0 = dhcp client, 1 = static ip): %i",wifi_settings.sta_static_ip);
-		//ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: sta_ip_addr: %s", IP2STR(&wifi_settings.sta_static_ip_config.ip));
-		//ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: sta_gw_addr: %s", IP2STR(&wifi_settings.sta_static_ip_config.gw));
-		//ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: sta_netmask: %s", IP2STR(&wifi_settings.sta_static_ip_config.netmask));
+
 
 	}
 
@@ -254,7 +314,6 @@ bool wifi_manager_fetch_wifi_sta_config(){
 			return false;
 		}
 		memcpy(wifi_manager_config_sta->sta.password, buff, sz);
-		/* memcpy(wifi_manager_config_sta->sta.password, "lewrong", strlen("lewrong")); this is debug to force a wrong password event. ignore! */
 
 		/* settings */
 		sz = sizeof(wifi_settings);
@@ -278,15 +337,6 @@ bool wifi_manager_fetch_wifi_sta_config(){
 		ESP_LOGD(TAG, "wifi_manager_fetch_wifi_settings: sta_only (0 = APSTA, 1 = STA when connected):%i",wifi_settings.sta_only);
 		ESP_LOGD(TAG, "wifi_manager_fetch_wifi_settings: sta_power_save (1 = yes):%i",wifi_settings.sta_power_save);
 		ESP_LOGD(TAG, "wifi_manager_fetch_wifi_settings: sta_static_ip (0 = dhcp client, 1 = static ip):%i",wifi_settings.sta_static_ip);
-
-		//TODO: support for static IP
-		//ESP_LOGD(TAG, "wifi_manager_fetch_wifi_settings: sta_static_ip_config: IP: %s , GW: %s , Mask: %s", IP2STR(&wifi_settings.sta_static_ip_config.ip), IP2STR(&wifi_settings.sta_static_ip_config.gw), IP2STR(&wifi_settings.sta_static_ip_config.netmask));
-		//ESP_LOGD(TAG, "wifi_manager_fetch_wifi_settings: sta_ip_addr: %s", IP2STR(&wifi_settings.sta_static_ip_config.ip));
-		//ESP_LOGD(TAG, "wifi_manager_fetch_wifi_settings: sta_gw_addr: %s", IP2STR(&wifi_settings.sta_static_ip_config.gw));
-		//ESP_LOGD(TAG, "wifi_manager_fetch_wifi_settings: sta_netmask: %s", IP2STR(&wifi_settings.sta_static_ip_config.netmask));
-
-
-
 
 		return wifi_manager_config_sta->sta.ssid[0] != '\0';
 
@@ -588,6 +638,7 @@ static void wifi_manager_event_handler(void* arg, esp_event_base_t event_base, i
 
 		case WIFI_EVENT_AP_STOP:
 			ESP_LOGI(TAG, "WIFI_EVENT_AP_STOP");
+			xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_AP_STARTED_BIT);
 			break;
 
 		/* Every time a station is connected to ESP32 AP, the <WIFI_EVENT_AP_STACONNECTED> will arise. Upon receiving this
@@ -595,7 +646,6 @@ static void wifi_manager_event_handler(void* arg, esp_event_base_t event_base, i
 		 * to do something, for example, to get the info of the connected STA, etc. */
 		case WIFI_EVENT_AP_STACONNECTED:
 			ESP_LOGI(TAG, "WIFI_EVENT_AP_STACONNECTED");
-			xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_AP_STA_CONNECTED_BIT);
 			break;
 
 		/* This event can happen in the following scenarios:
@@ -606,7 +656,6 @@ static void wifi_manager_event_handler(void* arg, esp_event_base_t event_base, i
 		 * something, e.g., close the socket which is related to this station, etc. */
 		case WIFI_EVENT_AP_STADISCONNECTED:
 			ESP_LOGI(TAG, "WIFI_EVENT_AP_STADISCONNECTED");
-			xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_AP_STA_CONNECTED_BIT);
 			break;
 
 		/* This event is disabled by default. The application can enable it via API esp_wifi_set_event_mask().
@@ -860,25 +909,6 @@ void wifi_manager( void * pvParameters ){
 	ESP_ERROR_CHECK(esp_wifi_set_ps(wifi_settings.sta_power_save));
 
 
-	/* STA - Wifi Station configuration setup */
-//	tcpip_adapter_dhcp_status_t status;
-//	if(wifi_settings.sta_static_ip) {
-//		ESP_LOGI(TAG, "Assigning static ip to STA interface. IP: %s , GW: %s , Mask: %s", ip4addr_ntoa(&wifi_settings.sta_static_ip_config.ip), ip4addr_ntoa(&wifi_settings.sta_static_ip_config.gw), ip4addr_ntoa(&wifi_settings.sta_static_ip_config.netmask));
-//
-//		/* stop DHCP client*/
-//		ESP_ERROR_CHECK(tcpip_adapter_dhcpc_stop(TCPIP_ADAPTER_IF_STA));
-//		/* assign a static IP to the STA network interface */
-//		ESP_ERROR_CHECK(tcpip_adapter_set_ip_info(TCPIP_ADAPTER_IF_STA, &wifi_settings.sta_static_ip_config));
-//		}
-//	else {
-//		/* start DHCP client if not started*/
-//		ESP_LOGI(TAG, "wifi_manager: Start DHCP client for STA interface. If not already running");
-//		ESP_ERROR_CHECK(tcpip_adapter_dhcpc_get_status(TCPIP_ADAPTER_IF_STA, &status));
-//		if (status!=TCPIP_ADAPTER_DHCP_STARTED)
-//			ESP_ERROR_CHECK(tcpip_adapter_dhcpc_start(TCPIP_ADAPTER_IF_STA));
-//	}
-
-
 	/* by default the mode is STA because wifi_manager will not start the access point unless it has to! */
 	ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
 	ESP_ERROR_CHECK(esp_wifi_start());
@@ -1018,7 +1048,7 @@ void wifi_manager( void * pvParameters ){
 				 *  5		ASSOC_TOOMANY				too many devices already connected to the AP => AP fails to respond
 				 *  6		NOT_AUTHED
 				 *  7		NOT_ASSOCED
-				 *  8		ASSOC_LEAVE					tested as manual disconnect by user
+				 *  8		ASSOC_LEAVE					tested as manual disconnect by user OR in the wireless MAC blacklist
 				 *  9		ASSOC_NOT_AUTHED
 				 *  10		DISASSOC_PWRCAP_BAD
 				 *  11		DISASSOC_SUPCHAN_BAD
@@ -1086,27 +1116,27 @@ void wifi_manager( void * pvParameters ){
 						wifi_manager_unlock_json_buffer();
 					}
 
-					if(retries < WIFI_MANAGER_MAX_RETRY){
-						retries++;
-						wifi_manager_send_message(ORDER_CONNECT_STA, (void*)CONNECTION_REQUEST_AUTO_RECONNECT);
-					}
-					else{
-						/* In this scenario the connection was lost beyond repair: kick start the AP! */
-						retries = 0;
+					/* Start the timer that will try to restore the saved config */
+					xTimerStart( wifi_manager_retry_timer, (TickType_t)0 );
 
-						/* if it was a restore attempt connection, we clear the bit */
-						xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_RESTORE_STA_BIT);
+					/* if it was a restore attempt connection, we clear the bit */
+					xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_RESTORE_STA_BIT);
 
-						/* erase configuration that could not be used to connect */
-						if(wifi_manager_config_sta){
-							memset(wifi_manager_config_sta, 0x00, sizeof(wifi_config_t));
+					/* if the AP is not started, we check if we have reached the threshold of failed attempt to start it */
+					if(! (uxBits & WIFI_MANAGER_AP_STARTED_BIT) ){
+
+						/* if the nunber of retries is below the threshold to start the AP, a reconnection attempt is made
+						 * This way we avoid restarting the AP directly in case the connection is mementarily lost */
+						if(retries < WIFI_MANAGER_MAX_RETRY_START_AP){
+							retries++;
 						}
+						else{
+							/* In this scenario the connection was lost beyond repair: kick start the AP! */
+							retries = 0;
 
-						/* save empty connection info in NVS memory */
-						wifi_manager_save_sta_config();
-
-						/* start SoftAP */
-						wifi_manager_send_message(ORDER_START_AP, NULL);
+							/* start SoftAP */
+							wifi_manager_send_message(ORDER_START_AP, NULL);
+						}
 					}
 				}
 
@@ -1119,7 +1149,11 @@ void wifi_manager( void * pvParameters ){
 				ESP_LOGI(TAG, "MESSAGE: ORDER_START_AP");
 				esp_wifi_set_mode(WIFI_MODE_APSTA);
 
-				//http_server_start();
+				/* restart HTTP daemon */
+				http_server_stop();
+				http_server_start();
+
+				/* start DNS */
 				dns_server_start();
 
 				/* callback */
@@ -1145,6 +1179,9 @@ void wifi_manager( void * pvParameters ){
 				else{
 					wifi_manager_save_sta_config();
 				}
+
+				/* reset number of retries */
+				retries = 0;
 
 				/* refresh JSON with the new IP */
 				if(wifi_manager_lock_json_buffer( portMAX_DELAY )){
