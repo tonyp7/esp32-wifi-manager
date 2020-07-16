@@ -1018,11 +1018,7 @@ void wifi_manager( void * pvParameters ){
 				}
 
 				uxBits = xEventGroupGetBits(wifi_manager_event_group);
-				if( uxBits & WIFI_MANAGER_WIFI_CONNECTED_BIT ){
-					wifi_manager_send_message(ORDER_DISCONNECT_STA, NULL);
-					/* todo: reconnect */
-				}
-				else{
+				if( ! (uxBits & WIFI_MANAGER_WIFI_CONNECTED_BIT) ){
 					/* update config to latest and attempt connection */
 					ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, wifi_manager_get_wifi_sta_config()));
 					ESP_ERROR_CHECK(esp_wifi_connect());
