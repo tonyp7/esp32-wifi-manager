@@ -34,13 +34,15 @@ function to process requests, decode URLs, serve files, etc. etc.
 #ifndef HTTP_SERVER_H_INCLUDED
 #define HTTP_SERVER_H_INCLUDED
 
+#include <stdbool.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 
 /* @brief spawns the http server */
-void http_server_start();
+void http_server_start(bool lru_purge_enable);
 
 /* @brief stops the http server */
 void http_server_stop();

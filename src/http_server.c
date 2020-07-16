@@ -135,6 +135,7 @@ static esp_err_t http_server_post_handler(httpd_req_t *req){
 			memset(config, 0x00, sizeof(wifi_config_t));
 			memcpy(config->sta.ssid, ssid, ssid_len);
 			memcpy(config->sta.password, password, password_len);
+			ESP_LOGI(TAG, "ssid: %s, password: %s", ssid, password);
 			ESP_LOGD(TAG, "http_server_post_handler: wifi_manager_connect_async() call");
 			wifi_manager_connect_async();
 
@@ -313,7 +314,7 @@ void http_server_stop(){
 	}
 }
 
-void http_server_start(){
+void http_server_start(bool lru_purge_enable){
 
 	esp_err_t err;
 
@@ -324,6 +325,7 @@ void http_server_start(){
 		/* this is an important option that isn't set up by default.
 		 * We could register all URLs one by one, but this would not work while the fake DNS is active */
 		config.uri_match_fn = httpd_uri_match_wildcard;
+		config.lru_purge_enable = lru_purge_enable;
 
 		err = httpd_start(&httpd_handle, &config);
 

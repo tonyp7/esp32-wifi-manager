@@ -74,6 +74,14 @@ extern "C" {
  */
 #define WIFI_MANAGER_RETRY_TIMER			CONFIG_WIFI_MANAGER_RETRY_TIMER
 
+
+/**
+ * @brief Time (in ms) to wait before shutting down the AP
+ * Defines the time (in ms) to wait after a succesful connection before shutting down the access point.
+ */
+#define WIFI_MANAGER_SHUTDOWN_AP_TIMER		CONFIG_WIFI_MANAGER_SHUTDOWN_AP_TIMER
+
+
 /** @brief Defines the task priority of the wifi_manager.
  *
  * Tasks spawn by the manager will have a priority of WIFI_MANAGER_TASK_PRIORITY-1.
@@ -205,7 +213,8 @@ typedef enum message_code_t {
 	EVENT_STA_DISCONNECTED = 12,
 	EVENT_SCAN_DONE = 13,
 	EVENT_STA_GOT_IP = 14,
-	MESSAGE_CODE_COUNT = 15 /* important for the callback array */
+	ORDER_STOP_AP = 15,
+	MESSAGE_CODE_COUNT = 16 /* important for the callback array */
 
 }message_code_t;
 

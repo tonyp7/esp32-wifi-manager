@@ -68,6 +68,10 @@ QueueHandle_t wifi_manager_queue;
  * There is no point hogging a hardware timer for a functionality like this which only needs to be 'accurate enough' */
 TimerHandle_t wifi_manager_retry_timer = NULL;
 
+/* @brief software timer that will trigger shutdown of the AP after a succesful STA connection
+ * There is no point hogging a hardware timer for a functionality like this which only needs to be 'accurate enough' */
+TimerHandle_t wifi_manager_shutdown_ap_timer = NULL;
+
 SemaphoreHandle_t wifi_manager_json_mutex = NULL;
 SemaphoreHandle_t wifi_manager_sta_ip_mutex = NULL;
 char *wifi_manager_sta_ip = NULL;
@@ -138,7 +142,7 @@ const int WIFI_MANAGER_REQUEST_DISCONNECT_BIT = BIT8;
 
 
 
-void wifi_manager_timer_cb( TimerHandle_t xTimer ){
+void wifi_manager_timer_retry_cb( TimerHandle_t xTimer ){
 
 	ESP_LOGI(TAG, "Retry Timer Tick! Sending ORDER_CONNECT_STA with reason CONNECTION_REQUEST_AUTO_RECONNECT");
 
@@ -150,6 +154,14 @@ void wifi_manager_timer_cb( TimerHandle_t xTimer ){
 
 }
 
+void wifi_manager_timer_shutdown_ap_cb( TimerHandle_t xTimer){
+
+	/* stop the timer */
+	xTimerStop( xTimer, (TickType_t) 0 );
+
+	/* Attempt to shutdown AP */
+	wifi_manager_send_message(ORDER_STOP_AP, NULL);
+}
 
 void wifi_manager_scan_async(){
 	wifi_manager_send_message(ORDER_START_WIFI_SCAN, NULL);
@@ -189,7 +201,10 @@ void wifi_manager_start(){
 	wifi_manager_event_group = xEventGroupCreate();
 
 	/* create timer for to keep track of retries */
-	wifi_manager_retry_timer = xTimerCreate( NULL, pdMS_TO_TICKS(WIFI_MANAGER_RETRY_TIMER), pdFALSE, ( void * ) 0, wifi_manager_timer_cb);
+	wifi_manager_retry_timer = xTimerCreate( NULL, pdMS_TO_TICKS(WIFI_MANAGER_RETRY_TIMER), pdFALSE, ( void * ) 0, wifi_manager_timer_retry_cb);
+
+	/* create timer for to keep track of AP shutdown */
+	wifi_manager_shutdown_ap_timer = xTimerCreate( NULL, pdMS_TO_TICKS(WIFI_MANAGER_SHUTDOWN_AP_TIMER), pdFALSE, ( void * ) 0, wifi_manager_timer_shutdown_ap_cb);
 
 	/* start wifi manager task */
 	xTaskCreate(&wifi_manager, "wifi_manager", 4096, NULL, WIFI_MANAGER_TASK_PRIORITY, &task_wifi_manager);
@@ -914,7 +929,7 @@ void wifi_manager( void * pvParameters ){
 	ESP_ERROR_CHECK(esp_wifi_start());
 
 	/* start http server */
-	http_server_start();
+	http_server_start(false);
 
 	/* wifi scanner config */
 	wifi_scan_config_t scan_config = {
@@ -1003,11 +1018,7 @@ void wifi_manager( void * pvParameters ){
 				}
 
 				uxBits = xEventGroupGetBits(wifi_manager_event_group);
-				if( uxBits & WIFI_MANAGER_WIFI_CONNECTED_BIT ){
-					wifi_manager_send_message(ORDER_DISCONNECT_STA, NULL);
-					/* todo: reconnect */
-				}
-				else{
+				if( ! (uxBits & WIFI_MANAGER_WIFI_CONNECTED_BIT) ){
 					/* update config to latest and attempt connection */
 					ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, wifi_manager_get_wifi_sta_config()));
 					ESP_ERROR_CHECK(esp_wifi_connect());
@@ -1075,6 +1086,11 @@ void wifi_manager( void * pvParameters ){
 
 				/* reset saved sta IP */
 				wifi_manager_safe_update_sta_ip_string((uint32_t)0);
+
+				/* if there was a timer on to stop the AP, well now it's time to cancel that since connection was lost! */
+				if(xTimerIsTimerActive(wifi_manager_shutdown_ap_timer) == pdTRUE ){
+					xTimerStop( wifi_manager_shutdown_ap_timer, (TickType_t)0 );
+				}
 
 				uxBits = xEventGroupGetBits(wifi_manager_event_group);
 				if( uxBits & WIFI_MANAGER_REQUEST_STA_CONNECT_BIT ){
@@ -1147,17 +1163,45 @@ void wifi_manager( void * pvParameters ){
 
 			case ORDER_START_AP:
 				ESP_LOGI(TAG, "MESSAGE: ORDER_START_AP");
-				esp_wifi_set_mode(WIFI_MODE_APSTA);
+
+				ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
 
 				/* restart HTTP daemon */
 				http_server_stop();
-				http_server_start();
+				http_server_start(true);
 
 				/* start DNS */
 				dns_server_start();
 
 				/* callback */
 				if(cb_ptr_arr[msg.code]) (*cb_ptr_arr[msg.code])(NULL);
+
+				break;
+
+			case ORDER_STOP_AP:
+				ESP_LOGI(TAG, "MESSAGE: ORDER_STOP_AP");
+
+
+				uxBits = xEventGroupGetBits(wifi_manager_event_group);
+
+				/* before stopping the AP, we check that we are still connected. There's a chance that once the timer
+				 * kicks in, for whatever reason the esp32 is already disconnected.
+				 */
+				if(uxBits & WIFI_MANAGER_WIFI_CONNECTED_BIT){
+
+					/* set to STA only */
+					esp_wifi_set_mode(WIFI_MODE_STA);
+
+					/* stop DNS */
+					dns_server_stop();
+
+					/* restart HTTP daemon */
+					http_server_stop();
+					http_server_start(false);
+
+					/* callback */
+					if(cb_ptr_arr[msg.code]) (*cb_ptr_arr[msg.code])(NULL);
+				}
 
 				break;
 
@@ -1193,6 +1237,23 @@ void wifi_manager( void * pvParameters ){
 
 				/* bring down DNS hijack */
 				dns_server_stop();
+
+				/* start the timer that will eventually shutdown the access point
+				 * We check first that it's actually running because in case of a boot and restore connection
+				 * the AP is not even started to begin with.
+				 */
+				if(uxBits & WIFI_MANAGER_AP_STARTED_BIT){
+					TickType_t t = pdMS_TO_TICKS( WIFI_MANAGER_SHUTDOWN_AP_TIMER );
+
+					/* if for whatever reason user configured the shutdown timer to be less than 1 tick, the AP is stopped straight away */
+					if(t > 0){
+						xTimerStart( wifi_manager_shutdown_ap_timer, (TickType_t)0 );
+					}
+					else{
+						wifi_manager_send_message(ORDER_STOP_AP, (void*)NULL);
+					}
+
+				}
 
 				/* callback */
 				if(cb_ptr_arr[msg.code]) (*cb_ptr_arr[msg.code])(NULL);
