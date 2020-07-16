@@ -267,8 +267,10 @@ void wifi_manager( void * pvParameters );
 char* wifi_manager_get_ap_list_json();
 char* wifi_manager_get_ip_info_json();
 
-
-
+/**
+ * @brief clears the current STA wifi config in flash ram storage.
+ */
+esp_err_t wifi_manager_clear_sta_config(void);
 
 /**
  * @brief saves the current STA wifi config to flash ram storage.

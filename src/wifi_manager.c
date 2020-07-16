@@ -80,6 +80,17 @@ static const char TAG[] = "wifi_manager";
 /* @brief task handle for the main wifi_manager task */
 static TaskHandle_t task_wifi_manager = NULL;
 
+static const struct wifi_settings_t wifi_default_settings = {
+		.ap_ssid = DEFAULT_AP_SSID,
+		.ap_pwd = DEFAULT_AP_PASSWORD,
+		.ap_channel = DEFAULT_AP_CHANNEL,
+		.ap_ssid_hidden = DEFAULT_AP_SSID_HIDDEN,
+		.ap_bandwidth = DEFAULT_AP_BANDWIDTH,
+		.sta_only = DEFAULT_STA_ONLY,
+		.sta_power_save = DEFAULT_STA_POWER_SAVE,
+		.sta_static_ip = 0,
+};
+
 /**
  * The actual WiFi settings in use
  */
@@ -163,6 +174,30 @@ void wifi_manager_start(){
 
 	/* start wifi manager task */
 	xTaskCreate(&wifi_manager, "wifi_manager", 4096, NULL, WIFI_MANAGER_TASK_PRIORITY, &task_wifi_manager);
+}
+
+esp_err_t wifi_manager_clear_sta_config(void) {
+	nvs_handle handle = 0;
+	esp_err_t esp_err = 0;
+	ESP_LOGI(TAG, "About to clear config in flash");
+
+	esp_err = nvs_open(wifi_manager_nvs_namespace, NVS_READWRITE, &handle);
+	if (esp_err != ESP_OK) return esp_err;
+
+	esp_err = nvs_set_blob(handle, "ssid", "", 32);
+	if (esp_err != ESP_OK) return esp_err;
+
+	esp_err = nvs_set_blob(handle, "password", "", 64);
+	if (esp_err != ESP_OK) return esp_err;
+
+	esp_err = nvs_set_blob(handle, "settings", &wifi_default_settings, sizeof(wifi_default_settings));
+	if (esp_err != ESP_OK) return esp_err;
+
+	esp_err = nvs_commit(handle);
+	if (esp_err != ESP_OK) return esp_err;
+
+	nvs_close(handle);
+	return ESP_OK;
 }
 
 esp_err_t wifi_manager_save_sta_config(){
