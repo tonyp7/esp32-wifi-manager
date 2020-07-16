@@ -17,6 +17,12 @@ config WIFI_MANAGER_MAX_RETRY_START_AP
     default 3
     help
 	Defines the maximum number of failed retries allowed before the WiFi manager starts its own access point.  
+	
+config WIFI_MANAGER_SHUTDOWN_AP_TIMER
+	int "Time (in ms) to wait before shutting down the AP"
+	default 60000
+	help
+	Defines the time (in ms) to wait after a succesful connection before shutting down the access point.
 
 config DEFAULT_AP_SSID
     string "Access Point SSID"
