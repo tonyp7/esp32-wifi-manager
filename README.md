@@ -19,6 +19,7 @@
    - [Configuring the Wifi Manager](#configuring-the-wifi-manager)
  - [Adding esp32-wifi-manager to your code](#adding-esp32-wifi-manager-to-your-code)
    - [Interacting with the manager](#interacting-with-the-manager)
+   - [Interacting with the http server](#interacting-with-the-http-server)
  - [License](#license)
    
 
@@ -146,10 +147,46 @@ void cb_connection_ok(void *pvParameter){
 Then just register it by calling:
 
 ```c
-wifi_manager_set_callback(EVENT_STA_GOT_IP, &cb_connection_ok);
+wifi_manager_set_callback(WM_EVENT_STA_GOT_IP, &cb_connection_ok);
 ```
 
 That's it! Now everytime the event is triggered it will call this function. The [examples/default_demo](examples/default_demo) contains sample code using callbacks.
+
+### List of events
+
+The list of possible events you can add a callback to are defined by message_code_t in wifi_manager.h. They are as following:
+
+* WM_ORDER_START_HTTP_SERVER
+* WM_ORDER_STOP_HTTP_SERVER
+* WM_ORDER_START_DNS_SERVICE
+* WM_ORDER_STOP_DNS_SERVICE
+* WM_ORDER_START_WIFI_SCAN
+* WM_ORDER_LOAD_AND_RESTORE_STA
+* WM_ORDER_CONNECT_STA
+* WM_ORDER_DISCONNECT_STA
+* WM_ORDER_START_AP
+* WM_EVENT_STA_DISCONNECTED
+* WM_EVENT_SCAN_DONE
+* WM_EVENT_STA_GOT_IP
+* WM_ORDER_STOP_AP
+
+In practice, keeping track of WM_EVENT_STA_GOT_IP and WM_EVENT_STA_DISCONNECTED is key to know whether or not your esp32 has a connection. The other messages can mostly be ignored in a typical applicationn using esp32-wifi-manager.
+
+## Interacting with the http server
+
+Because esp32-wifi-manager spawns its own http server, you might want to extend this server to serve your own pages in your application. It is possible to do so by registering your own URL handler using the standard esp_http_server signature:
+
+```c
+esp_err_t my_custom_handler(httpd_req_t *req){
+```
+
+And then registering the handler by doing
+
+```c
+http_app_set_handler_hook(HTTP_GET, &my_custom_handler);
+```
+
+The [examples/http_hook](examples/http_hook) contains an example where a web page is registered at /helloworld
 
 # License
 *esp32-wifi-manager* is MIT licensed. As such, it can be included in any project, commercial or not, as long as you retain original copyright. Please make sure to read the license file.
