@@ -929,7 +929,7 @@ void wifi_manager( void * pvParameters ){
 	ESP_ERROR_CHECK(esp_wifi_start());
 
 	/* start http server */
-	http_server_start(false);
+	http_app_start(false);
 
 	/* wifi scanner config */
 	wifi_scan_config_t scan_config = {
@@ -1167,8 +1167,8 @@ void wifi_manager( void * pvParameters ){
 				ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
 
 				/* restart HTTP daemon */
-				http_server_stop();
-				http_server_start(true);
+				http_app_stop();
+				http_app_start(true);
 
 				/* start DNS */
 				dns_server_start();
@@ -1196,8 +1196,8 @@ void wifi_manager( void * pvParameters ){
 					dns_server_stop();
 
 					/* restart HTTP daemon */
-					http_server_stop();
-					http_server_start(false);
+					http_app_stop();
+					http_app_start(false);
 
 					/* callback */
 					if(cb_ptr_arr[msg.code]) (*cb_ptr_arr[msg.code])(NULL);
