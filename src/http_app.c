@@ -19,7 +19,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-@file http_server.c
+@file http_app.c
 @author Tony Pottier
 @brief Defines all functions necessary for the HTTP server to run.
 
@@ -30,6 +30,7 @@ function to process requests, decode URLs, serve files, etc. etc.
 @see https://idyl.io
 @see https://github.com/tonyp7/esp32-wifi-manager
 */
+
 
 #include <stdio.h>
 #include <string.h>
@@ -42,8 +43,8 @@ function to process requests, decode URLs, serve files, etc. etc.
 #include "esp_netif.h"
 #include <esp_http_server.h>
 
-#include "http_server.h"
 #include "wifi_manager.h"
+#include "http_app.h"
 
 
 /* @brief tag used for ESP serial console messages */
@@ -51,6 +52,10 @@ static const char TAG[] = "http_server";
 
 /* @brief the HTTP server handle */
 static httpd_handle_t httpd_handle = NULL;
+
+/* function pointers to URI handlers that can be user made */
+esp_err_t (*custom_get_httpd_uri_handler)(httpd_req_t *r) = NULL;
+esp_err_t (*custom_post_httpd_uri_handler)(httpd_req_t *r) = NULL;
 
 /**
  * @brief embedded binary data.
@@ -84,11 +89,28 @@ const static char http_pragma_no_cache[] = "no-cache";
 
 
 
+esp_err_t http_app_set_handler_hook( httpd_method_t method,  esp_err_t (*handler)(httpd_req_t *r)  ){
+
+	if(method == HTTP_GET){
+		custom_get_httpd_uri_handler = handler;
+		return ESP_OK;
+	}
+	else if(method == HTTP_POST){
+		custom_post_httpd_uri_handler = handler;
+		return ESP_OK;
+	}
+	else{
+		return ESP_FAIL;
+	}
+
+}
+
+
 static esp_err_t http_server_delete_handler(httpd_req_t *req){
 
 	ESP_LOGI(TAG, "DELETE %s", req->uri);
 
-	if(strcmp(req->uri, "/connect.json") == 0){
+	if(strcmp(req->uri, "/wifimanager/connect.json") == 0){
 		wifi_manager_disconnect_async();
 
 		httpd_resp_set_status(req, http_200_hdr);
@@ -111,7 +133,7 @@ static esp_err_t http_server_post_handler(httpd_req_t *req){
 
 	ESP_LOGI(TAG, "POST %s", req->uri);
 
-	if(strcmp(req->uri, "/connect.json") == 0){
+	if(strcmp(req->uri, "/wifimanager/connect.json") == 0){
 
 
 		/* buffers for the headers */
@@ -170,6 +192,7 @@ static esp_err_t http_server_get_handler(httpd_req_t *req){
 
     char* host = NULL;
     size_t buf_len;
+    esp_err_t ret = ESP_OK;
 
     ESP_LOGI(TAG, "GET %s", req->uri);
 
@@ -195,10 +218,10 @@ static esp_err_t http_server_get_handler(httpd_req_t *req){
 		/* Captive Portal functionality */
 		/* 302 Redirect to IP of the access point */
 
-		size_t location_size = 23; /* size: http://255.255.255.255 */
+		size_t location_size = 35; /* size: http://255.255.255.255/wifimanager + \0 */
 		char* buff_location = malloc(sizeof(char) * location_size);
 		*buff_location = '\0';
-		snprintf(buff_location, location_size, "http://%s", DEFAULT_AP_IP);
+		snprintf(buff_location, location_size, "http://%s/wifimanager", DEFAULT_AP_IP);
 		httpd_resp_set_status(req, http_302_hdr);
 		httpd_resp_set_hdr(req, http_location_hdr, buff_location);
 		httpd_resp_send(req, NULL, 0);
@@ -209,23 +232,23 @@ static esp_err_t http_server_get_handler(httpd_req_t *req){
 
 		ESP_LOGD(TAG, "GET %s", req->uri);
 
-		if(strcmp(req->uri, "/") == 0){
+		if(strcmp(req->uri, "/wifimanager") == 0){
 			httpd_resp_set_status(req, http_200_hdr);
 			httpd_resp_set_type(req, http_content_type_html);
 			httpd_resp_send(req, (char*)index_html_start, index_html_end - index_html_start);
 		}
-		else if(strcmp(req->uri, "/code.js") == 0){
+		else if(strcmp(req->uri, "/wifimanager/code.js") == 0){
 			httpd_resp_set_status(req, http_200_hdr);
 			httpd_resp_set_type(req, http_content_type_js);
 			httpd_resp_send(req, (char*)code_js_start, code_js_end - code_js_start);
 		}
-		else if(strcmp(req->uri, "/style.css") == 0){
+		else if(strcmp(req->uri, "/wifimanager/style.css") == 0){
 			httpd_resp_set_status(req, http_200_hdr);
 			httpd_resp_set_type(req, http_content_type_css);
 			httpd_resp_set_hdr(req, http_cache_control_hdr, http_cache_control_cache);
 			httpd_resp_send(req, (char*)style_css_start, style_css_end - style_css_start);
 		}
-		else if(strcmp(req->uri, "/ap.json") == 0){
+		else if(strcmp(req->uri, "/wifimanager/ap.json") == 0){
 
 			/* if we can get the mutex, write the last version of the AP list */
 			if(wifi_manager_lock_json_buffer(( TickType_t ) 10)){
@@ -247,7 +270,7 @@ static esp_err_t http_server_get_handler(httpd_req_t *req){
 			/* request a wifi scan */
 			wifi_manager_scan_async();
 		}
-		else if(strcmp(req->uri, "/status.json") == 0){
+		else if(strcmp(req->uri, "/wifimanager/status.json") == 0){
 
 			if(wifi_manager_lock_json_buffer(( TickType_t ) 10)){
 				char *buff = wifi_manager_get_ip_info_json();
@@ -271,8 +294,16 @@ static esp_err_t http_server_get_handler(httpd_req_t *req){
 			}
 		}
 		else{
-			httpd_resp_set_status(req, http_404_hdr);
-			httpd_resp_send(req, NULL, 0);
+
+			if(custom_get_httpd_uri_handler == NULL){
+				httpd_resp_set_status(req, http_404_hdr);
+				httpd_resp_send(req, NULL, 0);
+			}
+			else{
+
+				/* if there's a hook, run it */
+				ret = (*custom_get_httpd_uri_handler)(req);
+			}
 		}
 
 	}
@@ -282,7 +313,7 @@ static esp_err_t http_server_get_handler(httpd_req_t *req){
     	free(host);
     }
 
-    return ESP_OK;
+    return ret;
 
 }
 
@@ -294,19 +325,19 @@ static const httpd_uri_t http_server_get_request = {
 };
 
 static const httpd_uri_t http_server_post_request = {
-	.uri	= "/*",
+	.uri	= "*",
 	.method = HTTP_POST,
 	.handler = http_server_post_handler
 };
 
 static const httpd_uri_t http_server_delete_request = {
-	.uri	= "/*",
+	.uri	= "*",
 	.method = HTTP_DELETE,
 	.handler = http_server_delete_handler
 };
 
 
-void http_server_stop(){
+void http_app_stop(){
 
 	if(httpd_handle != NULL){
 		httpd_stop(httpd_handle);
@@ -314,7 +345,7 @@ void http_server_stop(){
 	}
 }
 
-void http_server_start(bool lru_purge_enable){
+void http_app_start(bool lru_purge_enable){
 
 	esp_err_t err;
 

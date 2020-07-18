@@ -19,38 +19,58 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-@file http_server.h
+@file user_main.c
 @author Tony Pottier
-@brief Defines all functions necessary for the HTTP server to run.
-
-Contains the freeRTOS task for the HTTP listener and all necessary support
-function to process requests, decode URLs, serve files, etc. etc.
-
-@note http_server task cannot run without the wifi_manager task!
+@brief Entry point for the ESP32 application.
 @see https://idyl.io
 @see https://github.com/tonyp7/esp32-wifi-manager
 */
 
-#ifndef HTTP_SERVER_H_INCLUDED
-#define HTTP_SERVER_H_INCLUDED
+#include <stdio.h>
+#include <string.h>
+#include <esp_wifi.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "esp_system.h"
+#include "esp_log.h"
 
-#include <stdbool.h>
+#include "wifi_manager.h"
+#include "http_app.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-
-/* @brief spawns the http server */
-void http_server_start(bool lru_purge_enable);
-
-/* @brief stops the http server */
-void http_server_stop();
+/* @brief tag used for ESP serial console messages */
+static const char TAG[] = "main";
 
 
+static esp_err_t my_get_handler(httpd_req_t *req){
 
-#ifdef __cplusplus
+	/* our custom page sits at /helloworld in this example */
+	if(strcmp(req->uri, "/helloworld") == 0){
+
+		ESP_LOGI(TAG, "Serving page /helloworld");
+
+		const char* response = "<html><body><h1>Hello World!</h1></body></html>";
+
+		httpd_resp_set_status(req, "200 OK");
+		httpd_resp_set_type(req, "text/html");
+		httpd_resp_send(req, response, strlen(response));
+	}
+	else{
+		/* send a 404 otherwise */
+		httpd_resp_send_404(req);
+	}
+
+	return ESP_OK;
 }
-#endif
 
-#endif
+
+void app_main()
+{
+	/* start the wifi manager */
+	wifi_manager_start();
+
+	/* set custom handler for the http server
+	 * Now navigate to /helloworld to see the custom page
+	 * */
+	http_app_set_handler_hook(HTTP_GET, &my_get_handler);
+
+}
