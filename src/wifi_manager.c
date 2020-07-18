@@ -40,6 +40,7 @@ Contains the freeRTOS task and all necessary support
 #include <freertos/task.h>
 #include <freertos/event_groups.h>
 #include <freertos/timers.h>
+#include <http_app.h>
 #include "esp_wifi.h"
 #include "esp_event.h"
 #include "esp_netif.h"
@@ -55,7 +56,6 @@ Contains the freeRTOS task and all necessary support
 
 
 #include "json.h"
-#include "http_server.h"
 #include "dns_server.h"
 #include "wifi_manager.h"
 

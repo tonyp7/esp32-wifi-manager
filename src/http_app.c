@@ -19,7 +19,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-@file http_server.c
+@file http_app.c
 @author Tony Pottier
 @brief Defines all functions necessary for the HTTP server to run.
 
@@ -30,6 +30,7 @@ function to process requests, decode URLs, serve files, etc. etc.
 @see https://idyl.io
 @see https://github.com/tonyp7/esp32-wifi-manager
 */
+
 
 #include <stdio.h>
 #include <string.h>
@@ -42,8 +43,8 @@ function to process requests, decode URLs, serve files, etc. etc.
 #include "esp_netif.h"
 #include <esp_http_server.h>
 
-#include "http_server.h"
 #include "wifi_manager.h"
+#include "http_app.h"
 
 
 /* @brief tag used for ESP serial console messages */
@@ -191,6 +192,7 @@ static esp_err_t http_server_get_handler(httpd_req_t *req){
 
     char* host = NULL;
     size_t buf_len;
+    esp_err_t ret = ESP_OK;
 
     ESP_LOGI(TAG, "GET %s", req->uri);
 
@@ -292,8 +294,16 @@ static esp_err_t http_server_get_handler(httpd_req_t *req){
 			}
 		}
 		else{
-			httpd_resp_set_status(req, http_404_hdr);
-			httpd_resp_send(req, NULL, 0);
+
+			if(custom_get_httpd_uri_handler == NULL){
+				httpd_resp_set_status(req, http_404_hdr);
+				httpd_resp_send(req, NULL, 0);
+			}
+			else{
+
+				/* if there's a hook, run it */
+				ret = (*custom_get_httpd_uri_handler)(req);
+			}
 		}
 
 	}
@@ -303,7 +313,7 @@ static esp_err_t http_server_get_handler(httpd_req_t *req){
     	free(host);
     }
 
-    return ESP_OK;
+    return ret;
 
 }
 
@@ -327,7 +337,7 @@ static const httpd_uri_t http_server_delete_request = {
 };
 
 
-void http_server_stop(){
+void http_app_stop(){
 
 	if(httpd_handle != NULL){
 		httpd_stop(httpd_handle);
@@ -335,7 +345,7 @@ void http_server_stop(){
 	}
 }
 
-void http_server_start(bool lru_purge_enable){
+void http_app_start(bool lru_purge_enable){
 
 	esp_err_t err;
 
