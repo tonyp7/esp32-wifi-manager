@@ -35,6 +35,7 @@ function to process requests, decode URLs, serve files, etc. etc.
 #define HTTP_SERVER_H_INCLUDED
 
 #include <stdbool.h>
+#include <esp_http_server.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -47,6 +48,8 @@ void http_server_start(bool lru_purge_enable);
 /* @brief stops the http server */
 void http_server_stop();
 
+/* @brief sets a hook into the wifi manager URI handlers */
+esp_err_t http_server_set_handler_hook( httpd_method_t method,  esp_err_t (*handler)(httpd_req_t *r)  );
 
 
 #ifdef __cplusplus

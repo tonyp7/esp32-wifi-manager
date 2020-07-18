@@ -52,6 +52,10 @@ static const char TAG[] = "http_server";
 /* @brief the HTTP server handle */
 static httpd_handle_t httpd_handle = NULL;
 
+/* function pointers to URI handlers that can be user made */
+esp_err_t (*custom_get_httpd_uri_handler)(httpd_req_t *r) = NULL;
+esp_err_t (*custom_post_httpd_uri_handler)(httpd_req_t *r) = NULL;
+
 /**
  * @brief embedded binary data.
  * @see file "component.mk"
@@ -82,6 +86,23 @@ const static char http_cache_control_cache[] = "public, max-age=31536000";
 const static char http_pragma_hdr[] = "Pragma";
 const static char http_pragma_no_cache[] = "no-cache";
 
+
+
+esp_err_t http_server_set_handler_hook( httpd_method_t method,  esp_err_t (*handler)(httpd_req_t *r)  ){
+
+	if(method == HTTP_GET){
+		custom_get_httpd_uri_handler = handler;
+		return ESP_OK;
+	}
+	else if(method == HTTP_POST){
+		custom_post_httpd_uri_handler = handler;
+		return ESP_OK;
+	}
+	else{
+		return ESP_FAIL;
+	}
+
+}
 
 
 static esp_err_t http_server_delete_handler(httpd_req_t *req){
