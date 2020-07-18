@@ -6,7 +6,7 @@
 
 *esp32-wifi-manager* is is an all in one wifi scanner, http server & dns daemon living in the least amount of RAM possible.
 
-*esp32-wifi-manager* will automatically attempt to re-connect to a previously saved network on boot, and if it cannot find a saved wifi it will start its own access point through which you can manage and connect to wifi networks.
+*esp32-wifi-manager* will automatically attempt to re-connect to a previously saved network on boot, and if it cannot find a saved wifi it will start its own access point through which you can manage and connect to wifi networks. Upon a succesful connection, the software will shutdown the access point automatically after some time (1 minute by default).
 
 *esp32-wifi-manager* compiles with esp-idf 4.1 and above. See [Getting Started](#getting-started) to guide you through your first setup.
 
@@ -76,6 +76,8 @@ Navigate in "Component config" then pick "Wifi Manager Configuration". You will 
 ![esp32-wifi-manager-menuconfig](https://idyl.io/wp-content/uploads/2020/07/esp32-wifi-manager-menuconfig-800px.png "menuconfig screen")
 
 You can change the ssid and password of the access point at your convenience, but it is highly recommended to keep default values. Your password should be between 8 and 63 characters long, to comply with the WPA2 standard.
+
+You can also change the values for various timers, for instance how long it takes for the access point to shutdown once a connection is established (default: 60000). While it could be tempting to set this timer to 0, just be warned that in that case the user will never get the feedback that a connection is succesful. Shutting down the AP will instantly kill the current navigating session on the captive portal.
 
 # Adding esp32-wifi-manager to your code
 
