@@ -89,7 +89,7 @@ const static char http_pragma_no_cache[] = "no-cache";
 
 
 
-esp_err_t http_server_set_handler_hook( httpd_method_t method,  esp_err_t (*handler)(httpd_req_t *r)  ){
+esp_err_t http_app_set_handler_hook( httpd_method_t method,  esp_err_t (*handler)(httpd_req_t *r)  ){
 
 	if(method == HTTP_GET){
 		custom_get_httpd_uri_handler = handler;

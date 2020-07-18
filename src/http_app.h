@@ -49,7 +49,7 @@ void http_app_start(bool lru_purge_enable);
 void http_app_stop();
 
 /* @brief sets a hook into the wifi manager URI handlers */
-esp_err_t http_server_set_handler_hook( httpd_method_t method,  esp_err_t (*handler)(httpd_req_t *r)  );
+esp_err_t http_app_set_handler_hook( httpd_method_t method,  esp_err_t (*handler)(httpd_req_t *r)  );
 
 
 #ifdef __cplusplus
