@@ -88,7 +88,7 @@ static esp_err_t http_server_delete_handler(httpd_req_t *req){
 
 	ESP_LOGI(TAG, "DELETE %s", req->uri);
 
-	if(strcmp(req->uri, "/connect.json") == 0){
+	if(strcmp(req->uri, "/wifimanager/connect.json") == 0){
 		wifi_manager_disconnect_async();
 
 		httpd_resp_set_status(req, http_200_hdr);
@@ -111,7 +111,7 @@ static esp_err_t http_server_post_handler(httpd_req_t *req){
 
 	ESP_LOGI(TAG, "POST %s", req->uri);
 
-	if(strcmp(req->uri, "/connect.json") == 0){
+	if(strcmp(req->uri, "/wifimanager/connect.json") == 0){
 
 
 		/* buffers for the headers */
@@ -195,10 +195,10 @@ static esp_err_t http_server_get_handler(httpd_req_t *req){
 		/* Captive Portal functionality */
 		/* 302 Redirect to IP of the access point */
 
-		size_t location_size = 23; /* size: http://255.255.255.255 */
+		size_t location_size = 35; /* size: http://255.255.255.255/wifimanager + \0 */
 		char* buff_location = malloc(sizeof(char) * location_size);
 		*buff_location = '\0';
-		snprintf(buff_location, location_size, "http://%s", DEFAULT_AP_IP);
+		snprintf(buff_location, location_size, "http://%s/wifimanager", DEFAULT_AP_IP);
 		httpd_resp_set_status(req, http_302_hdr);
 		httpd_resp_set_hdr(req, http_location_hdr, buff_location);
 		httpd_resp_send(req, NULL, 0);
@@ -209,23 +209,23 @@ static esp_err_t http_server_get_handler(httpd_req_t *req){
 
 		ESP_LOGD(TAG, "GET %s", req->uri);
 
-		if(strcmp(req->uri, "/") == 0){
+		if(strcmp(req->uri, "/wifimanager") == 0){
 			httpd_resp_set_status(req, http_200_hdr);
 			httpd_resp_set_type(req, http_content_type_html);
 			httpd_resp_send(req, (char*)index_html_start, index_html_end - index_html_start);
 		}
-		else if(strcmp(req->uri, "/code.js") == 0){
+		else if(strcmp(req->uri, "/wifimanager/code.js") == 0){
 			httpd_resp_set_status(req, http_200_hdr);
 			httpd_resp_set_type(req, http_content_type_js);
 			httpd_resp_send(req, (char*)code_js_start, code_js_end - code_js_start);
 		}
-		else if(strcmp(req->uri, "/style.css") == 0){
+		else if(strcmp(req->uri, "/wifimanager/style.css") == 0){
 			httpd_resp_set_status(req, http_200_hdr);
 			httpd_resp_set_type(req, http_content_type_css);
 			httpd_resp_set_hdr(req, http_cache_control_hdr, http_cache_control_cache);
 			httpd_resp_send(req, (char*)style_css_start, style_css_end - style_css_start);
 		}
-		else if(strcmp(req->uri, "/ap.json") == 0){
+		else if(strcmp(req->uri, "/wifimanager/ap.json") == 0){
 
 			/* if we can get the mutex, write the last version of the AP list */
 			if(wifi_manager_lock_json_buffer(( TickType_t ) 10)){
@@ -247,7 +247,7 @@ static esp_err_t http_server_get_handler(httpd_req_t *req){
 			/* request a wifi scan */
 			wifi_manager_scan_async();
 		}
-		else if(strcmp(req->uri, "/status.json") == 0){
+		else if(strcmp(req->uri, "/wifimanager/status.json") == 0){
 
 			if(wifi_manager_lock_json_buffer(( TickType_t ) 10)){
 				char *buff = wifi_manager_get_ip_info_json();
@@ -294,13 +294,13 @@ static const httpd_uri_t http_server_get_request = {
 };
 
 static const httpd_uri_t http_server_post_request = {
-	.uri	= "/*",
+	.uri	= "*",
 	.method = HTTP_POST,
 	.handler = http_server_post_handler
 };
 
 static const httpd_uri_t http_server_delete_request = {
-	.uri	= "/*",
+	.uri	= "*",
 	.method = HTTP_DELETE,
 	.handler = http_server_delete_handler
 };
