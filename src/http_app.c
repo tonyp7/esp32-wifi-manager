@@ -100,7 +100,7 @@ esp_err_t http_app_set_handler_hook( httpd_method_t method,  esp_err_t (*handler
 		return ESP_OK;
 	}
 	else{
-		return ESP_FAIL;
+		return ESP_ERR_INVALID_ARG;
 	}
 
 }
@@ -130,6 +130,8 @@ static esp_err_t http_server_delete_handler(httpd_req_t *req){
 
 static esp_err_t http_server_post_handler(httpd_req_t *req){
 
+
+	esp_err_t ret = ESP_OK;
 
 	ESP_LOGI(TAG, "POST %s", req->uri);
 
@@ -180,11 +182,19 @@ static esp_err_t http_server_post_handler(httpd_req_t *req){
 
 	}
 	else{
-		httpd_resp_set_status(req, http_404_hdr);
-		httpd_resp_send(req, NULL, 0);
+
+		if(custom_post_httpd_uri_handler == NULL){
+			httpd_resp_set_status(req, http_404_hdr);
+			httpd_resp_send(req, NULL, 0);
+		}
+		else{
+
+			/* if there's a hook, run it */
+			ret = (*custom_post_httpd_uri_handler)(req);
+		}
 	}
 
-	return ESP_OK;
+	return ret;
 }
 
 
