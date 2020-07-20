@@ -42,13 +42,20 @@ extern "C" {
 #endif
 
 
-/* @brief spawns the http server */
+/** 
+ * @brief spawns the http server 
+ */
 void http_app_start(bool lru_purge_enable);
 
-/* @brief stops the http server */
+/**
+ * @brief stops the http server 
+ */
 void http_app_stop();
 
-/* @brief sets a hook into the wifi manager URI handlers */
+/** 
+ * @brief sets a hook into the wifi manager URI handlers. Setting the handler to NULL disables the hook.
+ * @return ESP_OK in case of success, ESP_ERR_INVALID_ARG if the method is unsupported.
+ */
 esp_err_t http_app_set_handler_hook( httpd_method_t method,  esp_err_t (*handler)(httpd_req_t *r)  );
 
 
