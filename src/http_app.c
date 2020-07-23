@@ -57,6 +57,15 @@ static httpd_handle_t httpd_handle = NULL;
 esp_err_t (*custom_get_httpd_uri_handler)(httpd_req_t *r) = NULL;
 esp_err_t (*custom_post_httpd_uri_handler)(httpd_req_t *r) = NULL;
 
+/* strings holding the URLs of the wifi manager */
+static char* http_root_url = NULL;
+static char* http_redirect_url = NULL;
+static char* http_js_url = NULL;
+static char* http_css_url = NULL;
+static char* http_connect_url = NULL;
+static char* http_ap_url = NULL;
+static char* http_status_url = NULL;
+
 /**
  * @brief embedded binary data.
  * @see file "component.mk"
@@ -110,7 +119,8 @@ static esp_err_t http_server_delete_handler(httpd_req_t *req){
 
 	ESP_LOGI(TAG, "DELETE %s", req->uri);
 
-	if(strcmp(req->uri, "/wifimanager/connect.json") == 0){
+	/* DELETE /connect.json */
+	if(strcmp(req->uri, http_connect_url) == 0){
 		wifi_manager_disconnect_async();
 
 		httpd_resp_set_status(req, http_200_hdr);
@@ -135,7 +145,8 @@ static esp_err_t http_server_post_handler(httpd_req_t *req){
 
 	ESP_LOGI(TAG, "POST %s", req->uri);
 
-	if(strcmp(req->uri, "/wifimanager/connect.json") == 0){
+	/* POST /connect.json */
+	if(strcmp(req->uri, http_connect_url) == 0){
 
 
 		/* buffers for the headers */
@@ -227,38 +238,36 @@ static esp_err_t http_server_get_handler(httpd_req_t *req){
 
 		/* Captive Portal functionality */
 		/* 302 Redirect to IP of the access point */
-
-		size_t location_size = 35; /* size: http://255.255.255.255/wifimanager + \0 */
-		char* buff_location = malloc(sizeof(char) * location_size);
-		*buff_location = '\0';
-		snprintf(buff_location, location_size, "http://%s/wifimanager", DEFAULT_AP_IP);
 		httpd_resp_set_status(req, http_302_hdr);
-		httpd_resp_set_hdr(req, http_location_hdr, buff_location);
+		httpd_resp_set_hdr(req, http_location_hdr, http_redirect_url);
 		httpd_resp_send(req, NULL, 0);
-		free(buff_location);
 
 	}
 	else{
 
 		ESP_LOGD(TAG, "GET %s", req->uri);
 
-		if(strcmp(req->uri, "/wifimanager") == 0){
+		/* GET /  */
+		if(strcmp(req->uri, http_root_url) == 0){
 			httpd_resp_set_status(req, http_200_hdr);
 			httpd_resp_set_type(req, http_content_type_html);
 			httpd_resp_send(req, (char*)index_html_start, index_html_end - index_html_start);
 		}
-		else if(strcmp(req->uri, "/wifimanager/code.js") == 0){
+		/* GET /code.js */
+		else if(strcmp(req->uri, http_js_url) == 0){
 			httpd_resp_set_status(req, http_200_hdr);
 			httpd_resp_set_type(req, http_content_type_js);
 			httpd_resp_send(req, (char*)code_js_start, code_js_end - code_js_start);
 		}
-		else if(strcmp(req->uri, "/wifimanager/style.css") == 0){
+		/* GET /style.css */
+		else if(strcmp(req->uri, http_css_url) == 0){
 			httpd_resp_set_status(req, http_200_hdr);
 			httpd_resp_set_type(req, http_content_type_css);
 			httpd_resp_set_hdr(req, http_cache_control_hdr, http_cache_control_cache);
 			httpd_resp_send(req, (char*)style_css_start, style_css_end - style_css_start);
 		}
-		else if(strcmp(req->uri, "/wifimanager/ap.json") == 0){
+		/* GET /ap.json */
+		else if(strcmp(req->uri, http_ap_url) == 0){
 
 			/* if we can get the mutex, write the last version of the AP list */
 			if(wifi_manager_lock_json_buffer(( TickType_t ) 10)){
@@ -280,7 +289,8 @@ static esp_err_t http_server_get_handler(httpd_req_t *req){
 			/* request a wifi scan */
 			wifi_manager_scan_async();
 		}
-		else if(strcmp(req->uri, "/wifimanager/status.json") == 0){
+		/* GET /status.json */
+		else if(strcmp(req->uri, http_status_url) == 0){
 
 			if(wifi_manager_lock_json_buffer(( TickType_t ) 10)){
 				char *buff = wifi_manager_get_ip_info_json();
@@ -350,9 +360,61 @@ static const httpd_uri_t http_server_delete_request = {
 void http_app_stop(){
 
 	if(httpd_handle != NULL){
+
+
+		/* dealloc URLs */
+		if(http_root_url) {
+			free(http_root_url);
+			http_root_url = NULL;
+		}
+		if(http_redirect_url){
+			free(http_redirect_url);
+			http_redirect_url = NULL;
+		}
+		if(http_js_url){
+			free(http_js_url);
+			http_js_url = NULL;
+		}
+		if(http_css_url){
+			free(http_css_url);
+			http_css_url = NULL;
+		}
+		if(http_connect_url){
+			free(http_connect_url);
+			http_connect_url = NULL;
+		}
+		if(http_ap_url){
+			free(http_ap_url);
+			http_ap_url = NULL;
+		}
+		if(http_status_url){
+			free(http_status_url);
+			http_status_url = NULL;
+		}
+
+		/* stop server */
 		httpd_stop(httpd_handle);
 		httpd_handle = NULL;
 	}
+}
+
+
+/**
+ * @brief helper to generate URLs of the wifi manager
+ */
+static char* http_app_generate_url(const char* page){
+
+	char* ret;
+
+	int root_len = strlen(WEBAPP_LOCATION);
+	const size_t url_sz = sizeof(char) * ( (root_len+1) + ( strlen(page) + 1) );
+
+	ret = malloc(url_sz);
+	memset(ret, 0x00, url_sz);
+	strcpy(ret, WEBAPP_LOCATION);
+	ret = strcat(ret, page);
+
+	return ret;
 }
 
 void http_app_start(bool lru_purge_enable){
@@ -367,6 +429,44 @@ void http_app_start(bool lru_purge_enable){
 		 * We could register all URLs one by one, but this would not work while the fake DNS is active */
 		config.uri_match_fn = httpd_uri_match_wildcard;
 		config.lru_purge_enable = lru_purge_enable;
+
+		/* generate the URLs */
+		if(http_root_url == NULL){
+			int root_len = strlen(WEBAPP_LOCATION);
+
+			/* all the pages */
+			const char page_js[] = "code.js";
+			const char page_css[] = "style.css";
+			const char page_connect[] = "connect.json";
+			const char page_ap[] = "ap.json";
+			const char page_status[] = "status.json";
+
+			/* root url, eg "/"   */
+			const size_t http_root_url_sz = sizeof(char) * (root_len+1);
+			http_root_url = malloc(http_root_url_sz);
+			memset(http_root_url, 0x00, http_root_url_sz);
+			strcpy(http_root_url, WEBAPP_LOCATION);
+
+			/* redirect url */
+			size_t redirect_sz = 22 + root_len + 1; /* strlen(http://255.255.255.255) + strlen("/") + 1 for \0 */
+			http_redirect_url = malloc(sizeof(char) * redirect_sz);
+			*http_redirect_url = '\0';
+
+			if(root_len == 1){
+				snprintf(http_redirect_url, redirect_sz, "http://%s", DEFAULT_AP_IP);
+			}
+			else{
+				snprintf(http_redirect_url, redirect_sz, "http://%s%s", DEFAULT_AP_IP, WEBAPP_LOCATION);
+			}
+
+			/* generate the other pages URLs*/
+			http_js_url = http_app_generate_url(page_js);
+			http_css_url = http_app_generate_url(page_css);
+			http_connect_url = http_app_generate_url(page_connect);
+			http_ap_url = http_app_generate_url(page_ap);
+			http_status_url = http_app_generate_url(page_status);
+
+		}
 
 		err = httpd_start(&httpd_handle, &config);
 
