@@ -192,7 +192,15 @@ static void http_server_netconn_resp_file(struct netconn *conn, const char *file
 void http_server_start(void) {
 	esp_log_level_set(TAG, ESP_LOG_DEBUG);
 	if (task_http_server == NULL) {
-		xTaskCreate(&http_server, "http_server", 20 * 1024, NULL, WIFI_MANAGER_TASK_PRIORITY - 1, &task_http_server);
+		ESP_LOGI(TAG, "Run http_server");
+		if (xTaskCreate(&http_server, "http_server", 20 * 1024, NULL, WIFI_MANAGER_TASK_PRIORITY - 1, &task_http_server) != pdPASS)
+		{
+			ESP_LOGE(TAG, "xTaskCreate failed: http_server");
+		}
+	}
+	else
+	{
+		ESP_LOGI(TAG, "Run http_server - the server is already running");
 	}
 }
 
