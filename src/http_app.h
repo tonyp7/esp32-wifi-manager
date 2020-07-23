@@ -42,6 +42,13 @@ extern "C" {
 #endif
 
 
+/** @brief Defines the URL where the wifi manager is located
+ *  By default it is at the server root (ie "/"). If you wish to add your own webpages
+ *  you may want to relocate the wifi manager to another URL, for instance /wifimanager
+ */
+#define WEBAPP_LOCATION 					CONFIG_WEBAPP_LOCATION
+
+
 /** 
  * @brief spawns the http server 
  */
