@@ -24,6 +24,12 @@ config WIFI_MANAGER_SHUTDOWN_AP_TIMER
 	help
 	Defines the time (in ms) to wait after a succesful connection before shutting down the access point.
 
+config WEBAPP_LOCATION
+    string "Defines the URL where the wifi manager is located"
+    default "/"
+    help
+    This parameter helps you relocate the wifimanager to another URL, for instance /wifimanager/ The trailing slash is important and should be included
+
 config DEFAULT_AP_SSID
     string "Access Point SSID"
     default "esp32"
