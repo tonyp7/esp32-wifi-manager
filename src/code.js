@@ -167,7 +167,7 @@ docReady(async function () {
     document.getElementById("diag-disconnect").style.display = "none";
     gel("connect-details-wrap").classList.remove("blur");
 
-    await fetch("/wifimanager/connect.json", {
+    await fetch("connect.json", {
       method: "DELETE",
       headers: {
         "Content-Type": "application/json",
@@ -215,7 +215,7 @@ async function performConnect(conntype) {
   connect_manual_div.style.display = "none";
   connect_wait_div.style.display = "block";
 
-  await fetch("/wifimanager/connect.json", {
+  await fetch("connect.json", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -242,7 +242,7 @@ function rssiToIcon(rssi) {
   }
 }
 
-async function refreshAP(url = "/wifimanager/ap.json") {
+async function refreshAP(url = "ap.json") {
   try {
     var res = await fetch(url);
     var access_points = await res.json();
@@ -272,7 +272,7 @@ function refreshAPHTML(data) {
   gel("wifi-list").innerHTML = h;
 }
 
-async function checkStatus(url = "/wifimanager/status.json") {
+async function checkStatus(url = "status.json") {
   try {
     var response = await fetch(url);
     var data = await response.json();
