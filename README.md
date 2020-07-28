@@ -35,10 +35,10 @@
 
 To get you started, esp32-wifi-manager needs:
 
-- esp-idf 4.1 and up
+- esp-idf **4.1 and up**
 - esp32 or esp32-s2
 
-Due to breaking changes in esp-idf 4.1, most notably the complete revision on how the event wifi loop works and how the tcpip library was deprecated in favour of a newer library (esp_netif), esp32-wifi-manager will not work with older releases of espressif's frameworks
+Due to breaking changes in esp-idf 4.1, most notably the complete revision on how the event wifi loop works and how the tcpip library was deprecated in favour of a newer library (esp_netif), esp32-wifi-manager will not work with older releases of espressif's framework.
 
 ## Hello World
 
@@ -170,7 +170,7 @@ The list of possible events you can add a callback to are defined by message_cod
 * WM_EVENT_STA_GOT_IP
 * WM_ORDER_STOP_AP
 
-In practice, keeping track of WM_EVENT_STA_GOT_IP and WM_EVENT_STA_DISCONNECTED is key to know whether or not your esp32 has a connection. The other messages can mostly be ignored in a typical applicationn using esp32-wifi-manager.
+In practice, keeping track of WM_EVENT_STA_GOT_IP and WM_EVENT_STA_DISCONNECTED is key to know whether or not your esp32 has a connection. The other messages can mostly be ignored in a typical application using esp32-wifi-manager.
 
 ## Interacting with the http server
 
