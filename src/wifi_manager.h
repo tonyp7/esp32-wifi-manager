@@ -241,12 +241,16 @@ typedef struct{
 	void *param;
 } queue_message;
 
+typedef struct {
+	wifi_ant_gpio_config_t wifiAntGpioConfig;
+	wifi_ant_config_t wifiAntConfig;
+} WiFiAntConfig_t;
 
 
 /**
  * Allocate heap memory for the wifi manager and start the wifi_manager RTOS task
  */
-void wifi_manager_start();
+void wifi_manager_start(const WiFiAntConfig_t* pWiFiAntConfig);
 
 /**
  * Frees up all memory allocated by the wifi_manager and kill the task.

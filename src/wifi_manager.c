@@ -145,7 +145,7 @@ void wifi_manager_disconnect_async(){
 	//xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_WIFI_DISCONNECT_BIT); TODO: delete
 }
 
-void wifi_manager_start(){
+void wifi_manager_start(const WiFiAntConfig_t* pWiFiAntConfig){
 	/* disable the default wifi logging */
 	//esp_log_level_set(TAG, ESP_LOG_DEBUG);
 
@@ -173,7 +173,7 @@ void wifi_manager_start(){
 	wifi_manager_event_group = xEventGroupCreate();
 
 	/* start wifi manager task */
-	xTaskCreate(&wifi_manager, "wifi_manager", 4096, NULL, WIFI_MANAGER_TASK_PRIORITY, &task_wifi_manager);
+	xTaskCreate(&wifi_manager, "wifi_manager", 4096, (void*)pWiFiAntConfig, WIFI_MANAGER_TASK_PRIORITY, &task_wifi_manager);
 }
 
 esp_err_t wifi_manager_clear_sta_config(void) {
@@ -653,6 +653,7 @@ void wifi_manager_set_callback(message_code_t message_code, void (*func_ptr)(voi
 }
 
 void wifi_manager( void * pvParameters ){
+	const WiFiAntConfig_t* pWiFiAntConfig = pvParameters;
 	queue_message msg;
 	BaseType_t xStatus;
 	EventBits_t uxBits;
@@ -681,6 +682,19 @@ void wifi_manager( void * pvParameters ){
 	ESP_ERROR_CHECK(esp_wifi_init(&wifi_init_config));
 	ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
 
+	if (NULL != pWiFiAntConfig)
+	{
+		esp_err_t err = esp_wifi_set_ant_gpio(&pWiFiAntConfig->wifiAntGpioConfig);
+		if (ESP_OK != err)
+		{
+			ESP_LOGE(TAG, "esp_wifi_set_ant_gpio failed, res=%d", err);
+		}
+		err = esp_wifi_set_ant(&pWiFiAntConfig->wifiAntConfig);
+		if (ESP_OK != err)
+		{
+			ESP_LOGE(TAG, "esp_wifi_set_ant failed, res=%d", err);
+		}
+	}
 	/* SoftAP - Wifi Access Point configuration setup */
 	tcpip_adapter_ip_info_t info;
 	memset(&info, 0x00, sizeof(info));
