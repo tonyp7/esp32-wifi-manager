@@ -186,6 +186,11 @@ extern "C" {
 #define JSON_IP_INFO_SIZE 					159
 
 
+/**
+ * @brief defines the minimum length of an access point password running on WPA2
+ */
+#define WPA2_MINIMUM_PASSWORD_LENGTH		8
+
 
 /**
  * @brief Defines the complete list of all messages that the wifi_manager can process.
