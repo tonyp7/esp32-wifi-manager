@@ -74,11 +74,13 @@ idf.py menuconfig
 
 Navigate in "Component config" then pick "Wifi Manager Configuration". You will be greeted by the following screen:
 
-![esp32-wifi-manager-menuconfig](https://idyl.io/wp-content/uploads/2020/07/esp32-wifi-manager-menuconfig-800px.png "menuconfig screen")
+![esp32-wifi-manager-menuconfig](https://idyl.io/wp-content/uploads/2020/08/wifi-manager-menuconfig-800px.png "menuconfig screen")
 
-You can change the ssid and password of the access point at your convenience, but it is highly recommended to keep default values. Your password should be between 8 and 63 characters long, to comply with the WPA2 standard.
+You can change the ssid and password of the access point at your convenience, but it is highly recommended to keep default values. Your password should be between 8 and 63 characters long, to comply with the WPA2 standard. If the password is set to an empty value or is less than 8 characters long, esp32-wifi-manager will create its access point as an open wifi network.
 
 You can also change the values for various timers, for instance how long it takes for the access point to shutdown once a connection is established (default: 60000). While it could be tempting to set this timer to 0, just be warned that in that case the user will never get the feedback that a connection is succesful. Shutting down the AP will instantly kill the current navigating session on the captive portal.
+
+Finally, you can choose to relocate esp32-wifi-manager to a different URL by changing the default value of "/" to something else, for instance "/wifimanager/". Please note that the trailing slash does matter. This feature is particularly useful in case you want your own webapp to co-exist with esp32-wifi-manager's own web pages.
 
 # Adding esp32-wifi-manager to your code
 
