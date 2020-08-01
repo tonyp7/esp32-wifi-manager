@@ -899,14 +899,23 @@ void wifi_manager( void * pvParameters ){
 		.ap = {
 			.ssid_len = 0,
 			.channel = wifi_settings.ap_channel,
-			.authmode = WIFI_AUTH_WPA2_PSK,
 			.ssid_hidden = wifi_settings.ap_ssid_hidden,
 			.max_connection = DEFAULT_AP_MAX_CONNECTIONS,
 			.beacon_interval = DEFAULT_AP_BEACON_INTERVAL,
 		},
 	};
 	memcpy(ap_config.ap.ssid, wifi_settings.ap_ssid , sizeof(wifi_settings.ap_ssid));
-	memcpy(ap_config.ap.password, wifi_settings.ap_pwd, sizeof(wifi_settings.ap_pwd));
+
+	/* if the password lenght is under 8 char which is the minium for WPA2, the access point starts as open */
+	if(strlen( (char*)wifi_settings.ap_pwd) < WPA2_MINIMUM_PASSWORD_LENGTH){
+		ap_config.ap.authmode = WIFI_AUTH_OPEN;
+		memset( ap_config.ap.password, 0x00, sizeof(ap_config.ap.password) );
+	}
+	else{
+		ap_config.ap.authmode = WIFI_AUTH_WPA2_PSK;
+		memcpy(ap_config.ap.password, wifi_settings.ap_pwd, sizeof(wifi_settings.ap_pwd));
+	}
+	
 
 	/* DHCP AP configuration */
 	esp_netif_dhcps_stop(esp_netif_ap); /* DHCP client/server must be stopped before setting new IP information. */
