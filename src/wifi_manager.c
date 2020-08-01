@@ -556,7 +556,8 @@ static void wifi_manager_event_handler(void* arg, esp_event_base_t event_base, i
 		case WIFI_EVENT_SCAN_DONE:
 			ESP_LOGD(TAG, "WIFI_EVENT_SCAN_DONE");
 	    	xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_SCAN_BIT);
-	    	wifi_manager_send_message(WM_EVENT_SCAN_DONE, NULL);
+			wifi_event_sta_scan_done_t event_sta_scan_done = *((wifi_event_sta_scan_done_t*)event_data);
+	    	wifi_manager_send_message(WM_EVENT_SCAN_DONE, &event_sta_scan_done);
 			break;
 
 		/* If esp_wifi_start() returns ESP_OK and the current Wi-Fi mode is Station or AP+Station, then this event will
@@ -959,25 +960,29 @@ void wifi_manager( void * pvParameters ){
 		if( xStatus == pdPASS ){
 			switch(msg.code){
 
-			case WM_EVENT_SCAN_DONE:
-				/* As input param, it stores max AP number ap_records can hold. As output param, it receives the actual AP number this API returns.
-				 * As a consequence, ap_num MUST be reset to MAX_AP_NUM at every scan */
-				ap_num = MAX_AP_NUM;
-				ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&ap_num, accessp_records));
-				/* make sure the http server isn't trying to access the list while it gets refreshed */
-				if(wifi_manager_lock_json_buffer( pdMS_TO_TICKS(1000) )){
-					/* Will remove the duplicate SSIDs from the list and update ap_num */
-					wifi_manager_filter_unique(accessp_records, &ap_num);
-					wifi_manager_generate_acess_points_json();
-					wifi_manager_unlock_json_buffer();
-				}
-				else{
-					ESP_LOGE(TAG, "could not get access to json mutex in wifi_scan");
+			case WM_EVENT_SCAN_DONE:{
+				wifi_event_sta_scan_done_t *evt_scan_done = (wifi_event_sta_scan_done_t*)msg.param;
+				/* only check for AP if the scan is succesful */
+				if(evt_scan_done->status == 0){
+					/* As input param, it stores max AP number ap_records can hold. As output param, it receives the actual AP number this API returns.
+					* As a consequence, ap_num MUST be reset to MAX_AP_NUM at every scan */
+					ap_num = MAX_AP_NUM;
+					ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&ap_num, accessp_records));
+					/* make sure the http server isn't trying to access the list while it gets refreshed */
+					if(wifi_manager_lock_json_buffer( pdMS_TO_TICKS(1000) )){
+						/* Will remove the duplicate SSIDs from the list and update ap_num */
+						wifi_manager_filter_unique(accessp_records, &ap_num);
+						wifi_manager_generate_acess_points_json();
+						wifi_manager_unlock_json_buffer();
+					}
+					else{
+						ESP_LOGE(TAG, "could not get access to json mutex in wifi_scan");
+					}
 				}
 
 				/* callback */
 				if(cb_ptr_arr[msg.code]) (*cb_ptr_arr[msg.code])(NULL);
-
+				}
 				break;
 
 			case WM_ORDER_START_WIFI_SCAN:
@@ -1030,6 +1035,12 @@ void wifi_manager( void * pvParameters ){
 				if( ! (uxBits & WIFI_MANAGER_WIFI_CONNECTED_BIT) ){
 					/* update config to latest and attempt connection */
 					ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, wifi_manager_get_wifi_sta_config()));
+
+					/* if there is a wifi scan in progress abort it first
+					   Calling esp_wifi_scan_stop will trigger a SCAN_DONE event which will reset this bit */
+					if(uxBits & WIFI_MANAGER_SCAN_BIT){
+						esp_wifi_scan_stop();
+					}
 					ESP_ERROR_CHECK(esp_wifi_connect());
 				}
 
