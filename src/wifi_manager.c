@@ -57,6 +57,7 @@ Contains the freeRTOS task and all necessary support
 
 #include "json.h"
 #include "dns_server.h"
+#include "nvs_sync.h"
 #include "wifi_manager.h"
 
 
@@ -179,6 +180,7 @@ void wifi_manager_start(){
 
 	/* initialize flash memory */
 	nvs_flash_init();
+	nvs_sync_create(); /* semaphore for thread synchronization on NVS memory */
 
 	/* memory allocation */
 	wifi_manager_queue = xQueueCreate( 3, sizeof( queue_message) );
@@ -225,7 +227,7 @@ esp_err_t wifi_manager_save_sta_config(){
 
 	ESP_LOGI(TAG, "About to save config to flash");
 
-	if(wifi_manager_config_sta){
+	if(wifi_manager_config_sta && nvs_sync_lock( portMAX_DELAY )){
 
 		esp_err = nvs_open(wifi_manager_nvs_namespace, NVS_READWRITE, &handle);
 		if (esp_err != ESP_OK) return esp_err;
@@ -287,9 +289,7 @@ esp_err_t wifi_manager_save_sta_config(){
 		if (esp_err != ESP_OK) return esp_err;
 
 		nvs_close(handle);
-
-
-
+		nvs_sync_unlock();
 
 	}
 
@@ -300,7 +300,7 @@ bool wifi_manager_fetch_wifi_sta_config(){
 
 	nvs_handle handle;
 	esp_err_t esp_err;
-	if(nvs_open(wifi_manager_nvs_namespace, NVS_READONLY, &handle) == ESP_OK){
+	if(nvs_sync_lock( portMAX_DELAY ) && nvs_open(wifi_manager_nvs_namespace, NVS_READONLY, &handle) == ESP_OK){
 
 		if(wifi_manager_config_sta == NULL){
 			wifi_manager_config_sta = (wifi_config_t*)malloc(sizeof(wifi_config_t));
@@ -317,6 +317,7 @@ bool wifi_manager_fetch_wifi_sta_config(){
 		esp_err = nvs_get_blob(handle, "ssid", buff, &sz);
 		if(esp_err != ESP_OK){
 			free(buff);
+			nvs_sync_unlock();
 			return false;
 		}
 		memcpy(wifi_manager_config_sta->sta.ssid, buff, sz);
@@ -326,6 +327,7 @@ bool wifi_manager_fetch_wifi_sta_config(){
 		esp_err = nvs_get_blob(handle, "password", buff, &sz);
 		if(esp_err != ESP_OK){
 			free(buff);
+			nvs_sync_unlock();
 			return false;
 		}
 		memcpy(wifi_manager_config_sta->sta.password, buff, sz);
@@ -335,12 +337,14 @@ bool wifi_manager_fetch_wifi_sta_config(){
 		esp_err = nvs_get_blob(handle, "settings", buff, &sz);
 		if(esp_err != ESP_OK){
 			free(buff);
+			nvs_sync_unlock();
 			return false;
 		}
 		memcpy(&wifi_settings, buff, sz);
 
 		free(buff);
 		nvs_close(handle);
+		nvs_sync_unlock();
 
 
 		ESP_LOGI(TAG, "wifi_manager_fetch_wifi_sta_config: ssid:%s password:%s",wifi_manager_config_sta->sta.ssid,wifi_manager_config_sta->sta.password);
