@@ -138,7 +138,7 @@ Ther are effectively three different ways you can embed esp32-wifi-manager with 
 * Use event callbacks
 * Modify esp32-wifi-manager code directly to fit your needs
 
-**Event callbacks** are the cleanest way to use the wifi manager and that's the recommended way to do it. A typical use-case would be to get notified when wifi manager finally gets a connection an access point. In order to do this you can simply define a callback function:
+**Event callbacks** are the cleanest way to use the wifi manager and that's the recommended way to do it. A typical use-case would be to get notified when wifi manager finally gets a connection to an access point. In order to do this you can simply define a callback function:
 
 ```c
 void cb_connection_ok(void *pvParameter){
