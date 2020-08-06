@@ -1,3 +1,6 @@
 [submodule "ruuvi.gwui.html"]
 	path = ruuvi.gwui.html
 	url = https://github.com/ruuvi/ruuvi.gwui.html.git
+[submodule "tests/googletest"]
+	path = tests/googletest
+	url = https://github.com/google/googletest.git
