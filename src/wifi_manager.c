@@ -406,7 +406,9 @@ bool wifi_manager_lock_sta_ip_string(TickType_t xTicksToWait){
 }
 
 void wifi_manager_unlock_sta_ip_string(){
-	xSemaphoreGive( wifi_manager_sta_ip_mutex );
+	if(wifi_manager_sta_ip_mutex){
+		xSemaphoreGive( wifi_manager_sta_ip_mutex );
+	}
 }
 
 void wifi_manager_safe_update_sta_ip_string(uint32_t ip){

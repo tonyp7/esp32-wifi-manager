@@ -559,7 +559,8 @@ void http_server_netconn_serve(struct netconn *conn) {
 		char *host = http_server_get_header(save_ptr, "Host: ", &lenH);
 		/* determine if Host is from the STA IP address */
 		wifi_manager_lock_sta_ip_string(portMAX_DELAY);
-		bool access_from_sta_ip = lenH > 0?strstr(host, wifi_manager_get_sta_ip_string()):false;
+		char *ipStr = wifi_manager_get_sta_ip_string();
+		bool access_from_sta_ip = NULL == ipStr || (lenH > 0 && strstr(host, ipStr));
 		wifi_manager_unlock_sta_ip_string();
 
 		if (lenH > 0 && !strstr(host, DEFAULT_AP_IP) && !access_from_sta_ip) {
