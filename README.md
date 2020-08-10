@@ -8,7 +8,7 @@
 
 *esp32-wifi-manager* will automatically attempt to re-connect to a previously saved network on boot, and if it cannot find a saved wifi it will start its own access point through which you can manage and connect to wifi networks. Upon a succesful connection, the software will shutdown the access point automatically after some time (1 minute by default).
 
-*esp32-wifi-manager* compiles with esp-idf 4.1 and above. See [Getting Started](#getting-started) to guide you through your first setup.
+*esp32-wifi-manager* compiles with esp-idf 4.2 and above. See [Getting Started](#getting-started) to guide you through your first setup.
 
 # Content
  - [Demo](#demo)
@@ -35,10 +35,10 @@
 
 To get you started, esp32-wifi-manager needs:
 
-- esp-idf **4.1 and up**
+- esp-idf **4.2 and up**
 - esp32 or esp32-s2
 
-Due to breaking changes in esp-idf 4.1, most notably the complete revision on how the event wifi loop works and how the tcpip library was deprecated in favour of a newer library (esp_netif), esp32-wifi-manager will not work with older releases of espressif's framework.
+There are breaking changes and new features in esp-idf 4.1 and 4.2 which makes esp32-wifi-manager incompatible with anything lower than 4.2. This includes esp_netif (introduced in 4.1) and esp_event_handler_instance_t (introduced in 4.2). It is recommended to compile esp32-wifi-manager with the master tree to avoid any compatibility issue.
 
 ## Hello World
 
