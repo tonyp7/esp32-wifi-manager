@@ -1053,8 +1053,8 @@ void wifi_manager( void * pvParameters ){
 				break;
 
 			case WM_EVENT_STA_DISCONNECTED:
-				;wifi_event_sta_disconnected_t* param = (wifi_event_sta_disconnected_t*)msg.param;
-				ESP_LOGI(TAG, "MESSAGE: EVENT_STA_DISCONNECTED with Reason code: %d", param->reason);
+				;wifi_event_sta_disconnected_t* wifi_event_sta_disconnected = (wifi_event_sta_disconnected_t*)msg.param;
+				ESP_LOGI(TAG, "MESSAGE: EVENT_STA_DISCONNECTED with Reason code: %d", wifi_event_sta_disconnected->reason);
 
 				/* this even can be posted in numerous different conditions
 				 *
@@ -1182,7 +1182,7 @@ void wifi_manager( void * pvParameters ){
 
 				/* callback */
 				if(cb_ptr_arr[msg.code]) (*cb_ptr_arr[msg.code])( msg.param );
-				free(param);
+				free(wifi_event_sta_disconnected);
 
 				break;
 
@@ -1232,14 +1232,14 @@ void wifi_manager( void * pvParameters ){
 
 			case WM_EVENT_STA_GOT_IP:
 				ESP_LOGI(TAG, "WM_EVENT_STA_GOT_IP");
-				ip_event_got_ip_t* param = (ip_event_got_ip_t*)msg.param; 
+				ip_event_got_ip_t* ip_event_got_ip = (ip_event_got_ip_t*)msg.param; 
 				uxBits = xEventGroupGetBits(wifi_manager_event_group);
 
 				/* reset connection requests bits -- doesn't matter if it was set or not */
 				xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_STA_CONNECT_BIT);
 
 				/* save IP as a string for the HTTP server host */
-				wifi_manager_safe_update_sta_ip_string(param->ip_info.ip.addr);
+				wifi_manager_safe_update_sta_ip_string(ip_event_got_ip->ip_info.ip.addr);
 
 				/* save wifi config in NVS if it wasn't a restored of a connection */
 				if(uxBits & WIFI_MANAGER_REQUEST_RESTORE_STA_BIT){
@@ -1282,7 +1282,7 @@ void wifi_manager( void * pvParameters ){
 
 				/* callback and free memory allocated for the void* param */
 				if(cb_ptr_arr[msg.code]) (*cb_ptr_arr[msg.code])( msg.param );
-				free(param);
+				free(ip_event_got_ip);
 
 				break;
 
