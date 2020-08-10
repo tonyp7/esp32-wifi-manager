@@ -20,6 +20,7 @@
  - [Adding esp32-wifi-manager to your code](#adding-esp32-wifi-manager-to-your-code)
    - [Interacting with the manager](#interacting-with-the-manager)
    - [Interacting with the http server](#interacting-with-the-http-server)
+   - [Thread safety and access to NVS](#thread-safety-and-access-to-nvs)
  - [License](#license)
    
 
@@ -189,6 +190,24 @@ http_app_set_handler_hook(HTTP_GET, &my_custom_handler);
 ```
 
 The [examples/http_hook](examples/http_hook) contains an example where a web page is registered at /helloworld
+
+## Thread safety and access to NVS
+
+esp32-wifi-manager accesses the non-volatile storage to store and load its configuration into a dedicated namespace "espwifimgr". If you want to make sure there will never be a conflict with concurrent access to the NVS, you can include nvs_sync.h and use calls to nvs_sync_lock and nvs_sync_unlock.
+
+```c
+nvs_handle handle;
+
+if(nvs_sync_lock( portMAX_DELAY )){  
+    if(nvs_open(wifi_manager_nvs_namespace, NVS_READWRITE, &handle) == ESP_OK){
+        /* do something with NVS */
+	nvs_close(handle);
+    }
+    nvs_sync_unlock();
+}
+```
+nvs_sync_lock waits for the number of ticks sent to it as a parameter to acquire a mutex. It is recommended to use portMAX_DELAY. In practice, nvs_sync_lock will almost never wait.
+
 
 # License
 *esp32-wifi-manager* is MIT licensed. As such, it can be included in any project, commercial or not, as long as you retain original copyright. Please make sure to read the license file.
