@@ -29,6 +29,7 @@ SOFTWARE.
 #include <stdio.h>
 #include <string.h>
 #include <esp_wifi.h>
+#include <esp_netif.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_system.h"
@@ -52,9 +53,17 @@ void monitoring_task(void *pvParameter)
 }
 
 
-/* brief this is an exemple of a callback that you can setup in your own app to get notified of wifi manager event */
+/**
+ * @brief this is an exemple of a callback that you can setup in your own app to get notified of wifi manager event.
+ */
 void cb_connection_ok(void *pvParameter){
-	ESP_LOGI(TAG, "I have a connection!");
+	ip_event_got_ip_t* param = (ip_event_got_ip_t*)pvParameter;
+
+	/* transform IP to human readable string */
+	char str_ip[16];
+	esp_ip4addr_ntoa(&param->ip_info.ip, str_ip, IP4ADDR_STRLEN_MAX);
+
+	ESP_LOGI(TAG, "I have a connection and my IP is %s!", str_ip);
 }
 
 void app_main()

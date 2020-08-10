@@ -57,6 +57,7 @@ Contains the freeRTOS task and all necessary support
 
 #include "json.h"
 #include "dns_server.h"
+#include "nvs_sync.h"
 #include "wifi_manager.h"
 
 
@@ -179,6 +180,7 @@ void wifi_manager_start(){
 
 	/* initialize flash memory */
 	nvs_flash_init();
+	nvs_sync_create(); /* semaphore for thread synchronization on NVS memory */
 
 	/* memory allocation */
 	wifi_manager_queue = xQueueCreate( 3, sizeof( queue_message) );
@@ -225,7 +227,7 @@ esp_err_t wifi_manager_save_sta_config(){
 
 	ESP_LOGI(TAG, "About to save config to flash");
 
-	if(wifi_manager_config_sta){
+	if(wifi_manager_config_sta && nvs_sync_lock( portMAX_DELAY )){
 
 		esp_err = nvs_open(wifi_manager_nvs_namespace, NVS_READWRITE, &handle);
 		if (esp_err != ESP_OK) return esp_err;
@@ -287,9 +289,7 @@ esp_err_t wifi_manager_save_sta_config(){
 		if (esp_err != ESP_OK) return esp_err;
 
 		nvs_close(handle);
-
-
-
+		nvs_sync_unlock();
 
 	}
 
@@ -300,7 +300,7 @@ bool wifi_manager_fetch_wifi_sta_config(){
 
 	nvs_handle handle;
 	esp_err_t esp_err;
-	if(nvs_open(wifi_manager_nvs_namespace, NVS_READONLY, &handle) == ESP_OK){
+	if(nvs_sync_lock( portMAX_DELAY ) && nvs_open(wifi_manager_nvs_namespace, NVS_READONLY, &handle) == ESP_OK){
 
 		if(wifi_manager_config_sta == NULL){
 			wifi_manager_config_sta = (wifi_config_t*)malloc(sizeof(wifi_config_t));
@@ -317,6 +317,7 @@ bool wifi_manager_fetch_wifi_sta_config(){
 		esp_err = nvs_get_blob(handle, "ssid", buff, &sz);
 		if(esp_err != ESP_OK){
 			free(buff);
+			nvs_sync_unlock();
 			return false;
 		}
 		memcpy(wifi_manager_config_sta->sta.ssid, buff, sz);
@@ -326,6 +327,7 @@ bool wifi_manager_fetch_wifi_sta_config(){
 		esp_err = nvs_get_blob(handle, "password", buff, &sz);
 		if(esp_err != ESP_OK){
 			free(buff);
+			nvs_sync_unlock();
 			return false;
 		}
 		memcpy(wifi_manager_config_sta->sta.password, buff, sz);
@@ -335,12 +337,14 @@ bool wifi_manager_fetch_wifi_sta_config(){
 		esp_err = nvs_get_blob(handle, "settings", buff, &sz);
 		if(esp_err != ESP_OK){
 			free(buff);
+			nvs_sync_unlock();
 			return false;
 		}
 		memcpy(&wifi_settings, buff, sz);
 
 		free(buff);
 		nvs_close(handle);
+		nvs_sync_unlock();
 
 
 		ESP_LOGI(TAG, "wifi_manager_fetch_wifi_sta_config: ssid:%s password:%s",wifi_manager_config_sta->sta.ssid,wifi_manager_config_sta->sta.password);
@@ -481,19 +485,14 @@ void wifi_manager_safe_update_sta_ip_string(uint32_t ip){
 		esp_ip4_addr_t ip4;
 		ip4.addr = ip;
 
-		//char* str_ip = (char*)malloc(sizeof(char) * IP4ADDR_STRLEN_MAX);
 		char str_ip[IP4ADDR_STRLEN_MAX];
 		esp_ip4addr_ntoa(&ip4, str_ip, IP4ADDR_STRLEN_MAX);
 
 		strcpy(wifi_manager_sta_ip, str_ip);
 
-		//free(str_ip);
-
 		ESP_LOGI(TAG, "Set STA IP String to: %s", wifi_manager_sta_ip);
 
 		wifi_manager_unlock_sta_ip_string();
-
-
 	}
 }
 
@@ -556,8 +555,9 @@ static void wifi_manager_event_handler(void* arg, esp_event_base_t event_base, i
 		case WIFI_EVENT_SCAN_DONE:
 			ESP_LOGD(TAG, "WIFI_EVENT_SCAN_DONE");
 	    	xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_SCAN_BIT);
-			wifi_event_sta_scan_done_t event_sta_scan_done = *((wifi_event_sta_scan_done_t*)event_data);
-	    	wifi_manager_send_message(WM_EVENT_SCAN_DONE, &event_sta_scan_done);
+			wifi_event_sta_scan_done_t* event_sta_scan_done = (wifi_event_sta_scan_done_t*)malloc(sizeof(wifi_event_sta_scan_done_t));
+			*event_sta_scan_done = *((wifi_event_sta_scan_done_t*)event_data);
+	    	wifi_manager_send_message(WM_EVENT_SCAN_DONE, event_sta_scan_done);
 			break;
 
 		/* If esp_wifi_start() returns ESP_OK and the current Wi-Fi mode is Station or AP+Station, then this event will
@@ -631,13 +631,14 @@ static void wifi_manager_event_handler(void* arg, esp_event_base_t event_base, i
 		case WIFI_EVENT_STA_DISCONNECTED:
 			ESP_LOGI(TAG, "WIFI_EVENT_STA_DISCONNECTED");
 
-			wifi_event_sta_disconnected_t* event = (wifi_event_sta_disconnected_t*)event_data;
+			wifi_event_sta_disconnected_t* wifi_event_sta_disconnected = (wifi_event_sta_disconnected_t*)malloc(sizeof(wifi_event_sta_disconnected));
+			*wifi_event_sta_disconnected =  *( (wifi_event_sta_disconnected_t*)event_data );
 
 			/* if a DISCONNECT message is posted while a scan is in progress this scan will NEVER end, causing scan to never work again. For this reason SCAN_BIT is cleared too */
 			xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_WIFI_CONNECTED_BIT | WIFI_MANAGER_SCAN_BIT);
 
 			/* post disconnect event with reason code */
-			wifi_manager_send_message(WM_EVENT_STA_DISCONNECTED, (void*)( (uint32_t) event->reason) );
+			wifi_manager_send_message(WM_EVENT_STA_DISCONNECTED, (void*)wifi_event_sta_disconnected );
 			break;
 
 		/* This event arises when the AP to which the station is connected changes its authentication mode, e.g., from no auth
@@ -700,8 +701,9 @@ static void wifi_manager_event_handler(void* arg, esp_event_base_t event_base, i
 		case IP_EVENT_STA_GOT_IP:
 			ESP_LOGI(TAG, "IP_EVENT_STA_GOT_IP");
 	        xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_WIFI_CONNECTED_BIT);
-	        ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
-	        wifi_manager_send_message(WM_EVENT_STA_GOT_IP, (void*)event->ip_info.ip.addr);
+	        ip_event_got_ip_t* ip_event_got_ip = (ip_event_got_ip_t*)malloc(sizeof(ip_event_got_ip_t));
+			*ip_event_got_ip =  *( (ip_event_got_ip_t*)event_data );
+	        wifi_manager_send_message(WM_EVENT_STA_GOT_IP, (void*)(ip_event_got_ip) );
 			break;
 
 		/* This event arises when the IPV6 SLAAC support auto-configures an address for the ESP32, or when this address changes.
@@ -981,7 +983,8 @@ void wifi_manager( void * pvParameters ){
 				}
 
 				/* callback */
-				if(cb_ptr_arr[msg.code]) (*cb_ptr_arr[msg.code])(NULL);
+				if(cb_ptr_arr[msg.code]) (*cb_ptr_arr[msg.code])( msg.param );
+				free(evt_scan_done);
 				}
 				break;
 
@@ -1050,7 +1053,8 @@ void wifi_manager( void * pvParameters ){
 				break;
 
 			case WM_EVENT_STA_DISCONNECTED:
-				ESP_LOGI(TAG, "MESSAGE: EVENT_STA_DISCONNECTED with Reason code: %d", (uint32_t)msg.param);
+				;wifi_event_sta_disconnected_t* wifi_event_sta_disconnected = (wifi_event_sta_disconnected_t*)msg.param;
+				ESP_LOGI(TAG, "MESSAGE: EVENT_STA_DISCONNECTED with Reason code: %d", wifi_event_sta_disconnected->reason);
 
 				/* this even can be posted in numerous different conditions
 				 *
@@ -1177,7 +1181,8 @@ void wifi_manager( void * pvParameters ){
 				}
 
 				/* callback */
-				if(cb_ptr_arr[msg.code]) (*cb_ptr_arr[msg.code])(NULL);
+				if(cb_ptr_arr[msg.code]) (*cb_ptr_arr[msg.code])( msg.param );
+				free(wifi_event_sta_disconnected);
 
 				break;
 
@@ -1226,15 +1231,15 @@ void wifi_manager( void * pvParameters ){
 				break;
 
 			case WM_EVENT_STA_GOT_IP:
-				ESP_LOGI(TAG, "MESSAGE: EVENT_STA_GOT_IP");
-
+				ESP_LOGI(TAG, "WM_EVENT_STA_GOT_IP");
+				ip_event_got_ip_t* ip_event_got_ip = (ip_event_got_ip_t*)msg.param; 
 				uxBits = xEventGroupGetBits(wifi_manager_event_group);
 
 				/* reset connection requests bits -- doesn't matter if it was set or not */
 				xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_STA_CONNECT_BIT);
 
 				/* save IP as a string for the HTTP server host */
-				wifi_manager_safe_update_sta_ip_string((uint32_t)msg.param);
+				wifi_manager_safe_update_sta_ip_string(ip_event_got_ip->ip_info.ip.addr);
 
 				/* save wifi config in NVS if it wasn't a restored of a connection */
 				if(uxBits & WIFI_MANAGER_REQUEST_RESTORE_STA_BIT){
@@ -1275,8 +1280,9 @@ void wifi_manager( void * pvParameters ){
 
 				}
 
-				/* callback */
-				if(cb_ptr_arr[msg.code]) (*cb_ptr_arr[msg.code])(NULL);
+				/* callback and free memory allocated for the void* param */
+				if(cb_ptr_arr[msg.code]) (*cb_ptr_arr[msg.code])( msg.param );
+				free(ip_event_got_ip);
 
 				break;
 
