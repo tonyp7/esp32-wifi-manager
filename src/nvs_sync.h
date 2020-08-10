@@ -32,13 +32,13 @@ SOFTWARE.
 #ifndef WIFI_MANAGER_NVS_SYNC_H_INCLUDED
 #define WIFI_MANAGER_NVS_SYNC_H_INCLUDED
 
+#include <stdbool.h> /* for type bool */
+#include <freertos/FreeRTOS.h> /* for TickType_t */
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#include <stdbool.h> /* for type bool */
-#include <freertos/FreeRTOS.h> /* for TickType_t */
 
 /**
  * @brief Attempts to get hold of the NVS semaphore for a set amount of ticks.
