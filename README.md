@@ -193,7 +193,7 @@ The [examples/http_hook](examples/http_hook) contains an example where a web pag
 
 ## Thread safety and access to NVS
 
-esp32-wifi-manager accesses the non-volatile storage to store and load its configuration into a dedicated namespace "espwifimgr". If you want to make sure there will never be a conflict with concurrent access to the NVS, you can include nvs_sync.h and use calls to nvs_sync_lock and nvs_sync_unlock.
+esp32-wifi-manager accesses the non-volatile storage to store and loads its configuration into a dedicated namespace "espwifimgr". If you want to make sure there will never be a conflict with concurrent access to the NVS, you can include nvs_sync.h and use calls to nvs_sync_lock and nvs_sync_unlock.
 
 ```c
 nvs_handle handle;
