@@ -189,6 +189,17 @@ static void http_server_netconn_resp_file(struct netconn *conn, const char *file
 	netconn_write(conn, file_content, file_len, NETCONN_NOCOPY);
 }
 
+static void http_server_netconn_resp_metrics(struct netconn *conn) {
+	char* metrics = ruuvi_get_metrics();
+	http_server_netconn_printf(
+			conn,
+			"HTTP/1.1 200 OK\n"
+			"Content-Type: text/plain; version=0.0.4; charset=utf-8\n"
+			"\n");
+	netconn_write(conn, metrics, strlen(metrics), NETCONN_COPY);
+	free(metrics);
+}
+
 void http_server_start(void) {
 	esp_log_level_set(TAG, ESP_LOG_DEBUG);
 	if (task_http_server == NULL) {
@@ -629,6 +640,10 @@ void http_server_netconn_serve(struct netconn *conn) {
 					else {
 						http_server_netconn_resp_404(conn);
 					}
+				}
+				else if (strcmp(file_name, "metrics") == 0)
+				{
+					http_server_netconn_resp_metrics(conn);
 				}
 				else
 				{

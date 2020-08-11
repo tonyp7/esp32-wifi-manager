@@ -11,6 +11,7 @@ if(IDF_VERSION_MAJOR GREATER_EQUAL 4)
             src/ruuvi_gwui_html.h
             ../../main/ethernet.c
             ../../main/settings.c
+            ../../main/metrics.c
         REQUIRES
             log
             nvs_flash
