@@ -185,6 +185,8 @@ Callback signature includes a void* pointer. For most events, this additional pa
 
 These objects are standard esp-idf structures, and are documented as such in the [official pages](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html).
 
+The [examples/default_demo](examples/default_demo) demonstrates how you can read a ip_event_got_ip_t object to access the IP address assigned to the esp32.
+
 ## Interacting with the http server
 
 Because esp32-wifi-manager spawns its own http server, you might want to extend this server to serve your own pages in your application. It is possible to do so by registering your own URL handler using the standard esp_http_server signature:
