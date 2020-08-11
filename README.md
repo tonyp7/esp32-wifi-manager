@@ -175,6 +175,16 @@ The list of possible events you can add a callback to are defined by message_cod
 
 In practice, keeping track of WM_EVENT_STA_GOT_IP and WM_EVENT_STA_DISCONNECTED is key to know whether or not your esp32 has a connection. The other messages can mostly be ignored in a typical application using esp32-wifi-manager.
 
+### Events parameters
+
+Callback signature includes a void* pointer. For most events, this additional parameter is empty and sent as a NULL value. A few select events have additional data which can be leveraged by user code. They are listed below:
+
+* WM_EVENT_SCAN_DONE is sent with a wifi_event_sta_scan_done_t* object.
+* WM_EVENT_STA_DISCONNECTED is sent with a wifi_event_sta_disconnected_t* object.
+* WM_EVENT_STA_GOT_IP is sent with a ip_event_got_ip_t* object.
+
+These objects are standard esp-idf structures, and are documented as such in the [official pages](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html).
+
 ## Interacting with the http server
 
 Because esp32-wifi-manager spawns its own http server, you might want to extend this server to serve your own pages in your application. It is possible to do so by registering your own URL handler using the standard esp_http_server signature:
