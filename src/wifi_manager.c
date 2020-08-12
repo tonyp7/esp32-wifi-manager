@@ -62,17 +62,16 @@ Contains the freeRTOS task and all necessary support
 /* objects used to manipulate the main queue of events */
 QueueHandle_t wifi_manager_queue;
 
-
-SemaphoreHandle_t wifi_manager_json_mutex = NULL;
+SemaphoreHandle_t wifi_manager_json_mutex   = NULL;
 SemaphoreHandle_t wifi_manager_sta_ip_mutex = NULL;
-char *wifi_manager_sta_ip = NULL;
-uint16_t ap_num = MAX_AP_NUM;
+char *            wifi_manager_sta_ip       = NULL;
+uint16_t          ap_num                    = MAX_AP_NUM;
 wifi_ap_record_t *accessp_records;
-char *accessp_json = NULL;
-char *ip_info_json = NULL;
-wifi_config_t* wifi_manager_config_sta = NULL;
+char *            accessp_json            = NULL;
+char *            ip_info_json            = NULL;
+wifi_config_t *   wifi_manager_config_sta = NULL;
 
-void (**cb_ptr_arr)(void*) = NULL;
+void (**cb_ptr_arr)(void *) = NULL;
 
 /* @brief tag used for ESP serial console messages */
 static const char TAG[] = "wifi_manager";
@@ -81,28 +80,28 @@ static const char TAG[] = "wifi_manager";
 static TaskHandle_t task_wifi_manager = NULL;
 
 static const struct wifi_settings_t wifi_default_settings = {
-		.ap_ssid = DEFAULT_AP_SSID,
-		.ap_pwd = DEFAULT_AP_PASSWORD,
-		.ap_channel = DEFAULT_AP_CHANNEL,
-		.ap_ssid_hidden = DEFAULT_AP_SSID_HIDDEN,
-		.ap_bandwidth = DEFAULT_AP_BANDWIDTH,
-		.sta_only = DEFAULT_STA_ONLY,
-		.sta_power_save = DEFAULT_STA_POWER_SAVE,
-		.sta_static_ip = 0,
+    .ap_ssid        = DEFAULT_AP_SSID,
+    .ap_pwd         = DEFAULT_AP_PASSWORD,
+    .ap_channel     = DEFAULT_AP_CHANNEL,
+    .ap_ssid_hidden = DEFAULT_AP_SSID_HIDDEN,
+    .ap_bandwidth   = DEFAULT_AP_BANDWIDTH,
+    .sta_only       = DEFAULT_STA_ONLY,
+    .sta_power_save = DEFAULT_STA_POWER_SAVE,
+    .sta_static_ip  = 0,
 };
 
 /**
  * The actual WiFi settings in use
  */
 struct wifi_settings_t wifi_settings = {
-	.ap_ssid = DEFAULT_AP_SSID,
-	.ap_pwd = DEFAULT_AP_PASSWORD,
-	.ap_channel = DEFAULT_AP_CHANNEL,
-	.ap_ssid_hidden = DEFAULT_AP_SSID_HIDDEN,
-	.ap_bandwidth = DEFAULT_AP_BANDWIDTH,
-	.sta_only = DEFAULT_STA_ONLY,
-	.sta_power_save = DEFAULT_STA_POWER_SAVE,
-	.sta_static_ip = 0,
+    .ap_ssid        = DEFAULT_AP_SSID,
+    .ap_pwd         = DEFAULT_AP_PASSWORD,
+    .ap_channel     = DEFAULT_AP_CHANNEL,
+    .ap_ssid_hidden = DEFAULT_AP_SSID_HIDDEN,
+    .ap_bandwidth   = DEFAULT_AP_BANDWIDTH,
+    .sta_only       = DEFAULT_STA_ONLY,
+    .sta_power_save = DEFAULT_STA_POWER_SAVE,
+    .sta_static_ip  = 0,
 };
 
 const char wifi_manager_nvs_namespace[] = "espwifimgr";
@@ -135,572 +134,734 @@ const int WIFI_MANAGER_SCAN_BIT = BIT7;
 /* @brief When set, means user requested for a disconnect */
 const int WIFI_MANAGER_REQUEST_DISCONNECT_BIT = BIT8;
 
-
-void wifi_manager_scan_async(){
-	wifi_manager_send_message(ORDER_START_WIFI_SCAN, NULL);
-}
-
-void wifi_manager_disconnect_async(){
-	wifi_manager_send_message(ORDER_DISCONNECT_STA, NULL);
-	//xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_WIFI_DISCONNECT_BIT); TODO: delete
-}
-
-void wifi_manager_start(const WiFiAntConfig_t* pWiFiAntConfig){
-	/* disable the default wifi logging */
-	//esp_log_level_set(TAG, ESP_LOG_DEBUG);
-
-	/* initialize flash memory */
-	//nvs_flash_init();
-
-	/* memory allocation */
-	wifi_manager_queue = xQueueCreate( 3, sizeof( queue_message) );
-	wifi_manager_json_mutex = xSemaphoreCreateMutex();
-	accessp_records = (wifi_ap_record_t*)malloc(sizeof(wifi_ap_record_t) * MAX_AP_NUM);
-	accessp_json = (char*)malloc(MAX_AP_NUM * JSON_ONE_APP_SIZE + 4); /* 4 bytes for json encapsulation of "[\n" and "]\0" */
-	wifi_manager_clear_access_points_json();
-	ip_info_json = (char*)malloc(sizeof(char) * JSON_IP_INFO_SIZE);
-	wifi_manager_clear_ip_info_json();
-	wifi_manager_config_sta = (wifi_config_t*)malloc(sizeof(wifi_config_t));
-	memset(wifi_manager_config_sta, 0x00, sizeof(wifi_config_t));
-	memset(&wifi_settings.sta_static_ip_config, 0x00, sizeof(tcpip_adapter_ip_info_t));
-	cb_ptr_arr = malloc(  sizeof(   sizeof( void (*)( void* ) )        ) * MESSAGE_CODE_COUNT);
-	for(int i=0; i<MESSAGE_CODE_COUNT; i++){
-		cb_ptr_arr[i] = NULL;
-	}
-	wifi_manager_sta_ip_mutex = xSemaphoreCreateMutex();
-	wifi_manager_sta_ip = (char*)malloc(sizeof(char) * IP4ADDR_STRLEN_MAX);
-	wifi_manager_safe_update_sta_ip_string((uint32_t)0);
-	wifi_manager_event_group = xEventGroupCreate();
-
-	/* start wifi manager task */
-	xTaskCreate(&wifi_manager, "wifi_manager", 4096, (void*)pWiFiAntConfig, WIFI_MANAGER_TASK_PRIORITY, &task_wifi_manager);
-}
-
-esp_err_t wifi_manager_clear_sta_config(void) {
-	nvs_handle handle = 0;
-	esp_err_t esp_err = 0;
-	ESP_LOGI(TAG, "About to clear config in flash");
-
-	esp_err = nvs_open(wifi_manager_nvs_namespace, NVS_READWRITE, &handle);
-	if (esp_err != ESP_OK) return esp_err;
-
-	esp_err = nvs_set_blob(handle, "ssid", "", 32);
-	if (esp_err != ESP_OK) return esp_err;
-
-	esp_err = nvs_set_blob(handle, "password", "", 64);
-	if (esp_err != ESP_OK) return esp_err;
-
-	esp_err = nvs_set_blob(handle, "settings", &wifi_default_settings, sizeof(wifi_default_settings));
-	if (esp_err != ESP_OK) return esp_err;
-
-	esp_err = nvs_commit(handle);
-	if (esp_err != ESP_OK) return esp_err;
-
-	nvs_close(handle);
-	return ESP_OK;
-}
-
-esp_err_t wifi_manager_save_sta_config(){
-	nvs_handle handle;
-	esp_err_t esp_err;
-	ESP_LOGI(TAG, "About to save config to flash");
-
-	if(wifi_manager_config_sta){
-
-		esp_err = nvs_open(wifi_manager_nvs_namespace, NVS_READWRITE, &handle);
-		if (esp_err != ESP_OK) return esp_err;
-
-		esp_err = nvs_set_blob(handle, "ssid", wifi_manager_config_sta->sta.ssid, 32);
-		if (esp_err != ESP_OK) return esp_err;
-
-		esp_err = nvs_set_blob(handle, "password", wifi_manager_config_sta->sta.password, 64);
-		if (esp_err != ESP_OK) return esp_err;
-
-		esp_err = nvs_set_blob(handle, "settings", &wifi_settings, sizeof(wifi_settings));
-		if (esp_err != ESP_OK) return esp_err;
-
-		esp_err = nvs_commit(handle);
-		if (esp_err != ESP_OK) return esp_err;
-
-		nvs_close(handle);
-
-		ESP_LOGD(TAG, "wifi_manager_wrote wifi_sta_config: ssid:%s password:%s",wifi_manager_config_sta->sta.ssid,wifi_manager_config_sta->sta.password);
-		ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: SoftAP_ssid: %s",wifi_settings.ap_ssid);
-		ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: SoftAP_pwd: %s",wifi_settings.ap_pwd);
-		ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: SoftAP_channel: %i",wifi_settings.ap_channel);
-		ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: SoftAP_hidden (1 = yes): %i",wifi_settings.ap_ssid_hidden);
-		ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: SoftAP_bandwidth (1 = 20MHz, 2 = 40MHz): %i",wifi_settings.ap_bandwidth);
-		ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: sta_only (0 = APSTA, 1 = STA when connected): %i",wifi_settings.sta_only);
-		ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: sta_power_save (1 = yes): %i",wifi_settings.sta_power_save);
-		ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: sta_static_ip (0 = dhcp client, 1 = static ip): %i",wifi_settings.sta_static_ip);
-		ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: sta_ip_addr: %s", ip4addr_ntoa(&wifi_settings.sta_static_ip_config.ip));
-		ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: sta_gw_addr: %s", ip4addr_ntoa(&wifi_settings.sta_static_ip_config.gw));
-		ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: sta_netmask: %s", ip4addr_ntoa(&wifi_settings.sta_static_ip_config.netmask));
-	}
-	return ESP_OK;
-}
-
-bool wifi_manager_fetch_wifi_sta_config(){
-
-	nvs_handle handle;
-	esp_err_t esp_err;
-	if(nvs_open(wifi_manager_nvs_namespace, NVS_READONLY, &handle) == ESP_OK){
-
-		if(wifi_manager_config_sta == NULL){
-			wifi_manager_config_sta = (wifi_config_t*)malloc(sizeof(wifi_config_t));
-		}
-		memset(wifi_manager_config_sta, 0x00, sizeof(wifi_config_t));
-
-		//memset(&wifi_settings, 0x00, sizeof(struct wifi_settings_t));
-
-		/* allocate buffer */
-		size_t sz = sizeof(wifi_settings);
-		uint8_t *buff = (uint8_t*)malloc(sizeof(uint8_t) * sz);
-		memset(buff, 0x00, sizeof(sz));
-
-		/* ssid */
-		sz = sizeof(wifi_manager_config_sta->sta.ssid);
-		esp_err = nvs_get_blob(handle, "ssid", buff, &sz);
-		if(esp_err != ESP_OK){
-			free(buff);
-			return false;
-		}
-		memcpy(wifi_manager_config_sta->sta.ssid, buff, sz);
-
-		/* password */
-		sz = sizeof(wifi_manager_config_sta->sta.password);
-		esp_err = nvs_get_blob(handle, "password", buff, &sz);
-		if(esp_err != ESP_OK){
-			free(buff);
-			return false;
-		}
-		memcpy(wifi_manager_config_sta->sta.password, buff, sz);
-		/* memcpy(wifi_manager_config_sta->sta.password, "lewrong", strlen("lewrong")); this is debug to force a wrong password event. ignore! */
-
-		/* settings */
-		sz = sizeof(wifi_settings);
-		esp_err = nvs_get_blob(handle, "settings", buff, &sz);
-		if(esp_err != ESP_OK){
-			free(buff);
-			return false;
-		}
-		memcpy(&wifi_settings, buff, sz);
-
-		free(buff);
-		nvs_close(handle);
-
-		ESP_LOGI(TAG, "wifi_manager_fetch_wifi_sta_config: ssid:%s password:%s",wifi_manager_config_sta->sta.ssid,wifi_manager_config_sta->sta.password);
-		ESP_LOGI(TAG, "wifi_manager_fetch_wifi_settings: SoftAP_ssid:%s",wifi_settings.ap_ssid);
-		ESP_LOGI(TAG, "wifi_manager_fetch_wifi_settings: SoftAP_pwd:%s",wifi_settings.ap_pwd);
-		ESP_LOGI(TAG, "wifi_manager_fetch_wifi_settings: SoftAP_channel:%i",wifi_settings.ap_channel);
-		ESP_LOGI(TAG, "wifi_manager_fetch_wifi_settings: SoftAP_hidden (1 = yes):%i",wifi_settings.ap_ssid_hidden);
-		ESP_LOGI(TAG, "wifi_manager_fetch_wifi_settings: SoftAP_bandwidth (1 = 20MHz, 2 = 40MHz)%i",wifi_settings.ap_bandwidth);
-		ESP_LOGI(TAG, "wifi_manager_fetch_wifi_settings: sta_only (0 = APSTA, 1 = STA when connected):%i",wifi_settings.sta_only);
-		ESP_LOGI(TAG, "wifi_manager_fetch_wifi_settings: sta_power_save (1 = yes):%i",wifi_settings.sta_power_save);
-		ESP_LOGI(TAG, "wifi_manager_fetch_wifi_settings: sta_static_ip (0 = dhcp client, 1 = static ip):%i",wifi_settings.sta_static_ip);
-		ESP_LOGI(TAG, "wifi_manager_fetch_wifi_settings: sta_static_ip_config: IP: %s , GW: %s , Mask: %s", ip4addr_ntoa(&wifi_settings.sta_static_ip_config.ip), ip4addr_ntoa(&wifi_settings.sta_static_ip_config.gw), ip4addr_ntoa(&wifi_settings.sta_static_ip_config.netmask));
-		ESP_LOGI(TAG, "wifi_manager_fetch_wifi_settings: sta_ip_addr: %s", ip4addr_ntoa(&wifi_settings.sta_static_ip_config.ip));
-		ESP_LOGI(TAG, "wifi_manager_fetch_wifi_settings: sta_gw_addr: %s", ip4addr_ntoa(&wifi_settings.sta_static_ip_config.gw));
-		ESP_LOGI(TAG, "wifi_manager_fetch_wifi_settings: sta_netmask: %s", ip4addr_ntoa(&wifi_settings.sta_static_ip_config.netmask));
-
-		return wifi_manager_config_sta->sta.ssid[0] != '\0';
-
-	}
-	else{
-		return false;
-	}
-}
-
-void wifi_manager_clear_ip_info_json(){
-	strcpy(ip_info_json, "{}\n");
-}
-
-void wifi_manager_generate_ip_info_json(update_reason_code_t update_reason_code){
-
-	wifi_config_t *config = wifi_manager_get_wifi_sta_config();
-	if(config){
-
-		const char ip_info_json_format[] = ",\"ip\":\"%s\",\"netmask\":\"%s\",\"gw\":\"%s\",\"urc\":%d}\n";
-
-		memset(ip_info_json, 0x00, JSON_IP_INFO_SIZE);
-
-		/* to avoid declaring a new buffer we copy the data directly into the buffer at its correct address */
-		strcpy(ip_info_json, "{\"ssid\":");
-		json_print_string(config->sta.ssid,  (unsigned char*)(ip_info_json+strlen(ip_info_json)) );
-
-		if(update_reason_code == UPDATE_CONNECTION_OK){
-			/* rest of the information is copied after the ssid */
-			tcpip_adapter_ip_info_t ip_info;
-			ESP_ERROR_CHECK(tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_STA, &ip_info));
-			char ip[IP4ADDR_STRLEN_MAX]; /* note: IP4ADDR_STRLEN_MAX is defined in lwip */
-			char gw[IP4ADDR_STRLEN_MAX];
-			char netmask[IP4ADDR_STRLEN_MAX];
-			strcpy(ip, ip4addr_ntoa(&ip_info.ip));
-			strcpy(netmask, ip4addr_ntoa(&ip_info.netmask));
-			strcpy(gw, ip4addr_ntoa(&ip_info.gw));
-
-			snprintf( (ip_info_json + strlen(ip_info_json)), JSON_IP_INFO_SIZE, ip_info_json_format,
-					ip,
-					netmask,
-					gw,
-					(int)update_reason_code);
-		}
-		else{
-			/* notify in the json output the reason code why this was updated without a connection */
-			snprintf( (ip_info_json + strlen(ip_info_json)), JSON_IP_INFO_SIZE, ip_info_json_format,
-								"0",
-								"0",
-								"0",
-								(int)update_reason_code);
-		}
-	}
-	else{
-		wifi_manager_clear_ip_info_json();
-	}
-}
-
-void wifi_manager_clear_access_points_json(){
-	strcpy(accessp_json, "[]\n");
-}
-
-void wifi_manager_generate_acess_points_json(){
-
-	strcpy(accessp_json, "[");
-
-	const char oneap_str[] = ",\"chan\":%d,\"rssi\":%d,\"auth\":%d}%c\n";
-
-	/* stack buffer to hold on to one AP until it's copied over to accessp_json */
-	char one_ap[JSON_ONE_APP_SIZE];
-	for(int i=0; i<ap_num;i++){
-
-		wifi_ap_record_t ap = accessp_records[i];
-
-		/* ssid needs to be json escaped. To save on heap memory it's directly printed at the correct address */
-		strcat(accessp_json, "{\"ssid\":");
-		json_print_string( (unsigned char*)ap.ssid,  (unsigned char*)(accessp_json+strlen(accessp_json)) );
-
-		/* print the rest of the json for this access point: no more string to escape */
-		snprintf(one_ap, (size_t)JSON_ONE_APP_SIZE, oneap_str,
-				ap.primary,
-				ap.rssi,
-				ap.authmode,
-				i==ap_num-1?']':',');
-
-		/* add it to the list */
-		strcat(accessp_json, one_ap);
-	}
-}
-
-bool wifi_manager_lock_sta_ip_string(TickType_t xTicksToWait){
-	if(wifi_manager_sta_ip_mutex){
-		if( xSemaphoreTake( wifi_manager_sta_ip_mutex, xTicksToWait ) == pdTRUE ) {
-			return true;
-		}
-		else{
-			return false;
-		}
-	}
-	else{
-		return false;
-	}
-}
-
-void wifi_manager_unlock_sta_ip_string(){
-	if(wifi_manager_sta_ip_mutex){
-		xSemaphoreGive( wifi_manager_sta_ip_mutex );
-	}
-}
-
-void wifi_manager_safe_update_sta_ip_string(uint32_t ip){
-	if(wifi_manager_lock_sta_ip_string(portMAX_DELAY)){
-		struct ip4_addr ip4;
-		ip4.addr = ip;
-		strcpy(wifi_manager_sta_ip, ip4addr_ntoa(&ip4));
-		ESP_LOGI(TAG, "Set STA IP String to: %s", wifi_manager_sta_ip);
-		wifi_manager_unlock_sta_ip_string();
-	}
-}
-
-char* wifi_manager_get_sta_ip_string(){
-	return wifi_manager_sta_ip;
-}
-
-bool wifi_manager_lock_json_buffer(TickType_t xTicksToWait){
-	if(wifi_manager_json_mutex){
-		if( xSemaphoreTake( wifi_manager_json_mutex, xTicksToWait ) == pdTRUE ) {
-			return true;
-		}
-		else{
-			return false;
-		}
-	}
-	else{
-		return false;
-	}
-
-}
-
-void wifi_manager_unlock_json_buffer(){
-	xSemaphoreGive( wifi_manager_json_mutex );
-}
-
-char* wifi_manager_get_ap_list_json(){
-	return accessp_json;
-}
-
-void wifi_manager_event_handler(void *ctx, esp_event_base_t event_base, int32_t event_id, void * event_data)
+void
+wifi_manager_scan_async()
 {
-    if (event_base == WIFI_EVENT) {
-        switch (event_id) {
-	    case WIFI_EVENT_WIFI_READY:
-		ESP_LOGI(TAG, "WIFI_EVENT_WIFI_READY");
-		break;
-	    case WIFI_EVENT_SCAN_DONE:
-		ESP_LOGD(TAG, "WIFI_EVENT_SCAN_DONE");
-		xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_SCAN_BIT);
-		wifi_manager_send_message(EVENT_SCAN_DONE, NULL);
-		break;
-	    case WIFI_EVENT_STA_AUTHMODE_CHANGE:
-		ESP_LOGI(TAG, "WIFI_EVENT_STA_AUTHMODE_CHANGE");
-		break;
-	    case WIFI_EVENT_AP_START:
-		ESP_LOGI(TAG, "WIFI_EVENT_AP_START");
-		xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_AP_STARTED_BIT);
-		wifi_manager_scan_async();
-		break;
-	    case WIFI_EVENT_AP_STOP:
-		break;
-	    case WIFI_EVENT_AP_PROBEREQRECVED:
-		break;
-	    case WIFI_EVENT_AP_STACONNECTED: /* a user disconnected from the SoftAP */
-		ESP_LOGI(TAG, "WIFI_EVENT_AP_STACONNECTED");
-		xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_AP_STA_CONNECTED_BIT);
-		break;
-	    case WIFI_EVENT_AP_STADISCONNECTED:
-		ESP_LOGI(TAG, "WIFI_EVENT_AP_STADISCONNECTED");
-		xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_AP_STA_CONNECTED_BIT);
-		break;
-	    case WIFI_EVENT_STA_START:
-		ESP_LOGI(TAG, "WIFI_EVENT_STA_START");
-		break;
-	    case WIFI_EVENT_STA_STOP:
-		ESP_LOGI(TAG, "WIFI_EVENT_STA_STOP");
-		break;
-	    case WIFI_EVENT_STA_CONNECTED:
-		ESP_LOGI(TAG, "WIFI_EVENT_STA_CONNECTED");
-		break;
-	    case WIFI_EVENT_STA_DISCONNECTED:
-		ESP_LOGI(TAG, "WIFI_EVENT_STA_DISCONNECTED");
-		/* if a DISCONNECT message is posted while a scan is in progress this scan will NEVER end, causing scan to never work again. For this reason SCAN_BIT is cleared too */
-		xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_WIFI_CONNECTED_BIT | WIFI_MANAGER_SCAN_BIT);
-		wifi_event_sta_disconnected_t* disconnected = (wifi_event_sta_disconnected_t*) event_data;
-		/* post disconnect event with reason code */
-		wifi_manager_send_message(EVENT_STA_DISCONNECTED, (void*)( (uint32_t)disconnected->reason) );
-	    break;
-	    default:
-	    break;
-	}
-    }else if (event_base == IP_EVENT) {
-        switch (event_id) {
-	    case IP_EVENT_STA_GOT_IP:
-		ESP_LOGI(TAG, "IP_EVENT_STA_GOT_IP");
-		xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_WIFI_CONNECTED_BIT);
-		ip_event_got_ip_t* ipevent = (ip_event_got_ip_t*) event_data;
-		wifi_manager_send_message(EVENT_STA_GOT_IP, (void*)( (uint32_t)ipevent->ip_info.ip.addr) );
-		break;
-	}
+    wifi_manager_send_message(ORDER_START_WIFI_SCAN, NULL);
+}
+
+void
+wifi_manager_disconnect_async()
+{
+    wifi_manager_send_message(ORDER_DISCONNECT_STA, NULL);
+    // xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_WIFI_DISCONNECT_BIT); TODO: delete
+}
+
+void
+wifi_manager_start(const WiFiAntConfig_t *pWiFiAntConfig)
+{
+    /* disable the default wifi logging */
+    // esp_log_level_set(TAG, ESP_LOG_DEBUG);
+
+    /* initialize flash memory */
+    // nvs_flash_init();
+
+    /* memory allocation */
+    wifi_manager_queue      = xQueueCreate(3, sizeof(queue_message));
+    wifi_manager_json_mutex = xSemaphoreCreateMutex();
+    accessp_records         = (wifi_ap_record_t *)malloc(sizeof(wifi_ap_record_t) * MAX_AP_NUM);
+    accessp_json
+        = (char *)malloc(MAX_AP_NUM * JSON_ONE_APP_SIZE + 4); /* 4 bytes for json encapsulation of "[\n" and "]\0" */
+    wifi_manager_clear_access_points_json();
+    ip_info_json = (char *)malloc(sizeof(char) * JSON_IP_INFO_SIZE);
+    wifi_manager_clear_ip_info_json();
+    wifi_manager_config_sta = (wifi_config_t *)malloc(sizeof(wifi_config_t));
+    memset(wifi_manager_config_sta, 0x00, sizeof(wifi_config_t));
+    memset(&wifi_settings.sta_static_ip_config, 0x00, sizeof(tcpip_adapter_ip_info_t));
+    cb_ptr_arr = malloc(sizeof(sizeof(void (*)(void *))) * MESSAGE_CODE_COUNT);
+    for (int i = 0; i < MESSAGE_CODE_COUNT; i++)
+    {
+        cb_ptr_arr[i] = NULL;
+    }
+    wifi_manager_sta_ip_mutex = xSemaphoreCreateMutex();
+    wifi_manager_sta_ip       = (char *)malloc(sizeof(char) * IP4ADDR_STRLEN_MAX);
+    wifi_manager_safe_update_sta_ip_string((uint32_t)0);
+    wifi_manager_event_group = xEventGroupCreate();
+
+    /* start wifi manager task */
+    xTaskCreate(
+        &wifi_manager,
+        "wifi_manager",
+        4096,
+        (void *)pWiFiAntConfig,
+        WIFI_MANAGER_TASK_PRIORITY,
+        &task_wifi_manager);
+}
+
+esp_err_t
+wifi_manager_clear_sta_config(void)
+{
+    nvs_handle handle  = 0;
+    esp_err_t  esp_err = 0;
+    ESP_LOGI(TAG, "About to clear config in flash");
+
+    esp_err = nvs_open(wifi_manager_nvs_namespace, NVS_READWRITE, &handle);
+    if (esp_err != ESP_OK)
+        return esp_err;
+
+    esp_err = nvs_set_blob(handle, "ssid", "", 32);
+    if (esp_err != ESP_OK)
+        return esp_err;
+
+    esp_err = nvs_set_blob(handle, "password", "", 64);
+    if (esp_err != ESP_OK)
+        return esp_err;
+
+    esp_err = nvs_set_blob(handle, "settings", &wifi_default_settings, sizeof(wifi_default_settings));
+    if (esp_err != ESP_OK)
+        return esp_err;
+
+    esp_err = nvs_commit(handle);
+    if (esp_err != ESP_OK)
+        return esp_err;
+
+    nvs_close(handle);
+    return ESP_OK;
+}
+
+esp_err_t
+wifi_manager_save_sta_config()
+{
+    nvs_handle handle;
+    esp_err_t  esp_err;
+    ESP_LOGI(TAG, "About to save config to flash");
+
+    if (wifi_manager_config_sta)
+    {
+
+        esp_err = nvs_open(wifi_manager_nvs_namespace, NVS_READWRITE, &handle);
+        if (esp_err != ESP_OK)
+            return esp_err;
+
+        esp_err = nvs_set_blob(handle, "ssid", wifi_manager_config_sta->sta.ssid, 32);
+        if (esp_err != ESP_OK)
+            return esp_err;
+
+        esp_err = nvs_set_blob(handle, "password", wifi_manager_config_sta->sta.password, 64);
+        if (esp_err != ESP_OK)
+            return esp_err;
+
+        esp_err = nvs_set_blob(handle, "settings", &wifi_settings, sizeof(wifi_settings));
+        if (esp_err != ESP_OK)
+            return esp_err;
+
+        esp_err = nvs_commit(handle);
+        if (esp_err != ESP_OK)
+            return esp_err;
+
+        nvs_close(handle);
+
+        ESP_LOGD(
+            TAG,
+            "wifi_manager_wrote wifi_sta_config: ssid:%s password:%s",
+            wifi_manager_config_sta->sta.ssid,
+            wifi_manager_config_sta->sta.password);
+        ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: SoftAP_ssid: %s", wifi_settings.ap_ssid);
+        ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: SoftAP_pwd: %s", wifi_settings.ap_pwd);
+        ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: SoftAP_channel: %i", wifi_settings.ap_channel);
+        ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: SoftAP_hidden (1 = yes): %i", wifi_settings.ap_ssid_hidden);
+        ESP_LOGD(
+            TAG,
+            "wifi_manager_wrote wifi_settings: SoftAP_bandwidth (1 = 20MHz, 2 = 40MHz): %i",
+            wifi_settings.ap_bandwidth);
+        ESP_LOGD(
+            TAG,
+            "wifi_manager_wrote wifi_settings: sta_only (0 = APSTA, 1 = STA when connected): %i",
+            wifi_settings.sta_only);
+        ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: sta_power_save (1 = yes): %i", wifi_settings.sta_power_save);
+        ESP_LOGD(
+            TAG,
+            "wifi_manager_wrote wifi_settings: sta_static_ip (0 = dhcp client, 1 = static ip): %i",
+            wifi_settings.sta_static_ip);
+        ESP_LOGD(
+            TAG,
+            "wifi_manager_wrote wifi_settings: sta_ip_addr: %s",
+            ip4addr_ntoa(&wifi_settings.sta_static_ip_config.ip));
+        ESP_LOGD(
+            TAG,
+            "wifi_manager_wrote wifi_settings: sta_gw_addr: %s",
+            ip4addr_ntoa(&wifi_settings.sta_static_ip_config.gw));
+        ESP_LOGD(
+            TAG,
+            "wifi_manager_wrote wifi_settings: sta_netmask: %s",
+            ip4addr_ntoa(&wifi_settings.sta_static_ip_config.netmask));
+    }
+    return ESP_OK;
+}
+
+bool
+wifi_manager_fetch_wifi_sta_config()
+{
+
+    nvs_handle handle;
+    esp_err_t  esp_err;
+    if (nvs_open(wifi_manager_nvs_namespace, NVS_READONLY, &handle) == ESP_OK)
+    {
+
+        if (wifi_manager_config_sta == NULL)
+        {
+            wifi_manager_config_sta = (wifi_config_t *)malloc(sizeof(wifi_config_t));
+        }
+        memset(wifi_manager_config_sta, 0x00, sizeof(wifi_config_t));
+
+        // memset(&wifi_settings, 0x00, sizeof(struct wifi_settings_t));
+
+        /* allocate buffer */
+        size_t   sz   = sizeof(wifi_settings);
+        uint8_t *buff = (uint8_t *)malloc(sizeof(uint8_t) * sz);
+        memset(buff, 0x00, sizeof(sz));
+
+        /* ssid */
+        sz      = sizeof(wifi_manager_config_sta->sta.ssid);
+        esp_err = nvs_get_blob(handle, "ssid", buff, &sz);
+        if (esp_err != ESP_OK)
+        {
+            free(buff);
+            return false;
+        }
+        memcpy(wifi_manager_config_sta->sta.ssid, buff, sz);
+
+        /* password */
+        sz      = sizeof(wifi_manager_config_sta->sta.password);
+        esp_err = nvs_get_blob(handle, "password", buff, &sz);
+        if (esp_err != ESP_OK)
+        {
+            free(buff);
+            return false;
+        }
+        memcpy(wifi_manager_config_sta->sta.password, buff, sz);
+        /* memcpy(wifi_manager_config_sta->sta.password, "lewrong", strlen("lewrong")); this is debug to force a wrong
+         * password event. ignore! */
+
+        /* settings */
+        sz      = sizeof(wifi_settings);
+        esp_err = nvs_get_blob(handle, "settings", buff, &sz);
+        if (esp_err != ESP_OK)
+        {
+            free(buff);
+            return false;
+        }
+        memcpy(&wifi_settings, buff, sz);
+
+        free(buff);
+        nvs_close(handle);
+
+        ESP_LOGI(
+            TAG,
+            "wifi_manager_fetch_wifi_sta_config: ssid:%s password:%s",
+            wifi_manager_config_sta->sta.ssid,
+            wifi_manager_config_sta->sta.password);
+        ESP_LOGI(TAG, "wifi_manager_fetch_wifi_settings: SoftAP_ssid:%s", wifi_settings.ap_ssid);
+        ESP_LOGI(TAG, "wifi_manager_fetch_wifi_settings: SoftAP_pwd:%s", wifi_settings.ap_pwd);
+        ESP_LOGI(TAG, "wifi_manager_fetch_wifi_settings: SoftAP_channel:%i", wifi_settings.ap_channel);
+        ESP_LOGI(TAG, "wifi_manager_fetch_wifi_settings: SoftAP_hidden (1 = yes):%i", wifi_settings.ap_ssid_hidden);
+        ESP_LOGI(
+            TAG,
+            "wifi_manager_fetch_wifi_settings: SoftAP_bandwidth (1 = 20MHz, 2 = 40MHz)%i",
+            wifi_settings.ap_bandwidth);
+        ESP_LOGI(
+            TAG,
+            "wifi_manager_fetch_wifi_settings: sta_only (0 = APSTA, 1 = STA when connected):%i",
+            wifi_settings.sta_only);
+        ESP_LOGI(TAG, "wifi_manager_fetch_wifi_settings: sta_power_save (1 = yes):%i", wifi_settings.sta_power_save);
+        ESP_LOGI(
+            TAG,
+            "wifi_manager_fetch_wifi_settings: sta_static_ip (0 = dhcp client, 1 = static ip):%i",
+            wifi_settings.sta_static_ip);
+        ESP_LOGI(
+            TAG,
+            "wifi_manager_fetch_wifi_settings: sta_static_ip_config: IP: %s , GW: %s , Mask: %s",
+            ip4addr_ntoa(&wifi_settings.sta_static_ip_config.ip),
+            ip4addr_ntoa(&wifi_settings.sta_static_ip_config.gw),
+            ip4addr_ntoa(&wifi_settings.sta_static_ip_config.netmask));
+        ESP_LOGI(
+            TAG,
+            "wifi_manager_fetch_wifi_settings: sta_ip_addr: %s",
+            ip4addr_ntoa(&wifi_settings.sta_static_ip_config.ip));
+        ESP_LOGI(
+            TAG,
+            "wifi_manager_fetch_wifi_settings: sta_gw_addr: %s",
+            ip4addr_ntoa(&wifi_settings.sta_static_ip_config.gw));
+        ESP_LOGI(
+            TAG,
+            "wifi_manager_fetch_wifi_settings: sta_netmask: %s",
+            ip4addr_ntoa(&wifi_settings.sta_static_ip_config.netmask));
+
+        return wifi_manager_config_sta->sta.ssid[0] != '\0';
+    }
+    else
+    {
+        return false;
     }
 }
 
-
-
-wifi_config_t* wifi_manager_get_wifi_sta_config(){
-	return wifi_manager_config_sta;
+void
+wifi_manager_clear_ip_info_json()
+{
+    strcpy(ip_info_json, "{}\n");
 }
 
+void
+wifi_manager_generate_ip_info_json(update_reason_code_t update_reason_code)
+{
 
-void wifi_manager_connect_async(){
-	/* in order to avoid a false positive on the front end app we need to quickly flush the ip json
-	 * There'se a risk the front end sees an IP or a password error when in fact
-	 * it's a remnant from a previous connection
-	 */
-	if(wifi_manager_lock_json_buffer( portMAX_DELAY )){
-		wifi_manager_clear_ip_info_json();
-		wifi_manager_unlock_json_buffer();
-	}
-	wifi_manager_send_message(ORDER_CONNECT_STA, (void*)CONNECTION_REQUEST_USER);
+    wifi_config_t *config = wifi_manager_get_wifi_sta_config();
+    if (config)
+    {
+
+        const char ip_info_json_format[] = ",\"ip\":\"%s\",\"netmask\":\"%s\",\"gw\":\"%s\",\"urc\":%d}\n";
+
+        memset(ip_info_json, 0x00, JSON_IP_INFO_SIZE);
+
+        /* to avoid declaring a new buffer we copy the data directly into the buffer at its correct address */
+        strcpy(ip_info_json, "{\"ssid\":");
+        json_print_string(config->sta.ssid, (unsigned char *)(ip_info_json + strlen(ip_info_json)));
+
+        if (update_reason_code == UPDATE_CONNECTION_OK)
+        {
+            /* rest of the information is copied after the ssid */
+            tcpip_adapter_ip_info_t ip_info;
+            ESP_ERROR_CHECK(tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_STA, &ip_info));
+            char ip[IP4ADDR_STRLEN_MAX]; /* note: IP4ADDR_STRLEN_MAX is defined in lwip */
+            char gw[IP4ADDR_STRLEN_MAX];
+            char netmask[IP4ADDR_STRLEN_MAX];
+            strcpy(ip, ip4addr_ntoa(&ip_info.ip));
+            strcpy(netmask, ip4addr_ntoa(&ip_info.netmask));
+            strcpy(gw, ip4addr_ntoa(&ip_info.gw));
+
+            snprintf(
+                (ip_info_json + strlen(ip_info_json)),
+                JSON_IP_INFO_SIZE,
+                ip_info_json_format,
+                ip,
+                netmask,
+                gw,
+                (int)update_reason_code);
+        }
+        else
+        {
+            /* notify in the json output the reason code why this was updated without a connection */
+            snprintf(
+                (ip_info_json + strlen(ip_info_json)),
+                JSON_IP_INFO_SIZE,
+                ip_info_json_format,
+                "0",
+                "0",
+                "0",
+                (int)update_reason_code);
+        }
+    }
+    else
+    {
+        wifi_manager_clear_ip_info_json();
+    }
 }
 
-
-char* wifi_manager_get_ip_info_json(){
-	return ip_info_json;
+void
+wifi_manager_clear_access_points_json()
+{
+    strcpy(accessp_json, "[]\n");
 }
 
-void wifi_manager_stop() {
-	ESP_LOGI(TAG, "%s",__func__);
-	esp_event_handler_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_manager_event_handler);
-	esp_event_handler_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, &wifi_manager_event_handler);
+void
+wifi_manager_generate_acess_points_json()
+{
 
-	esp_wifi_disconnect();
-	esp_wifi_stop();
-	esp_wifi_deinit();
+    strcpy(accessp_json, "[");
 
-	wifi_manager_destroy();
+    const char oneap_str[] = ",\"chan\":%d,\"rssi\":%d,\"auth\":%d}%c\n";
 
-	tcpip_adapter_stop(TCPIP_ADAPTER_IF_STA);
-	tcpip_adapter_stop(TCPIP_ADAPTER_IF_AP);
+    /* stack buffer to hold on to one AP until it's copied over to accessp_json */
+    char one_ap[JSON_ONE_APP_SIZE];
+    for (int i = 0; i < ap_num; i++)
+    {
+
+        wifi_ap_record_t ap = accessp_records[i];
+
+        /* ssid needs to be json escaped. To save on heap memory it's directly printed at the correct address */
+        strcat(accessp_json, "{\"ssid\":");
+        json_print_string((unsigned char *)ap.ssid, (unsigned char *)(accessp_json + strlen(accessp_json)));
+
+        /* print the rest of the json for this access point: no more string to escape */
+        snprintf(
+            one_ap,
+            (size_t)JSON_ONE_APP_SIZE,
+            oneap_str,
+            ap.primary,
+            ap.rssi,
+            ap.authmode,
+            i == ap_num - 1 ? ']' : ',');
+
+        /* add it to the list */
+        strcat(accessp_json, one_ap);
+    }
 }
 
-void wifi_manager_destroy(){
-	ESP_LOGI(TAG, "%s", __func__);
-	if (task_wifi_manager) {
-		vTaskDelete(task_wifi_manager);
-		task_wifi_manager = NULL;
-
-		/* heap buffers */
-		free(accessp_records);
-		accessp_records = NULL;
-		free(accessp_json);
-		accessp_json = NULL;
-		free(ip_info_json);
-		ip_info_json = NULL;
-		free(wifi_manager_sta_ip);
-		wifi_manager_sta_ip = NULL;
-		if(wifi_manager_config_sta){
-			free(wifi_manager_config_sta);
-			wifi_manager_config_sta = NULL;
-		}
-
-		/* RTOS objects */
-		vSemaphoreDelete(wifi_manager_json_mutex);
-		wifi_manager_json_mutex = NULL;
-		vSemaphoreDelete(wifi_manager_sta_ip_mutex);
-		wifi_manager_sta_ip_mutex = NULL;
-		vEventGroupDelete(wifi_manager_event_group);
-		wifi_manager_event_group = NULL;
-		vQueueDelete(wifi_manager_queue);
-		wifi_manager_queue = NULL;
-	}
+bool
+wifi_manager_lock_sta_ip_string(TickType_t xTicksToWait)
+{
+    if (wifi_manager_sta_ip_mutex)
+    {
+        if (xSemaphoreTake(wifi_manager_sta_ip_mutex, xTicksToWait) == pdTRUE)
+        {
+            return true;
+        }
+        else
+        {
+            return false;
+        }
+    }
+    else
+    {
+        return false;
+    }
 }
 
-void wifi_manager_filter_unique( wifi_ap_record_t * aplist, uint16_t * aps) {
-	int total_unique;
-	wifi_ap_record_t * first_free;
-	total_unique=*aps;
-
-	first_free=NULL;
-
-	for(int i=0; i<*aps-1;i++) {
-		wifi_ap_record_t * ap = &aplist[i];
-
-		/* skip the previously removed APs */
-		if (ap->ssid[0] == 0) continue;
-
-		/* remove the identical SSID+authmodes */
-		for(int j=i+1; j<*aps;j++) {
-			wifi_ap_record_t * ap1 = &aplist[j];
-			if ( (strcmp((const char *)ap->ssid, (const char *)ap1->ssid)==0) &&
-			     (ap->authmode == ap1->authmode) ) { /* same SSID, different auth mode is skipped */
-				/* save the rssi for the display */
-				if ((ap1->rssi) > (ap->rssi)) ap->rssi=ap1->rssi;
-				/* clearing the record */
-				memset(ap1,0, sizeof(wifi_ap_record_t));
-			}
-		}
-	}
-	/* reorder the list so APs follow each other in the list */
-	for(int i=0; i<*aps;i++) {
-		wifi_ap_record_t * ap = &aplist[i];
-		/* skipping all that has no name */
-		if (ap->ssid[0] == 0) {
-			/* mark the first free slot */
-			if (first_free==NULL) first_free=ap;
-			total_unique--;
-			continue;
-		}
-		if (first_free!=NULL) {
-			memcpy(first_free, ap, sizeof(wifi_ap_record_t));
-			memset(ap,0, sizeof(wifi_ap_record_t));
-			/* find the next free slot */
-			for(int j=0; j<*aps;j++) {
-				if (aplist[j].ssid[0]==0) {
-					first_free=&aplist[j];
-					break;
-				}
-			}
-		}
-	}
-	/* update the length of the list */
-	*aps = total_unique;
+void
+wifi_manager_unlock_sta_ip_string()
+{
+    if (wifi_manager_sta_ip_mutex)
+    {
+        xSemaphoreGive(wifi_manager_sta_ip_mutex);
+    }
 }
 
-BaseType_t wifi_manager_send_message_to_front(message_code_t code, void *param){
-	queue_message msg;
-	msg.code = code;
-	msg.param = param;
-	return xQueueSendToFront( wifi_manager_queue, &msg, portMAX_DELAY);
+void
+wifi_manager_safe_update_sta_ip_string(uint32_t ip)
+{
+    if (wifi_manager_lock_sta_ip_string(portMAX_DELAY))
+    {
+        struct ip4_addr ip4;
+        ip4.addr = ip;
+        strcpy(wifi_manager_sta_ip, ip4addr_ntoa(&ip4));
+        ESP_LOGI(TAG, "Set STA IP String to: %s", wifi_manager_sta_ip);
+        wifi_manager_unlock_sta_ip_string();
+    }
 }
 
-BaseType_t wifi_manager_send_message(message_code_t code, void *param){
-	queue_message msg;
-	msg.code = code;
-	msg.param = param;
-	return xQueueSend( wifi_manager_queue, &msg, portMAX_DELAY);
+char *
+wifi_manager_get_sta_ip_string()
+{
+    return wifi_manager_sta_ip;
 }
 
-void wifi_manager_set_callback(message_code_t message_code, void (*func_ptr)(void*) ){
-	if(cb_ptr_arr && message_code < MESSAGE_CODE_COUNT){
-		cb_ptr_arr[message_code] = func_ptr;
-	}
+bool
+wifi_manager_lock_json_buffer(TickType_t xTicksToWait)
+{
+    if (wifi_manager_json_mutex)
+    {
+        if (xSemaphoreTake(wifi_manager_json_mutex, xTicksToWait) == pdTRUE)
+        {
+            return true;
+        }
+        else
+        {
+            return false;
+        }
+    }
+    else
+    {
+        return false;
+    }
 }
 
-void wifi_manager( void * pvParameters ){
-	const WiFiAntConfig_t* pWiFiAntConfig = pvParameters;
-	queue_message msg;
-	BaseType_t xStatus;
-	EventBits_t uxBits;
-	//uint8_t	retries = 0;
+void
+wifi_manager_unlock_json_buffer()
+{
+    xSemaphoreGive(wifi_manager_json_mutex);
+}
 
-	/* initialize the tcp stack */
-	tcpip_adapter_init();
+char *
+wifi_manager_get_ap_list_json()
+{
+    return accessp_json;
+}
 
-	/* event handler and event group for the wifi driver */
-	wifi_manager_event_group = xEventGroupCreate();
+void
+wifi_manager_event_handler(void *ctx, esp_event_base_t event_base, int32_t event_id, void *event_data)
+{
+    if (event_base == WIFI_EVENT)
+    {
+        switch (event_id)
+        {
+            case WIFI_EVENT_WIFI_READY:
+                ESP_LOGI(TAG, "WIFI_EVENT_WIFI_READY");
+                break;
+            case WIFI_EVENT_SCAN_DONE:
+                ESP_LOGD(TAG, "WIFI_EVENT_SCAN_DONE");
+                xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_SCAN_BIT);
+                wifi_manager_send_message(EVENT_SCAN_DONE, NULL);
+                break;
+            case WIFI_EVENT_STA_AUTHMODE_CHANGE:
+                ESP_LOGI(TAG, "WIFI_EVENT_STA_AUTHMODE_CHANGE");
+                break;
+            case WIFI_EVENT_AP_START:
+                ESP_LOGI(TAG, "WIFI_EVENT_AP_START");
+                xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_AP_STARTED_BIT);
+                wifi_manager_scan_async();
+                break;
+            case WIFI_EVENT_AP_STOP:
+                break;
+            case WIFI_EVENT_AP_PROBEREQRECVED:
+                break;
+            case WIFI_EVENT_AP_STACONNECTED: /* a user disconnected from the SoftAP */
+                ESP_LOGI(TAG, "WIFI_EVENT_AP_STACONNECTED");
+                xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_AP_STA_CONNECTED_BIT);
+                break;
+            case WIFI_EVENT_AP_STADISCONNECTED:
+                ESP_LOGI(TAG, "WIFI_EVENT_AP_STADISCONNECTED");
+                xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_AP_STA_CONNECTED_BIT);
+                break;
+            case WIFI_EVENT_STA_START:
+                ESP_LOGI(TAG, "WIFI_EVENT_STA_START");
+                break;
+            case WIFI_EVENT_STA_STOP:
+                ESP_LOGI(TAG, "WIFI_EVENT_STA_STOP");
+                break;
+            case WIFI_EVENT_STA_CONNECTED:
+                ESP_LOGI(TAG, "WIFI_EVENT_STA_CONNECTED");
+                break;
+            case WIFI_EVENT_STA_DISCONNECTED:
+                ESP_LOGI(TAG, "WIFI_EVENT_STA_DISCONNECTED");
+                /* if a DISCONNECT message is posted while a scan is in progress this scan will NEVER end, causing scan
+                 * to never work again. For this reason SCAN_BIT is cleared too */
+                xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_WIFI_CONNECTED_BIT | WIFI_MANAGER_SCAN_BIT);
+                wifi_event_sta_disconnected_t *disconnected = (wifi_event_sta_disconnected_t *)event_data;
+                /* post disconnect event with reason code */
+                wifi_manager_send_message(EVENT_STA_DISCONNECTED, (void *)((uint32_t)disconnected->reason));
+                break;
+            default:
+                break;
+        }
+    }
+    else if (event_base == IP_EVENT)
+    {
+        switch (event_id)
+        {
+            case IP_EVENT_STA_GOT_IP:
+                ESP_LOGI(TAG, "IP_EVENT_STA_GOT_IP");
+                xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_WIFI_CONNECTED_BIT);
+                ip_event_got_ip_t *ipevent = (ip_event_got_ip_t *)event_data;
+                wifi_manager_send_message(EVENT_STA_GOT_IP, (void *)((uint32_t)ipevent->ip_info.ip.addr));
+                break;
+        }
+    }
+}
 
-	ESP_ERROR_CHECK(esp_event_loop_create_default());
-	ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_manager_event_handler, NULL));
-	ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &wifi_manager_event_handler, NULL));
+wifi_config_t *
+wifi_manager_get_wifi_sta_config()
+{
+    return wifi_manager_config_sta;
+}
 
-	/* wifi scanner config */
-	wifi_scan_config_t scan_config = {
-		.ssid = 0,
-		.bssid = 0,
-		.channel = 0,
-		.show_hidden = true
-	};
+void
+wifi_manager_connect_async()
+{
+    /* in order to avoid a false positive on the front end app we need to quickly flush the ip json
+     * There'se a risk the front end sees an IP or a password error when in fact
+     * it's a remnant from a previous connection
+     */
+    if (wifi_manager_lock_json_buffer(portMAX_DELAY))
+    {
+        wifi_manager_clear_ip_info_json();
+        wifi_manager_unlock_json_buffer();
+    }
+    wifi_manager_send_message(ORDER_CONNECT_STA, (void *)CONNECTION_REQUEST_USER);
+}
 
-	/* default wifi config */
-	wifi_init_config_t wifi_init_config = WIFI_INIT_CONFIG_DEFAULT();
-	ESP_ERROR_CHECK(esp_wifi_init(&wifi_init_config));
-	ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
+char *
+wifi_manager_get_ip_info_json()
+{
+    return ip_info_json;
+}
 
-	if (NULL != pWiFiAntConfig)
-	{
-		esp_err_t err = esp_wifi_set_ant_gpio(&pWiFiAntConfig->wifiAntGpioConfig);
-		if (ESP_OK != err)
-		{
-			ESP_LOGE(TAG, "esp_wifi_set_ant_gpio failed, res=%d", err);
-		}
-		err = esp_wifi_set_ant(&pWiFiAntConfig->wifiAntConfig);
-		if (ESP_OK != err)
-		{
-			ESP_LOGE(TAG, "esp_wifi_set_ant failed, res=%d", err);
-		}
-	}
-	/* SoftAP - Wifi Access Point configuration setup */
-	tcpip_adapter_ip_info_t info;
-	memset(&info, 0x00, sizeof(info));
-	wifi_config_t ap_config = {
+void
+wifi_manager_stop()
+{
+    ESP_LOGI(TAG, "%s", __func__);
+    esp_event_handler_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_manager_event_handler);
+    esp_event_handler_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, &wifi_manager_event_handler);
+
+    esp_wifi_disconnect();
+    esp_wifi_stop();
+    esp_wifi_deinit();
+
+    wifi_manager_destroy();
+
+    tcpip_adapter_stop(TCPIP_ADAPTER_IF_STA);
+    tcpip_adapter_stop(TCPIP_ADAPTER_IF_AP);
+}
+
+void
+wifi_manager_destroy()
+{
+    ESP_LOGI(TAG, "%s", __func__);
+    if (task_wifi_manager)
+    {
+        vTaskDelete(task_wifi_manager);
+        task_wifi_manager = NULL;
+
+        /* heap buffers */
+        free(accessp_records);
+        accessp_records = NULL;
+        free(accessp_json);
+        accessp_json = NULL;
+        free(ip_info_json);
+        ip_info_json = NULL;
+        free(wifi_manager_sta_ip);
+        wifi_manager_sta_ip = NULL;
+        if (wifi_manager_config_sta)
+        {
+            free(wifi_manager_config_sta);
+            wifi_manager_config_sta = NULL;
+        }
+
+        /* RTOS objects */
+        vSemaphoreDelete(wifi_manager_json_mutex);
+        wifi_manager_json_mutex = NULL;
+        vSemaphoreDelete(wifi_manager_sta_ip_mutex);
+        wifi_manager_sta_ip_mutex = NULL;
+        vEventGroupDelete(wifi_manager_event_group);
+        wifi_manager_event_group = NULL;
+        vQueueDelete(wifi_manager_queue);
+        wifi_manager_queue = NULL;
+    }
+}
+
+void
+wifi_manager_filter_unique(wifi_ap_record_t *aplist, uint16_t *aps)
+{
+    int               total_unique;
+    wifi_ap_record_t *first_free;
+    total_unique = *aps;
+
+    first_free = NULL;
+
+    for (int i = 0; i < *aps - 1; i++)
+    {
+        wifi_ap_record_t *ap = &aplist[i];
+
+        /* skip the previously removed APs */
+        if (ap->ssid[0] == 0)
+            continue;
+
+        /* remove the identical SSID+authmodes */
+        for (int j = i + 1; j < *aps; j++)
+        {
+            wifi_ap_record_t *ap1 = &aplist[j];
+            if ((strcmp((const char *)ap->ssid, (const char *)ap1->ssid) == 0) && (ap->authmode == ap1->authmode))
+            { /* same SSID, different auth mode is skipped */
+                /* save the rssi for the display */
+                if ((ap1->rssi) > (ap->rssi))
+                    ap->rssi = ap1->rssi;
+                /* clearing the record */
+                memset(ap1, 0, sizeof(wifi_ap_record_t));
+            }
+        }
+    }
+    /* reorder the list so APs follow each other in the list */
+    for (int i = 0; i < *aps; i++)
+    {
+        wifi_ap_record_t *ap = &aplist[i];
+        /* skipping all that has no name */
+        if (ap->ssid[0] == 0)
+        {
+            /* mark the first free slot */
+            if (first_free == NULL)
+                first_free = ap;
+            total_unique--;
+            continue;
+        }
+        if (first_free != NULL)
+        {
+            memcpy(first_free, ap, sizeof(wifi_ap_record_t));
+            memset(ap, 0, sizeof(wifi_ap_record_t));
+            /* find the next free slot */
+            for (int j = 0; j < *aps; j++)
+            {
+                if (aplist[j].ssid[0] == 0)
+                {
+                    first_free = &aplist[j];
+                    break;
+                }
+            }
+        }
+    }
+    /* update the length of the list */
+    *aps = total_unique;
+}
+
+BaseType_t
+wifi_manager_send_message_to_front(message_code_t code, void *param)
+{
+    queue_message msg;
+    msg.code  = code;
+    msg.param = param;
+    return xQueueSendToFront(wifi_manager_queue, &msg, portMAX_DELAY);
+}
+
+BaseType_t
+wifi_manager_send_message(message_code_t code, void *param)
+{
+    queue_message msg;
+    msg.code  = code;
+    msg.param = param;
+    return xQueueSend(wifi_manager_queue, &msg, portMAX_DELAY);
+}
+
+void
+wifi_manager_set_callback(message_code_t message_code, void (*func_ptr)(void *))
+{
+    if (cb_ptr_arr && message_code < MESSAGE_CODE_COUNT)
+    {
+        cb_ptr_arr[message_code] = func_ptr;
+    }
+}
+
+void
+wifi_manager(void *pvParameters)
+{
+    const WiFiAntConfig_t *pWiFiAntConfig = pvParameters;
+    queue_message          msg;
+    BaseType_t             xStatus;
+    EventBits_t            uxBits;
+    // uint8_t	retries = 0;
+
+    /* initialize the tcp stack */
+    tcpip_adapter_init();
+
+    /* event handler and event group for the wifi driver */
+    wifi_manager_event_group = xEventGroupCreate();
+
+    ESP_ERROR_CHECK(esp_event_loop_create_default());
+    ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_manager_event_handler, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &wifi_manager_event_handler, NULL));
+
+    /* wifi scanner config */
+    wifi_scan_config_t scan_config = { .ssid = 0, .bssid = 0, .channel = 0, .show_hidden = true };
+
+    /* default wifi config */
+    wifi_init_config_t wifi_init_config = WIFI_INIT_CONFIG_DEFAULT();
+    ESP_ERROR_CHECK(esp_wifi_init(&wifi_init_config));
+    ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
+
+    if (NULL != pWiFiAntConfig)
+    {
+        esp_err_t err = esp_wifi_set_ant_gpio(&pWiFiAntConfig->wifiAntGpioConfig);
+        if (ESP_OK != err)
+        {
+            ESP_LOGE(TAG, "esp_wifi_set_ant_gpio failed, res=%d", err);
+        }
+        err = esp_wifi_set_ant(&pWiFiAntConfig->wifiAntConfig);
+        if (ESP_OK != err)
+        {
+            ESP_LOGE(TAG, "esp_wifi_set_ant failed, res=%d", err);
+        }
+    }
+    /* SoftAP - Wifi Access Point configuration setup */
+    tcpip_adapter_ip_info_t info;
+    memset(&info, 0x00, sizeof(info));
+    wifi_config_t ap_config = {
 		.ap = {
 			.ssid_len = 0,
 			.channel = wifi_settings.ap_channel,
@@ -711,331 +872,384 @@ void wifi_manager( void * pvParameters ){
 		},
 	};
 
-	{
-		uint8_t ap_mac[6];
-		memset(ap_mac, 0, sizeof(ap_mac));
-		ESP_ERROR_CHECK(esp_wifi_get_mac(ESP_IF_WIFI_AP, ap_mac));
-		char tmp_ap_ssid[sizeof(wifi_settings.ap_ssid) - 5];
-		strncpy(tmp_ap_ssid, (const char*)&wifi_settings.ap_ssid[0], sizeof(tmp_ap_ssid));
-		tmp_ap_ssid[sizeof(tmp_ap_ssid) - 1] = '\0';
-		snprintf((char*)&ap_config.ap.ssid[0], sizeof(ap_config.ap.ssid), "%s %02X%02X", tmp_ap_ssid, ap_mac[4], ap_mac[5]);
-	}
-	snprintf((char*)&ap_config.ap.password[0], sizeof(ap_config.ap.password), "%s", wifi_settings.ap_pwd);
+    {
+        uint8_t ap_mac[6];
+        memset(ap_mac, 0, sizeof(ap_mac));
+        ESP_ERROR_CHECK(esp_wifi_get_mac(ESP_IF_WIFI_AP, ap_mac));
+        char tmp_ap_ssid[sizeof(wifi_settings.ap_ssid) - 5];
+        strncpy(tmp_ap_ssid, (const char *)&wifi_settings.ap_ssid[0], sizeof(tmp_ap_ssid));
+        tmp_ap_ssid[sizeof(tmp_ap_ssid) - 1] = '\0';
+        snprintf(
+            (char *)&ap_config.ap.ssid[0],
+            sizeof(ap_config.ap.ssid),
+            "%s %02X%02X",
+            tmp_ap_ssid,
+            ap_mac[4],
+            ap_mac[5]);
+    }
+    snprintf((char *)&ap_config.ap.password[0], sizeof(ap_config.ap.password), "%s", wifi_settings.ap_pwd);
 
-	ESP_ERROR_CHECK(tcpip_adapter_dhcps_stop(TCPIP_ADAPTER_IF_AP)); 	/* stop AP DHCP server */
-	inet_pton(AF_INET, DEFAULT_AP_IP, &info.ip); /* access point is on a static IP */
-	inet_pton(AF_INET, DEFAULT_AP_GATEWAY, &info.gw);
-	inet_pton(AF_INET, DEFAULT_AP_NETMASK, &info.netmask);
-	ESP_ERROR_CHECK(tcpip_adapter_set_ip_info(TCPIP_ADAPTER_IF_AP, &info));
-	ESP_ERROR_CHECK(tcpip_adapter_dhcps_start(TCPIP_ADAPTER_IF_AP)); /* start AP DHCP server */
+    ESP_ERROR_CHECK(tcpip_adapter_dhcps_stop(TCPIP_ADAPTER_IF_AP)); /* stop AP DHCP server */
+    inet_pton(AF_INET, DEFAULT_AP_IP, &info.ip);                    /* access point is on a static IP */
+    inet_pton(AF_INET, DEFAULT_AP_GATEWAY, &info.gw);
+    inet_pton(AF_INET, DEFAULT_AP_NETMASK, &info.netmask);
+    ESP_ERROR_CHECK(tcpip_adapter_set_ip_info(TCPIP_ADAPTER_IF_AP, &info));
+    ESP_ERROR_CHECK(tcpip_adapter_dhcps_start(TCPIP_ADAPTER_IF_AP)); /* start AP DHCP server */
 
-	ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
-	ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &ap_config));
-	ESP_ERROR_CHECK(esp_wifi_set_bandwidth(WIFI_IF_AP, wifi_settings.ap_bandwidth));
-	ESP_ERROR_CHECK(esp_wifi_set_ps(wifi_settings.sta_power_save));
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
+    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &ap_config));
+    ESP_ERROR_CHECK(esp_wifi_set_bandwidth(WIFI_IF_AP, wifi_settings.ap_bandwidth));
+    ESP_ERROR_CHECK(esp_wifi_set_ps(wifi_settings.sta_power_save));
 
-	/* STA - Wifi Station configuration setup */
-	tcpip_adapter_dhcp_status_t status;
-	if(wifi_settings.sta_static_ip) {
-		ESP_LOGI(TAG, "Assigning static ip to STA interface. IP: %s , GW: %s , Mask: %s", ip4addr_ntoa(&wifi_settings.sta_static_ip_config.ip), ip4addr_ntoa(&wifi_settings.sta_static_ip_config.gw), ip4addr_ntoa(&wifi_settings.sta_static_ip_config.netmask));
+    /* STA - Wifi Station configuration setup */
+    tcpip_adapter_dhcp_status_t status;
+    if (wifi_settings.sta_static_ip)
+    {
+        ESP_LOGI(
+            TAG,
+            "Assigning static ip to STA interface. IP: %s , GW: %s , Mask: %s",
+            ip4addr_ntoa(&wifi_settings.sta_static_ip_config.ip),
+            ip4addr_ntoa(&wifi_settings.sta_static_ip_config.gw),
+            ip4addr_ntoa(&wifi_settings.sta_static_ip_config.netmask));
 
-		/* stop DHCP client*/
-		ESP_ERROR_CHECK(tcpip_adapter_dhcpc_stop(TCPIP_ADAPTER_IF_STA));
-		/* assign a static IP to the STA network interface */
-		ESP_ERROR_CHECK(tcpip_adapter_set_ip_info(TCPIP_ADAPTER_IF_STA, &wifi_settings.sta_static_ip_config));
-		}
-	else {
-		/* start DHCP client if not started*/
-		ESP_LOGI(TAG, "wifi_manager: Start DHCP client for STA interface. If not already running");
-		ESP_ERROR_CHECK(tcpip_adapter_dhcpc_get_status(TCPIP_ADAPTER_IF_STA, &status));
-		if (status!=TCPIP_ADAPTER_DHCP_STARTED)
-			ESP_ERROR_CHECK(tcpip_adapter_dhcpc_start(TCPIP_ADAPTER_IF_STA));
-	}
+        /* stop DHCP client*/
+        ESP_ERROR_CHECK(tcpip_adapter_dhcpc_stop(TCPIP_ADAPTER_IF_STA));
+        /* assign a static IP to the STA network interface */
+        ESP_ERROR_CHECK(tcpip_adapter_set_ip_info(TCPIP_ADAPTER_IF_STA, &wifi_settings.sta_static_ip_config));
+    }
+    else
+    {
+        /* start DHCP client if not started*/
+        ESP_LOGI(TAG, "wifi_manager: Start DHCP client for STA interface. If not already running");
+        ESP_ERROR_CHECK(tcpip_adapter_dhcpc_get_status(TCPIP_ADAPTER_IF_STA, &status));
+        if (status != TCPIP_ADAPTER_DHCP_STARTED)
+            ESP_ERROR_CHECK(tcpip_adapter_dhcpc_start(TCPIP_ADAPTER_IF_STA));
+    }
 
-	/* by default the mode is STA because wifi_manager will not start the access point unless it has to! */
-	ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-	ESP_ERROR_CHECK(esp_wifi_start());
+    /* by default the mode is STA because wifi_manager will not start the access point unless it has to! */
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+    ESP_ERROR_CHECK(esp_wifi_start());
 
-	/* enqueue first event: load previous config */
-	wifi_manager_send_message(ORDER_LOAD_AND_RESTORE_STA, NULL);
+    /* enqueue first event: load previous config */
+    wifi_manager_send_message(ORDER_LOAD_AND_RESTORE_STA, NULL);
 
-	/* main processing loop */
-	for(;;){
-		xStatus = xQueueReceive( wifi_manager_queue, &msg, portMAX_DELAY );
+    /* main processing loop */
+    for (;;)
+    {
+        xStatus = xQueueReceive(wifi_manager_queue, &msg, portMAX_DELAY);
 
-		if( xStatus == pdPASS ){
-			switch(msg.code){
+        if (xStatus == pdPASS)
+        {
+            switch (msg.code)
+            {
 
-			case EVENT_SCAN_DONE:
-				ESP_LOGD(TAG, "MESSAGE: EVENT_SCAN_DONE");
-				/* As input param, it stores max AP number ap_records can hold. As output param, it receives the actual AP number this API returns.
-				 * As a consequence, ap_num MUST be reset to MAX_AP_NUM at every scan */
-				ap_num = MAX_AP_NUM;
-				ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&ap_num, accessp_records));
-				/* make sure the http server isn't trying to access the list while it gets refreshed */
-				if(wifi_manager_lock_json_buffer( pdMS_TO_TICKS(1000) )){
-					/* Will remove the duplicate SSIDs from the list and update ap_num */
-					wifi_manager_filter_unique(accessp_records, &ap_num);
-					wifi_manager_generate_acess_points_json();
-					wifi_manager_unlock_json_buffer();
-				}
-				else{
-					ESP_LOGE(TAG, "could not get access to json mutex in wifi_scan");
-				}
+                case EVENT_SCAN_DONE:
+                    ESP_LOGD(TAG, "MESSAGE: EVENT_SCAN_DONE");
+                    /* As input param, it stores max AP number ap_records can hold. As output param, it receives the
+                     * actual AP number this API returns.
+                     * As a consequence, ap_num MUST be reset to MAX_AP_NUM at every scan */
+                    ap_num = MAX_AP_NUM;
+                    ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&ap_num, accessp_records));
+                    /* make sure the http server isn't trying to access the list while it gets refreshed */
+                    if (wifi_manager_lock_json_buffer(pdMS_TO_TICKS(1000)))
+                    {
+                        /* Will remove the duplicate SSIDs from the list and update ap_num */
+                        wifi_manager_filter_unique(accessp_records, &ap_num);
+                        wifi_manager_generate_acess_points_json();
+                        wifi_manager_unlock_json_buffer();
+                    }
+                    else
+                    {
+                        ESP_LOGE(TAG, "could not get access to json mutex in wifi_scan");
+                    }
 
-				http_server_start();
-				dns_server_start();
+                    http_server_start();
+                    dns_server_start();
 
-				/* callback */
-				if(cb_ptr_arr[msg.code]) (*cb_ptr_arr[msg.code])(NULL);
+                    /* callback */
+                    if (cb_ptr_arr[msg.code])
+                        (*cb_ptr_arr[msg.code])(NULL);
 
-				break;
+                    break;
 
-			case ORDER_START_WIFI_SCAN:
-				ESP_LOGD(TAG, "MESSAGE: ORDER_START_WIFI_SCAN");
+                case ORDER_START_WIFI_SCAN:
+                    ESP_LOGD(TAG, "MESSAGE: ORDER_START_WIFI_SCAN");
 
-				/* if a scan is already in progress this message is simply ignored thanks to the WIFI_MANAGER_SCAN_BIT uxBit */
-				uxBits = xEventGroupGetBits(wifi_manager_event_group);
-				if(! (uxBits & WIFI_MANAGER_SCAN_BIT) ){
-					xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_SCAN_BIT);
-					esp_err_t ret = esp_wifi_scan_start(&scan_config, false);
-					//sometimes when connecting to a network, a scan is started at the same time and then the scan will fail
-					//that's fine because we already have a network to connect and we don't need new scan results
-					//TODO: maybe fix this in the web page that scanning is stopped when connecting to a network
-					if (ret != 0) {
-						ESP_LOGW(TAG, "scan start return: %d", ret);
-					}
-				}
+                    /* if a scan is already in progress this message is simply ignored thanks to the
+                     * WIFI_MANAGER_SCAN_BIT uxBit */
+                    uxBits = xEventGroupGetBits(wifi_manager_event_group);
+                    if (!(uxBits & WIFI_MANAGER_SCAN_BIT))
+                    {
+                        xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_SCAN_BIT);
+                        esp_err_t ret = esp_wifi_scan_start(&scan_config, false);
+                        // sometimes when connecting to a network, a scan is started at the same time and then the scan
+                        // will fail that's fine because we already have a network to connect and we don't need new scan
+                        // results
+                        // TODO: maybe fix this in the web page that scanning is stopped when connecting to a network
+                        if (ret != 0)
+                        {
+                            ESP_LOGW(TAG, "scan start return: %d", ret);
+                        }
+                    }
 
-				/* callback */
-				if(cb_ptr_arr[msg.code]) (*cb_ptr_arr[msg.code])(NULL);
+                    /* callback */
+                    if (cb_ptr_arr[msg.code])
+                        (*cb_ptr_arr[msg.code])(NULL);
 
-				break;
+                    break;
 
-			case ORDER_LOAD_AND_RESTORE_STA:
-				ESP_LOGI(TAG, "MESSAGE: ORDER_LOAD_AND_RESTORE_STA");
-				if(wifi_manager_fetch_wifi_sta_config()){
-					ESP_LOGI(TAG, "Saved wifi found on startup. Will attempt to connect.");
-					wifi_manager_send_message(ORDER_CONNECT_STA, (void*)CONNECTION_REQUEST_RESTORE_CONNECTION);
-				}
-				else{
-					/* no wifi saved: start soft AP! This is what should happen during a first run */
-					ESP_LOGI(TAG, "No saved wifi found on startup. Starting access point.");
-					wifi_manager_send_message(ORDER_START_AP, NULL);
-				}
+                case ORDER_LOAD_AND_RESTORE_STA:
+                    ESP_LOGI(TAG, "MESSAGE: ORDER_LOAD_AND_RESTORE_STA");
+                    if (wifi_manager_fetch_wifi_sta_config())
+                    {
+                        ESP_LOGI(TAG, "Saved wifi found on startup. Will attempt to connect.");
+                        wifi_manager_send_message(ORDER_CONNECT_STA, (void *)CONNECTION_REQUEST_RESTORE_CONNECTION);
+                    }
+                    else
+                    {
+                        /* no wifi saved: start soft AP! This is what should happen during a first run */
+                        ESP_LOGI(TAG, "No saved wifi found on startup. Starting access point.");
+                        wifi_manager_send_message(ORDER_START_AP, NULL);
+                    }
 
-				/* callback */
-				if(cb_ptr_arr[msg.code]) (*cb_ptr_arr[msg.code])(NULL);
+                    /* callback */
+                    if (cb_ptr_arr[msg.code])
+                        (*cb_ptr_arr[msg.code])(NULL);
 
-				break;
+                    break;
 
-			case ORDER_CONNECT_STA:
-				ESP_LOGI(TAG, "MESSAGE: ORDER_CONNECT_STA");
+                case ORDER_CONNECT_STA:
+                    ESP_LOGI(TAG, "MESSAGE: ORDER_CONNECT_STA");
 
-				/* very important: precise that this connection attempt is specifically requested.
-				 * Param in that case is a boolean indicating if the request was made automatically
-				 * by the wifi_manager.
-				 * */
-				if((BaseType_t)msg.param == CONNECTION_REQUEST_USER) {
-					xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_STA_CONNECT_BIT);
-				}
-				else if((BaseType_t)msg.param == CONNECTION_REQUEST_RESTORE_CONNECTION) {
-					xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_RESTORE_STA_BIT);
-				}
+                    /* very important: precise that this connection attempt is specifically requested.
+                     * Param in that case is a boolean indicating if the request was made automatically
+                     * by the wifi_manager.
+                     * */
+                    if ((BaseType_t)msg.param == CONNECTION_REQUEST_USER)
+                    {
+                        xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_STA_CONNECT_BIT);
+                    }
+                    else if ((BaseType_t)msg.param == CONNECTION_REQUEST_RESTORE_CONNECTION)
+                    {
+                        xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_RESTORE_STA_BIT);
+                    }
 
-				uxBits = xEventGroupGetBits(wifi_manager_event_group);
-				if( uxBits & WIFI_MANAGER_WIFI_CONNECTED_BIT ){
-					wifi_manager_send_message(ORDER_DISCONNECT_STA, NULL);
-					/* todo: reconnect */
-				}
-				else{
-					/* update config to latest and attempt connection */
-					ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, wifi_manager_get_wifi_sta_config()));
-					ESP_ERROR_CHECK(esp_wifi_connect());
-				}
+                    uxBits = xEventGroupGetBits(wifi_manager_event_group);
+                    if (uxBits & WIFI_MANAGER_WIFI_CONNECTED_BIT)
+                    {
+                        wifi_manager_send_message(ORDER_DISCONNECT_STA, NULL);
+                        /* todo: reconnect */
+                    }
+                    else
+                    {
+                        /* update config to latest and attempt connection */
+                        ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, wifi_manager_get_wifi_sta_config()));
+                        ESP_ERROR_CHECK(esp_wifi_connect());
+                    }
 
-				/* callback */
-				if(cb_ptr_arr[msg.code]) (*cb_ptr_arr[msg.code])(NULL);
+                    /* callback */
+                    if (cb_ptr_arr[msg.code])
+                        (*cb_ptr_arr[msg.code])(NULL);
 
-				break;
+                    break;
 
-			case EVENT_STA_DISCONNECTED:
-				ESP_LOGI(TAG, "MESSAGE: EVENT_STA_DISCONNECTED with Reason code: %d", (uint32_t)msg.param);
+                case EVENT_STA_DISCONNECTED:
+                    ESP_LOGI(TAG, "MESSAGE: EVENT_STA_DISCONNECTED with Reason code: %d", (uint32_t)msg.param);
 
-				/* this even can be posted in numerous different conditions
-				 *
-				 * 1. SSID password is wrong
-				 * 2. Manual disconnection ordered
-				 * 3. Connection lost
-				 *
-				 * Having clear understand as to WHY the event was posted is key to having an efficient wifi manager
-				 *
-				 * With wifi_manager, we determine:
-				 *  If WIFI_MANAGER_REQUEST_STA_CONNECT_BIT is set, We consider it's a client that requested the connection.
-				 *    When WIFI_EVENT_STA_DISCONNECTED is posted, it's probably a password/something went wrong with the handshake.
-				 *
-				 *  If WIFI_MANAGER_REQUEST_STA_CONNECT_BIT is set, it's a disconnection that was ASKED by the client (clicking disconnect in the app)
-				 *    When WIFI_EVENT_STA_DISCONNECTED is posted, saved wifi is erased from the NVS memory.
-				 *
-				 *  If WIFI_MANAGER_REQUEST_STA_CONNECT_BIT and WIFI_MANAGER_REQUEST_STA_CONNECT_BIT are NOT set, it's a lost connection
-				 *
-				 *  In this version of the software, reason codes are not used. They are indicated here for potential future usage.
-				 *
-				 *  REASON CODE:
-				 *  1		UNSPECIFIED
-				 *  2		AUTH_EXPIRE					auth no longer valid, this smells like someone changed a password on the AP
-				 *  3		AUTH_LEAVE
-				 *  4		ASSOC_EXPIRE
-				 *  5		ASSOC_TOOMANY				too many devices already connected to the AP => AP fails to respond
-				 *  6		NOT_AUTHED
-				 *  7		NOT_ASSOCED
-				 *  8		ASSOC_LEAVE
-				 *  9		ASSOC_NOT_AUTHED
-				 *  10		DISASSOC_PWRCAP_BAD
-				 *  11		DISASSOC_SUPCHAN_BAD
-				 *	12		<n/a>
-				 *  13		IE_INVALID
-				 *  14		MIC_FAILURE
-				 *  15		4WAY_HANDSHAKE_TIMEOUT		wrong password! This was personnaly tested on my home wifi with a wrong password.
-				 *  16		GROUP_KEY_UPDATE_TIMEOUT
-				 *  17		IE_IN_4WAY_DIFFERS
-				 *  18		GROUP_CIPHER_INVALID
-				 *  19		PAIRWISE_CIPHER_INVALID
-				 *  20		AKMP_INVALID
-				 *  21		UNSUPP_RSN_IE_VERSION
-				 *  22		INVALID_RSN_IE_CAP
-				 *  23		802_1X_AUTH_FAILED			wrong password?
-				 *  24		CIPHER_SUITE_REJECTED
-				 *  200		BEACON_TIMEOUT
-				 *  201		NO_AP_FOUND
-				 *  202		AUTH_FAIL
-				 *  203		ASSOC_FAIL
-				 *  204		HANDSHAKE_TIMEOUT
-				 *
-				 * */
+                    /* this even can be posted in numerous different conditions
+                     *
+                     * 1. SSID password is wrong
+                     * 2. Manual disconnection ordered
+                     * 3. Connection lost
+                     *
+                     * Having clear understand as to WHY the event was posted is key to having an efficient wifi manager
+                     *
+                     * With wifi_manager, we determine:
+                     *  If WIFI_MANAGER_REQUEST_STA_CONNECT_BIT is set, We consider it's a client that requested the
+                     *connection. When WIFI_EVENT_STA_DISCONNECTED is posted, it's probably a password/something went
+                     *wrong with the handshake.
+                     *
+                     *  If WIFI_MANAGER_REQUEST_STA_CONNECT_BIT is set, it's a disconnection that was ASKED by the
+                     *client (clicking disconnect in the app) When WIFI_EVENT_STA_DISCONNECTED is posted, saved wifi is
+                     *erased from the NVS memory.
+                     *
+                     *  If WIFI_MANAGER_REQUEST_STA_CONNECT_BIT and WIFI_MANAGER_REQUEST_STA_CONNECT_BIT are NOT set,
+                     *it's a lost connection
+                     *
+                     *  In this version of the software, reason codes are not used. They are indicated here for
+                     *potential future usage.
+                     *
+                     *  REASON CODE:
+                     *  1       UNSPECIFIED
+                     *  2       AUTH_EXPIRE auth no longer valid, this smells like someone changed a password on the AP
+                     *  3       AUTH_LEAVE
+                     *  4       ASSOC_EXPIRE
+                     *  5       ASSOC_TOOMANY too many devices already connected to the AP => AP fails to respond
+                     *  6       NOT_AUTHED
+                     *  7       NOT_ASSOCED
+                     *  8       ASSOC_LEAVE
+                     *  9       ASSOC_NOT_AUTHED
+                     *  10      DISASSOC_PWRCAP_BAD
+                     *  11      DISASSOC_SUPCHAN_BAD
+                     *  12      <n/a>
+                     *  13      IE_INVALID
+                     *  14      MIC_FAILURE
+                     *  15      4WAY_HANDSHAKE_TIMEOUT wrong password! This was personnaly tested on my home wifi
+                     *          with a wrong password.
+                     *  16      GROUP_KEY_UPDATE_TIMEOUT
+                     *  17      IE_IN_4WAY_DIFFERS
+                     *  18      GROUP_CIPHER_INVALID
+                     *  19      PAIRWISE_CIPHER_INVALID
+                     *  20      AKMP_INVALID
+                     *  21      UNSUPP_RSN_IE_VERSION
+                     *  22      INVALID_RSN_IE_CAP
+                     *  23      802_1X_AUTH_FAILED  wrong password?
+                     *  24      CIPHER_SUITE_REJECTED
+                     *  200     BEACON_TIMEOUT
+                     *  201     NO_AP_FOUND
+                     *  202     AUTH_FAIL
+                     *  203     ASSOC_FAIL
+                     *  204     HANDSHAKE_TIMEOUT
+                     * */
 
-				/* reset saved sta IP */
-				wifi_manager_safe_update_sta_ip_string((uint32_t)0);
+                    /* reset saved sta IP */
+                    wifi_manager_safe_update_sta_ip_string((uint32_t)0);
 
-				uxBits = xEventGroupGetBits(wifi_manager_event_group);
-				if( uxBits & WIFI_MANAGER_REQUEST_STA_CONNECT_BIT ){
-					ESP_LOGI(TAG, "uxBits & WIFI_MANAGER_REQUEST_STA_CONNECT_BIT");
-					/* there are no retries when it's a user requested connection by design. This avoids a user hanging too much
-					 * in case they typed a wrong password for instance. Here we simply clear the request bit and move on */
-					xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_STA_CONNECT_BIT);
+                    uxBits = xEventGroupGetBits(wifi_manager_event_group);
+                    if (uxBits & WIFI_MANAGER_REQUEST_STA_CONNECT_BIT)
+                    {
+                        ESP_LOGI(TAG, "uxBits & WIFI_MANAGER_REQUEST_STA_CONNECT_BIT");
+                        /* there are no retries when it's a user requested connection by design. This avoids a user
+                         * hanging too much in case they typed a wrong password for instance. Here we simply clear the
+                         * request bit and move on */
+                        xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_STA_CONNECT_BIT);
 
-					if(wifi_manager_lock_json_buffer( portMAX_DELAY )){
-						wifi_manager_generate_ip_info_json( UPDATE_FAILED_ATTEMPT );
-						wifi_manager_unlock_json_buffer();
-					}
+                        if (wifi_manager_lock_json_buffer(portMAX_DELAY))
+                        {
+                            wifi_manager_generate_ip_info_json(UPDATE_FAILED_ATTEMPT);
+                            wifi_manager_unlock_json_buffer();
+                        }
+                    }
+                    else if (uxBits & WIFI_MANAGER_REQUEST_DISCONNECT_BIT)
+                    {
+                        ESP_LOGI(TAG, "uxBits & WIFI_MANAGER_REQUEST_DISCONNECT_BIT");
+                        /* user manually requested a disconnect so the lost connection is a normal event. Clear the flag
+                         * and restart the AP */
+                        xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_DISCONNECT_BIT);
 
-				}
-				else if (uxBits & WIFI_MANAGER_REQUEST_DISCONNECT_BIT){
-					ESP_LOGI(TAG, "uxBits & WIFI_MANAGER_REQUEST_DISCONNECT_BIT");
-					/* user manually requested a disconnect so the lost connection is a normal event. Clear the flag and restart the AP */
-					xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_DISCONNECT_BIT);
+                        if (wifi_manager_lock_json_buffer(portMAX_DELAY))
+                        {
+                            wifi_manager_generate_ip_info_json(UPDATE_USER_DISCONNECT);
+                            wifi_manager_unlock_json_buffer();
+                        }
 
-					if(wifi_manager_lock_json_buffer( portMAX_DELAY )){
-						wifi_manager_generate_ip_info_json( UPDATE_USER_DISCONNECT );
-						wifi_manager_unlock_json_buffer();
-					}
+                        /* erase configuration */
+                        if (wifi_manager_config_sta)
+                        {
+                            memset(wifi_manager_config_sta, 0x00, sizeof(wifi_config_t));
+                        }
 
-					/* erase configuration */
-					if(wifi_manager_config_sta){
-						memset(wifi_manager_config_sta, 0x00, sizeof(wifi_config_t));
-					}
+                        /* save NVS memory */
+                        wifi_manager_save_sta_config();
 
-					/* save NVS memory */
-					wifi_manager_save_sta_config();
+                        /* start SoftAP */
+                        wifi_manager_send_message(ORDER_START_AP, NULL);
+                    }
+                    else
+                    {
+                        ESP_LOGI(TAG, "lost connection");
+                        /* lost connection ? */
+                        if (wifi_manager_lock_json_buffer(portMAX_DELAY))
+                        {
+                            wifi_manager_generate_ip_info_json(UPDATE_LOST_CONNECTION);
+                            wifi_manager_unlock_json_buffer();
+                        }
 
-					/* start SoftAP */
-					wifi_manager_send_message(ORDER_START_AP, NULL);
-				}
-				else{
-					ESP_LOGI(TAG, "lost connection");
-					/* lost connection ? */
-					if(wifi_manager_lock_json_buffer( portMAX_DELAY )){
-						wifi_manager_generate_ip_info_json( UPDATE_LOST_CONNECTION );
-						wifi_manager_unlock_json_buffer();
-					}
+                        wifi_manager_send_message(ORDER_CONNECT_STA, (void *)CONNECTION_REQUEST_AUTO_RECONNECT);
+                    }
 
-					wifi_manager_send_message(ORDER_CONNECT_STA, (void*)CONNECTION_REQUEST_AUTO_RECONNECT);
-				}
+                    /* callback */
+                    if (cb_ptr_arr[msg.code])
+                        (*cb_ptr_arr[msg.code])(NULL);
 
-				/* callback */
-				if(cb_ptr_arr[msg.code]) (*cb_ptr_arr[msg.code])(NULL);
+                    break;
 
-				break;
+                case ORDER_START_AP:
+                    ESP_LOGI(TAG, "MESSAGE: ORDER_START_AP");
+                    esp_wifi_set_mode(WIFI_MODE_APSTA);
 
-			case ORDER_START_AP:
-				ESP_LOGI(TAG, "MESSAGE: ORDER_START_AP");
-				esp_wifi_set_mode(WIFI_MODE_APSTA);
+                    // http_server_start();
+                    // dns_server_start();
 
-				//http_server_start();
-				//dns_server_start();
+                    /* callback */
+                    if (cb_ptr_arr[msg.code])
+                        (*cb_ptr_arr[msg.code])(NULL);
 
-				/* callback */
-				if(cb_ptr_arr[msg.code]) (*cb_ptr_arr[msg.code])(NULL);
+                    break;
 
-				break;
+                case EVENT_STA_GOT_IP:
+                    ESP_LOGI(TAG, "MESSAGE: EVENT_STA_GOT_IP");
 
-			case EVENT_STA_GOT_IP:
-				ESP_LOGI(TAG, "MESSAGE: EVENT_STA_GOT_IP");
+                    uxBits = xEventGroupGetBits(wifi_manager_event_group);
 
-				uxBits = xEventGroupGetBits(wifi_manager_event_group);
+                    /* reset connection requests bits -- doesn't matter if it was set or not */
+                    xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_STA_CONNECT_BIT);
 
-				/* reset connection requests bits -- doesn't matter if it was set or not */
-				xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_STA_CONNECT_BIT);
+                    /* save IP as a string for the HTTP server host */
+                    wifi_manager_safe_update_sta_ip_string((uint32_t)msg.param);
 
-				/* save IP as a string for the HTTP server host */
-				wifi_manager_safe_update_sta_ip_string((uint32_t)msg.param);
+                    /* save wifi config in NVS if it wasn't a restored of a connection */
+                    if (uxBits & WIFI_MANAGER_REQUEST_RESTORE_STA_BIT)
+                    {
+                        xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_RESTORE_STA_BIT);
+                    }
+                    else
+                    {
+                        wifi_manager_save_sta_config();
+                    }
 
-				/* save wifi config in NVS if it wasn't a restored of a connection */
-				if(uxBits & WIFI_MANAGER_REQUEST_RESTORE_STA_BIT){
-					xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_RESTORE_STA_BIT);
-				}
-				else{
-					wifi_manager_save_sta_config();
-				}
+                    /* refresh JSON with the new IP */
+                    if (wifi_manager_lock_json_buffer(portMAX_DELAY))
+                    {
+                        /* generate the connection info with success */
+                        wifi_manager_generate_ip_info_json(UPDATE_CONNECTION_OK);
+                        wifi_manager_unlock_json_buffer();
+                    }
+                    else
+                    {
+                        abort();
+                    }
 
-				/* refresh JSON with the new IP */
-				if(wifi_manager_lock_json_buffer( portMAX_DELAY )){
-					/* generate the connection info with success */
-					wifi_manager_generate_ip_info_json( UPDATE_CONNECTION_OK );
-					wifi_manager_unlock_json_buffer();
-				}
-				else { abort(); }
+                    /* bring down DNS hijack */
+                    // http_server_stop();
+                    dns_server_stop();
 
-				/* bring down DNS hijack */
-				//http_server_stop();
-				dns_server_stop();
+                    /* callback */
+                    if (cb_ptr_arr[msg.code])
+                        (*cb_ptr_arr[msg.code])(NULL);
 
-				/* callback */
-				if(cb_ptr_arr[msg.code]) (*cb_ptr_arr[msg.code])(NULL);
+                    break;
 
-				break;
+                case ORDER_DISCONNECT_STA:
+                    ESP_LOGI(TAG, "MESSAGE: ORDER_DISCONNECT_STA");
 
-			case ORDER_DISCONNECT_STA:
-				ESP_LOGI(TAG, "MESSAGE: ORDER_DISCONNECT_STA");
+                    /* precise this is coming from a user request */
+                    xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_DISCONNECT_BIT);
 
-				/* precise this is coming from a user request */
-				xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_DISCONNECT_BIT);
+                    /* order wifi discconect */
+                    ESP_ERROR_CHECK(esp_wifi_disconnect());
 
-				/* order wifi discconect */
-				ESP_ERROR_CHECK(esp_wifi_disconnect());
+                    /* callback */
+                    if (cb_ptr_arr[msg.code])
+                        (*cb_ptr_arr[msg.code])(NULL);
 
-				/* callback */
-				if(cb_ptr_arr[msg.code]) (*cb_ptr_arr[msg.code])(NULL);
+                    break;
 
-				break;
+                default:
+                    break;
 
-			default:
-				break;
-
-			} /* end of switch/case */
-		} /* end of if status=pdPASS */
-	} /* end of for loop */
-	vTaskDelete( NULL );
+            } /* end of switch/case */
+        }     /* end of if status=pdPASS */
+    }         /* end of for loop */
+    vTaskDelete(NULL);
 }
-
-

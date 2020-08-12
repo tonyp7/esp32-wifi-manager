@@ -8,25 +8,25 @@ using namespace std;
 class TestStub : public ::testing::Test
 {
 private:
-
 protected:
-
-    void SetUp() override
+    void
+    SetUp() override
     {
     }
 
-    void TearDown() override
+    void
+    TearDown() override
     {
     }
 
 public:
-
     TestStub();
 
     ~TestStub() override;
 };
 
-TestStub::TestStub() : Test()
+TestStub::TestStub()
+    : Test()
 {
 }
 
