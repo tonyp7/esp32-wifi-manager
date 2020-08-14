@@ -59,7 +59,7 @@ function to process requests, decode URLs, serve files, etc. etc.
 #include "http_server.h"
 #include "wifi_manager.h"
 
-#include "../../main/includes/ruuvidongle.h"
+#include "../../main/includes/ruuvi_gateway.h"
 #include "../../main/includes/ethernet.h"
 #include "cJSON.h"
 #include "ruuvi_gwui_html.h"
@@ -330,7 +330,7 @@ get_http_body(char *msg, int len, int *blen)
 }
 
 bool
-parse_ruuvi_config_json(const char *body, struct dongle_config *c)
+parse_ruuvi_config_json(const char *body, struct ruuvi_gateway_config_t *c)
 {
     // TODO replace this parsing with generic implementation
     bool   ret  = true;
@@ -840,12 +840,12 @@ http_server_netconn_serve(struct netconn *conn)
                 {
                     ESP_LOGD(TAG, "http_server_netconn_serve: POST /ruuvi.json");
                     char *body = get_http_body(save_ptr, buflen - (save_ptr - buf), 0);
-                    if (parse_ruuvi_config_json(body, &m_dongle_config))
+                    if (parse_ruuvi_config_json(body, &g_gateway_config))
                     {
                         ESP_LOGI(TAG, "settings got from browser:");
-                        settings_print(&m_dongle_config);
-                        settings_save_to_flash(&m_dongle_config);
-                        ruuvi_send_nrf_settings(&m_dongle_config);
+                        settings_print(&g_gateway_config);
+                        settings_save_to_flash(&g_gateway_config);
+                        ruuvi_send_nrf_settings(&g_gateway_config);
                         ethernet_update_ip();
                         http_server_netconn_resp_200_json(conn, "{}");
                     }
