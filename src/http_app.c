@@ -215,7 +215,7 @@ static esp_err_t http_server_get_handler(httpd_req_t *req){
     size_t buf_len;
     esp_err_t ret = ESP_OK;
 
-    ESP_LOGI(TAG, "GET %s", req->uri);
+    ESP_LOGD(TAG, "GET %s", req->uri);
 
     /* Get header value string length and allocate memory for length + 1,
      * extra byte for null termination */
@@ -244,8 +244,6 @@ static esp_err_t http_server_get_handler(httpd_req_t *req){
 
 	}
 	else{
-
-		ESP_LOGD(TAG, "GET %s", req->uri);
 
 		/* GET /  */
 		if(strcmp(req->uri, http_root_url) == 0){
