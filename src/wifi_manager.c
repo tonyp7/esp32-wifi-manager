@@ -180,7 +180,7 @@ void wifi_manager_start(){
 
 	/* initialize flash memory */
 	nvs_flash_init();
-	nvs_sync_create(); /* semaphore for thread synchronization on NVS memory */
+	ESP_ERROR_CHECK(nvs_sync_create()); /* semaphore for thread synchronization on NVS memory */
 
 	/* memory allocation */
 	wifi_manager_queue = xQueueCreate( 3, sizeof( queue_message) );
@@ -225,19 +225,25 @@ esp_err_t wifi_manager_save_sta_config(){
 	memset(&tmp_settings, 0x00, sizeof(tmp_settings));
 	bool change = false;
 
-	ESP_LOGI(TAG, "About to save config to flash");
+	ESP_LOGI(TAG, "About to save config to flash!!");
 
 	if(wifi_manager_config_sta && nvs_sync_lock( portMAX_DELAY )){
 
 		esp_err = nvs_open(wifi_manager_nvs_namespace, NVS_READWRITE, &handle);
-		if (esp_err != ESP_OK) return esp_err;
+		if (esp_err != ESP_OK){
+			nvs_sync_unlock();
+			return esp_err;
+		}
 
 		sz = sizeof(tmp_conf.sta.ssid);
 		esp_err = nvs_get_blob(handle, "ssid", tmp_conf.sta.ssid, &sz);
 		if( (esp_err == ESP_OK  || esp_err == ESP_ERR_NVS_NOT_FOUND) && strcmp( (char*)tmp_conf.sta.ssid, (char*)wifi_manager_config_sta->sta.ssid) != 0){
 			/* different ssid or ssid does not exist in flash: save new ssid */
 			esp_err = nvs_set_blob(handle, "ssid", wifi_manager_config_sta->sta.ssid, 32);
-			if (esp_err != ESP_OK) return esp_err;
+			if (esp_err != ESP_OK){
+				nvs_sync_unlock();
+				return esp_err;
+			}
 			change = true;
 			ESP_LOGI(TAG, "wifi_manager_wrote wifi_sta_config: ssid:%s",wifi_manager_config_sta->sta.ssid);
 
@@ -248,7 +254,10 @@ esp_err_t wifi_manager_save_sta_config(){
 		if( (esp_err == ESP_OK  || esp_err == ESP_ERR_NVS_NOT_FOUND) && strcmp( (char*)tmp_conf.sta.password, (char*)wifi_manager_config_sta->sta.password) != 0){
 			/* different password or password does not exist in flash: save new password */
 			esp_err = nvs_set_blob(handle, "password", wifi_manager_config_sta->sta.password, 64);
-			if (esp_err != ESP_OK) return esp_err;
+			if (esp_err != ESP_OK){
+				nvs_sync_unlock();
+				return esp_err;
+			}
 			change = true;
 			ESP_LOGI(TAG, "wifi_manager_wrote wifi_sta_config: password:%s",wifi_manager_config_sta->sta.password);
 		}
@@ -267,7 +276,10 @@ esp_err_t wifi_manager_save_sta_config(){
 				)
 		){
 			esp_err = nvs_set_blob(handle, "settings", &wifi_settings, sizeof(wifi_settings));
-			if (esp_err != ESP_OK) return esp_err;
+			if (esp_err != ESP_OK){
+				nvs_sync_unlock();
+				return esp_err;
+			}
 			change = true;
 
 			ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: SoftAP_ssid: %s",wifi_settings.ap_ssid);
@@ -292,6 +304,9 @@ esp_err_t wifi_manager_save_sta_config(){
 		nvs_sync_unlock();
 
 	}
+	else{
+		ESP_LOGE(TAG, "wifi_manager_save_sta_config failed to acquire nvs_sync mutex");
+	}
 
 	return ESP_OK;
 }
@@ -300,7 +315,14 @@ bool wifi_manager_fetch_wifi_sta_config(){
 
 	nvs_handle handle;
 	esp_err_t esp_err;
-	if(nvs_sync_lock( portMAX_DELAY ) && nvs_open(wifi_manager_nvs_namespace, NVS_READONLY, &handle) == ESP_OK){
+	if(nvs_sync_lock( portMAX_DELAY )){
+
+		esp_err = nvs_open(wifi_manager_nvs_namespace, NVS_READONLY, &handle);
+
+		if(esp_err != ESP_OK){
+			nvs_sync_unlock();
+			return false;
+		}
 
 		if(wifi_manager_config_sta == NULL){
 			wifi_manager_config_sta = (wifi_config_t*)malloc(sizeof(wifi_config_t));

@@ -34,6 +34,7 @@ SOFTWARE.
 
 #include <stdbool.h> /* for type bool */
 #include <freertos/FreeRTOS.h> /* for TickType_t */
+#include <esp_err.h> /* for esp_err_t */
 
 #ifdef __cplusplus
 extern "C" {
@@ -56,9 +57,10 @@ void nvs_sync_unlock();
 
 /** 
  * @brief Create the NVS semaphore
- * @return true on success or if the semaphore already exists, false otherwise
+ * @return      ESP_OK: success or if the semaphore already exists
+ *              ESP_FAIL: failure
  */ 
-bool nvs_sync_create();
+esp_err_t nvs_sync_create();
 
 /**
  * @brief Frees memory associated with the NVS semaphore 

@@ -30,17 +30,27 @@ SOFTWARE.
 #include <stdbool.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
+#include <esp_err.h>
 #include "nvs_sync.h"
 
 
 static SemaphoreHandle_t nvs_sync_mutex = NULL;
 
-bool nvs_sync_create(){
+esp_err_t nvs_sync_create(){
     if(nvs_sync_mutex == NULL){
-        nvs_sync_mutex = xSemaphoreCreateMutex();
-    }
 
-    return nvs_sync_mutex != NULL;
+        nvs_sync_mutex = xSemaphoreCreateMutex();
+
+		if(nvs_sync_mutex){
+			return ESP_OK;
+		}
+		else{
+			return ESP_FAIL;
+		}
+    }
+	else{
+		return ESP_OK;
+	}
 }
 
 void nvs_sync_free(){
