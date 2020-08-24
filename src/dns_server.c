@@ -167,9 +167,9 @@ dns_server(void *pvParameters)
 
             /* create DNS answer at the end of the query*/
             dns_answer_t *dns_answer = (dns_answer_t *)&response[length];
-            dns_answer->NAME
-                = __bswap_16(0xC00C); /* This is a pointer to the beginning of the question. As per DNS standard, first
-                                         two bits must be set to 11 for some odd reason hence 0xC0 */
+            dns_answer->NAME         = __bswap_16(
+                0xC00C); /* This is a pointer to the beginning of the question.
+                                  * As per DNS standard, first two bits must be set to 11 for some odd reason hence 0xC0 */
             dns_answer->TYPE  = __bswap_16(DNS_ANSWER_TYPE_A);
             dns_answer->CLASS = __bswap_16(DNS_ANSWER_CLASS_IN);
             dns_answer->TTL   = (uint32_t)0x00000000;  /* no caching. Avoids DNS poisoning since this is a DNS hijack */

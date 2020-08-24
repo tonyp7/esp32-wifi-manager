@@ -58,6 +58,8 @@ function to process requests, decode URLs, serve files, etc. etc.
 
 #include "http_server.h"
 #include "wifi_manager.h"
+#include "json_access_points.h"
+#include "json_network_info.h"
 
 #include "../../main/includes/ruuvi_gateway.h"
 #include "../../main/includes/ethernet.h"
@@ -728,7 +730,7 @@ http_server_netconn_serve(struct netconn *conn)
                         /* if we can get the mutex, write the last version of the AP list */
                         if (wifi_manager_lock_json_buffer((TickType_t)10))
                         {
-                            char *buff = wifi_manager_get_ap_list_json();
+                            const char *buff = json_access_points_get();
                             ESP_LOGI(TAG, "ap.json: %s", buff);
                             http_server_netconn_resp_200_json(conn, buff);
                             wifi_manager_unlock_json_buffer();
@@ -746,7 +748,7 @@ http_server_netconn_serve(struct netconn *conn)
                     {
                         if (wifi_manager_lock_json_buffer((TickType_t)10))
                         {
-                            char *buff = wifi_manager_get_ip_info_json();
+                            const char *buff = json_network_info_get();
                             if (buff)
                             {
                                 ESP_LOGI(TAG, "status.json: %s", buff);

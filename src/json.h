@@ -2,7 +2,8 @@
 @file json.h
 @brief handles very basic JSON with a minimal footprint on the system
 
-This code is a lightly modified version of cJSON 1.4.7. cJSON is licensed under the MIT license:
+This code is a completely rewritten version of cJSON 1.4.7.
+cJSON is licensed under the MIT license:
 Copyright (c) 2009 Dave Gamble
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -28,19 +29,24 @@ OTHER DEALINGS IN THE SOFTWARE.
 #ifndef JSON_H_INCLUDED
 #define JSON_H_INCLUDED
 
+#include <stdint.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include "str_buf.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /**
  * @brief Render the cstring provided to a JSON escaped version that can be printed.
- * @param input the input buffer to be escaped.
- * @param output_buffer the output buffer to write to. You must ensure it is big enough to contain the final string.
- * @see cJSON equivlaent static cJSON_bool print_string_ptr(const unsigned char * const input, printbuffer * const
+ * @param p_str_buf - a pointer to @def str_buf_t.
+ * @param p_input_str the p_input_str buffer to be escaped.
+ * @see cJSON equivalent static cJSON_bool print_string_ptr(const unsigned char * const p_input_str, printbuffer * const
  * output_buffer)
  */
 bool
-json_print_string(const unsigned char *input, unsigned char *output_buffer);
+json_print_escaped_string(str_buf_t *p_str_buf, const char *p_input_str);
 
 #ifdef __cplusplus
 }

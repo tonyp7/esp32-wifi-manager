@@ -54,6 +54,8 @@ Contains the freeRTOS task and all necessary support
 #include "tcpip_adapter.h"
 #include "wifi_manager.h"
 #include "dns_server.h"
+#include "json_network_info.h"
+#include "json_access_points.h"
 #include "../../main/includes/ethernet.h"
 
 #undef LOG_LOCAL_LEVEL
@@ -67,9 +69,8 @@ SemaphoreHandle_t wifi_manager_sta_ip_mutex = NULL;
 char *            wifi_manager_sta_ip       = NULL;
 uint16_t          ap_num                    = MAX_AP_NUM;
 wifi_ap_record_t *accessp_records;
-char *            accessp_json            = NULL;
-char *            ip_info_json            = NULL;
-wifi_config_t *   wifi_manager_config_sta = NULL;
+
+wifi_config_t *wifi_manager_config_sta = NULL;
 
 void (**cb_ptr_arr)(void *) = NULL;
 
@@ -159,16 +160,21 @@ wifi_manager_start(const WiFiAntConfig_t *pWiFiAntConfig)
     /* memory allocation */
     wifi_manager_queue      = xQueueCreate(3, sizeof(queue_message));
     wifi_manager_json_mutex = xSemaphoreCreateMutex();
-    accessp_records         = (wifi_ap_record_t *)malloc(sizeof(wifi_ap_record_t) * MAX_AP_NUM);
-    accessp_json
-        = (char *)malloc(MAX_AP_NUM * JSON_ONE_APP_SIZE + 4); /* 4 bytes for json encapsulation of "[\n" and "]\0" */
-    wifi_manager_clear_access_points_json();
-    ip_info_json = (char *)malloc(sizeof(char) * JSON_IP_INFO_SIZE);
-    wifi_manager_clear_ip_info_json();
+
+    accessp_records = (wifi_ap_record_t *)malloc(sizeof(wifi_ap_record_t) * MAX_AP_NUM);
+    // TODO: check accessp_records for NULL
+
+    ESP_ERROR_CHECK(json_access_points_init());
+
+    json_network_info_init();
+
     wifi_manager_config_sta = (wifi_config_t *)malloc(sizeof(wifi_config_t));
+    // TODO: check wifi_manager_config_sta for NULL
     memset(wifi_manager_config_sta, 0x00, sizeof(wifi_config_t));
+
     memset(&wifi_settings.sta_static_ip_config, 0x00, sizeof(tcpip_adapter_ip_info_t));
     cb_ptr_arr = malloc(sizeof(sizeof(void (*)(void *))) * MESSAGE_CODE_COUNT);
+    // TODO: check cb_ptr_arr for NULL
     for (int i = 0; i < MESSAGE_CODE_COUNT; i++)
     {
         cb_ptr_arr[i] = NULL;
@@ -395,106 +401,23 @@ wifi_manager_fetch_wifi_sta_config()
     }
 }
 
-void
-wifi_manager_clear_ip_info_json()
-{
-    strcpy(ip_info_json, "{}\n");
-}
-
+/**
+ * @brief Generates the connection status json: ssid and IP addresses.
+ * @note This is not thread-safe and should be called only if wifi_manager_lock_json_buffer call is successful.
+ */
 void
 wifi_manager_generate_ip_info_json(update_reason_code_t update_reason_code)
 {
+    tcpip_adapter_ip_info_t ip_info = { 0 };
+    ESP_ERROR_CHECK(tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_STA, &ip_info));
+    const char *ssid = wifi_manager_get_wifi_sta_ssid();
 
-    wifi_config_t *config = wifi_manager_get_wifi_sta_config();
-    if (config)
-    {
+    network_info_str_t ip_info_str = { 0 };
+    snprintf(ip_info_str.ip, sizeof(ip_info_str.ip), "%s", ip4addr_ntoa(&ip_info.ip));
+    snprintf(ip_info_str.netmask, sizeof(ip_info_str.netmask), "%s", ip4addr_ntoa(&ip_info.netmask));
+    snprintf(ip_info_str.gw, sizeof(ip_info_str.gw), "%s", ip4addr_ntoa(&ip_info.gw));
 
-        const char ip_info_json_format[] = ",\"ip\":\"%s\",\"netmask\":\"%s\",\"gw\":\"%s\",\"urc\":%d}\n";
-
-        memset(ip_info_json, 0x00, JSON_IP_INFO_SIZE);
-
-        /* to avoid declaring a new buffer we copy the data directly into the buffer at its correct address */
-        strcpy(ip_info_json, "{\"ssid\":");
-        json_print_string(config->sta.ssid, (unsigned char *)(ip_info_json + strlen(ip_info_json)));
-
-        if (update_reason_code == UPDATE_CONNECTION_OK)
-        {
-            /* rest of the information is copied after the ssid */
-            tcpip_adapter_ip_info_t ip_info;
-            ESP_ERROR_CHECK(tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_STA, &ip_info));
-            char ip[IP4ADDR_STRLEN_MAX]; /* note: IP4ADDR_STRLEN_MAX is defined in lwip */
-            char gw[IP4ADDR_STRLEN_MAX];
-            char netmask[IP4ADDR_STRLEN_MAX];
-            strcpy(ip, ip4addr_ntoa(&ip_info.ip));
-            strcpy(netmask, ip4addr_ntoa(&ip_info.netmask));
-            strcpy(gw, ip4addr_ntoa(&ip_info.gw));
-
-            snprintf(
-                (ip_info_json + strlen(ip_info_json)),
-                JSON_IP_INFO_SIZE,
-                ip_info_json_format,
-                ip,
-                netmask,
-                gw,
-                (int)update_reason_code);
-        }
-        else
-        {
-            /* notify in the json output the reason code why this was updated without a connection */
-            snprintf(
-                (ip_info_json + strlen(ip_info_json)),
-                JSON_IP_INFO_SIZE,
-                ip_info_json_format,
-                "0",
-                "0",
-                "0",
-                (int)update_reason_code);
-        }
-    }
-    else
-    {
-        wifi_manager_clear_ip_info_json();
-    }
-}
-
-void
-wifi_manager_clear_access_points_json()
-{
-    strcpy(accessp_json, "[]\n");
-}
-
-void
-wifi_manager_generate_acess_points_json()
-{
-
-    strcpy(accessp_json, "[");
-
-    const char oneap_str[] = ",\"chan\":%d,\"rssi\":%d,\"auth\":%d}%c\n";
-
-    /* stack buffer to hold on to one AP until it's copied over to accessp_json */
-    char one_ap[JSON_ONE_APP_SIZE];
-    for (int i = 0; i < ap_num; i++)
-    {
-
-        wifi_ap_record_t ap = accessp_records[i];
-
-        /* ssid needs to be json escaped. To save on heap memory it's directly printed at the correct address */
-        strcat(accessp_json, "{\"ssid\":");
-        json_print_string((unsigned char *)ap.ssid, (unsigned char *)(accessp_json + strlen(accessp_json)));
-
-        /* print the rest of the json for this access point: no more string to escape */
-        snprintf(
-            one_ap,
-            (size_t)JSON_ONE_APP_SIZE,
-            oneap_str,
-            ap.primary,
-            ap.rssi,
-            ap.authmode,
-            i == ap_num - 1 ? ']' : ',');
-
-        /* add it to the list */
-        strcat(accessp_json, one_ap);
-    }
+    json_network_info_generate(ssid, &ip_info_str, update_reason_code);
 }
 
 bool
@@ -569,12 +492,6 @@ void
 wifi_manager_unlock_json_buffer()
 {
     xSemaphoreGive(wifi_manager_json_mutex);
-}
-
-char *
-wifi_manager_get_ap_list_json()
-{
-    return accessp_json;
 }
 
 void
@@ -654,6 +571,14 @@ wifi_manager_get_wifi_sta_config()
     return wifi_manager_config_sta;
 }
 
+const char *
+wifi_manager_get_wifi_sta_ssid(void)
+{
+    wifi_config_t *p_wifi_cfg = wifi_manager_get_wifi_sta_config();
+    const char *   ssid       = (NULL != p_wifi_cfg) ? (const char *)p_wifi_cfg->sta.ssid : NULL;
+    return ssid;
+}
+
 void
 wifi_manager_connect_async()
 {
@@ -663,16 +588,10 @@ wifi_manager_connect_async()
      */
     if (wifi_manager_lock_json_buffer(portMAX_DELAY))
     {
-        wifi_manager_clear_ip_info_json();
+        json_network_info_clear();
         wifi_manager_unlock_json_buffer();
     }
     wifi_manager_send_message(ORDER_CONNECT_STA, (void *)CONNECTION_REQUEST_USER);
-}
-
-char *
-wifi_manager_get_ip_info_json()
-{
-    return ip_info_json;
 }
 
 void
@@ -704,10 +623,8 @@ wifi_manager_destroy()
         /* heap buffers */
         free(accessp_records);
         accessp_records = NULL;
-        free(accessp_json);
-        accessp_json = NULL;
-        free(ip_info_json);
-        ip_info_json = NULL;
+        json_access_points_deinit();
+        json_network_info_deinit();
         free(wifi_manager_sta_ip);
         wifi_manager_sta_ip = NULL;
         if (wifi_manager_config_sta)
@@ -955,7 +872,7 @@ wifi_manager(void *pvParameters)
                     {
                         /* Will remove the duplicate SSIDs from the list and update ap_num */
                         wifi_manager_filter_unique(accessp_records, &ap_num);
-                        wifi_manager_generate_acess_points_json();
+                        json_access_points_generate(accessp_records, ap_num);
                         wifi_manager_unlock_json_buffer();
                     }
                     else
