@@ -169,23 +169,6 @@ wifi_manager_unlock_json_buffer();
 void
 wifi_manager_initialise_mdns();
 
-bool
-wifi_manager_lock_sta_ip_string(TickType_t xTicksToWait);
-void
-wifi_manager_unlock_sta_ip_string();
-
-/**
- * @brief gets the string representation of the STA IP address, e.g.: "192.168.1.69"
- */
-char *
-wifi_manager_get_sta_ip_string();
-
-/**
- * @brief thread safe char representation of the STA IP update
- */
-void
-wifi_manager_safe_update_sta_ip_string(uint32_t ip);
-
 /**
  * @brief Register a callback to a custom function when specific event message_code happens.
  */

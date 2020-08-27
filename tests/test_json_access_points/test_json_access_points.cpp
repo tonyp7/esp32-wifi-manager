@@ -1,8 +1,14 @@
+/**
+ * @file json_test_access_points.cpp
+ * @author TheSomeMan
+ * @date 2020-08-23
+ * @copyright Ruuvi Innovations Ltd, license BSD-3-Clause.
+ */
+
 #include "gtest/gtest.h"
 #include "json_access_points.h"
-#include <stdio.h>
+#include <cstdio>
 #include <cstring>
-#include <memory.h>
 #include <string>
 #include "wifi_manager_defs.h"
 
@@ -32,13 +38,9 @@ public:
     ~TestJsonAccessPoints() override;
 };
 
-TestJsonAccessPoints::TestJsonAccessPoints()
-{
-}
+TestJsonAccessPoints::TestJsonAccessPoints() = default;
 
-TestJsonAccessPoints::~TestJsonAccessPoints()
-{
-}
+TestJsonAccessPoints::~TestJsonAccessPoints() = default;
 
 /*** Unit-Tests *******************************************************************************************************/
 

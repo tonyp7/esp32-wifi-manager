@@ -3,6 +3,9 @@ include(${CMAKE_CURRENT_LIST_DIR}/embed_files.txt)
 if(IDF_VERSION_MAJOR GREATER_EQUAL 4)
     idf_component_register(
         SRCS
+            src/ap_mac.h
+            src/ap_ssid.c
+            src/ap_ssid.h
             src/dns_server.c
             src/http_server.c
             src/json.c
@@ -13,6 +16,11 @@ if(IDF_VERSION_MAJOR GREATER_EQUAL 4)
             src/json_network_info.h
             src/ruuvi_gwui_html.c
             src/ruuvi_gwui_html.h
+            src/sta_ip.h
+            src/sta_ip_safe.c
+            src/sta_ip_safe.h
+            src/sta_ip_unsafe.c
+            src/sta_ip_unsafe.h
             src/str_buf.c
             src/str_buf.h
             src/wifi_manager.c

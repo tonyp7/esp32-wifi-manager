@@ -1,3 +1,10 @@
+/**
+ * @file test_json_network_info.cpp
+ * @author TheSomeMan
+ * @date 2020-08-23
+ * @copyright Ruuvi Innovations Ltd, license BSD-3-Clause.
+ */
+
 #include "gtest/gtest.h"
 #include "json_network_info.h"
 #include <string>
@@ -28,13 +35,9 @@ public:
     ~TestJsonNetworkInfo() override;
 };
 
-TestJsonNetworkInfo::TestJsonNetworkInfo()
-{
-}
+TestJsonNetworkInfo::TestJsonNetworkInfo() = default;
 
-TestJsonNetworkInfo::~TestJsonNetworkInfo() noexcept
-{
-}
+TestJsonNetworkInfo::~TestJsonNetworkInfo() = default;
 
 /*** Unit-Tests *******************************************************************************************************/
 

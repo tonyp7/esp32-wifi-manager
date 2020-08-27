@@ -1,3 +1,10 @@
+/**
+ * @file test_json.cpp
+ * @author TheSomeMan
+ * @date 2020-08-23
+ * @copyright Ruuvi Innovations Ltd, license BSD-3-Clause.
+ */
+
 #include "gtest/gtest.h"
 #include "json.h"
 #include <string>

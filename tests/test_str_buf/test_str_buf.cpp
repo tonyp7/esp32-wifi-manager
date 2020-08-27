@@ -1,3 +1,10 @@
+/**
+ * @file test_str_buf.cpp
+ * @author TheSomeMan
+ * @date 2020-08-24
+ * @copyright Ruuvi Innovations Ltd, license BSD-3-Clause.
+ */
+
 #include "gtest/gtest.h"
 #include "str_buf.h"
 #include <string>
@@ -31,9 +38,7 @@ TestStrBuf::TestStrBuf()
 {
 }
 
-TestStrBuf::~TestStrBuf()
-{
-}
+TestStrBuf::~TestStrBuf() = default;
 
 /*** Unit-Tests *******************************************************************************************************/
 

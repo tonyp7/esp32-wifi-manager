@@ -57,6 +57,8 @@ Contains the freeRTOS task and all necessary support
 #include "json_network_info.h"
 #include "json_access_points.h"
 #include "../../main/includes/ethernet.h"
+#include "sta_ip_safe.h"
+#include "ap_ssid.h"
 
 #undef LOG_LOCAL_LEVEL
 #define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
@@ -64,10 +66,9 @@ Contains the freeRTOS task and all necessary support
 /* objects used to manipulate the main queue of events */
 QueueHandle_t wifi_manager_queue;
 
-SemaphoreHandle_t wifi_manager_json_mutex   = NULL;
-SemaphoreHandle_t wifi_manager_sta_ip_mutex = NULL;
-char *            wifi_manager_sta_ip       = NULL;
-uint16_t          ap_num                    = MAX_AP_NUM;
+SemaphoreHandle_t wifi_manager_json_mutex = NULL;
+
+uint16_t          ap_num = MAX_AP_NUM;
 wifi_ap_record_t *accessp_records;
 
 wifi_config_t *wifi_manager_config_sta = NULL;
@@ -179,9 +180,7 @@ wifi_manager_start(const WiFiAntConfig_t *pWiFiAntConfig)
     {
         cb_ptr_arr[i] = NULL;
     }
-    wifi_manager_sta_ip_mutex = xSemaphoreCreateMutex();
-    wifi_manager_sta_ip       = (char *)malloc(sizeof(char) * IP4ADDR_STRLEN_MAX);
-    wifi_manager_safe_update_sta_ip_string((uint32_t)0);
+    sta_ip_safe_init();
     wifi_manager_event_group = xEventGroupCreate();
 
     /* start wifi manager task */
@@ -421,54 +420,6 @@ wifi_manager_generate_ip_info_json(update_reason_code_t update_reason_code)
 }
 
 bool
-wifi_manager_lock_sta_ip_string(TickType_t xTicksToWait)
-{
-    if (wifi_manager_sta_ip_mutex)
-    {
-        if (xSemaphoreTake(wifi_manager_sta_ip_mutex, xTicksToWait) == pdTRUE)
-        {
-            return true;
-        }
-        else
-        {
-            return false;
-        }
-    }
-    else
-    {
-        return false;
-    }
-}
-
-void
-wifi_manager_unlock_sta_ip_string()
-{
-    if (wifi_manager_sta_ip_mutex)
-    {
-        xSemaphoreGive(wifi_manager_sta_ip_mutex);
-    }
-}
-
-void
-wifi_manager_safe_update_sta_ip_string(uint32_t ip)
-{
-    if (wifi_manager_lock_sta_ip_string(portMAX_DELAY))
-    {
-        struct ip4_addr ip4;
-        ip4.addr = ip;
-        strcpy(wifi_manager_sta_ip, ip4addr_ntoa(&ip4));
-        ESP_LOGI(TAG, "Set STA IP String to: %s", wifi_manager_sta_ip);
-        wifi_manager_unlock_sta_ip_string();
-    }
-}
-
-char *
-wifi_manager_get_sta_ip_string()
-{
-    return wifi_manager_sta_ip;
-}
-
-bool
 wifi_manager_lock_json_buffer(TickType_t xTicksToWait)
 {
     if (wifi_manager_json_mutex)
@@ -625,8 +576,7 @@ wifi_manager_destroy()
         accessp_records = NULL;
         json_access_points_deinit();
         json_network_info_deinit();
-        free(wifi_manager_sta_ip);
-        wifi_manager_sta_ip = NULL;
+        sta_ip_safe_deinit();
         if (wifi_manager_config_sta)
         {
             free(wifi_manager_config_sta);
@@ -636,8 +586,6 @@ wifi_manager_destroy()
         /* RTOS objects */
         vSemaphoreDelete(wifi_manager_json_mutex);
         wifi_manager_json_mutex = NULL;
-        vSemaphoreDelete(wifi_manager_sta_ip_mutex);
-        wifi_manager_sta_ip_mutex = NULL;
         vEventGroupDelete(wifi_manager_event_group);
         wifi_manager_event_group = NULL;
         vQueueDelete(wifi_manager_queue);
@@ -755,7 +703,12 @@ wifi_manager(void *pvParameters)
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &wifi_manager_event_handler, NULL));
 
     /* wifi scanner config */
-    wifi_scan_config_t scan_config = { .ssid = 0, .bssid = 0, .channel = 0, .show_hidden = true };
+    wifi_scan_config_t scan_config = {
+        .ssid        = 0,
+        .bssid       = 0,
+        .channel     = 0,
+        .show_hidden = true,
+    };
 
     /* default wifi config */
     wifi_init_config_t wifi_init_config = WIFI_INIT_CONFIG_DEFAULT();
@@ -779,30 +732,24 @@ wifi_manager(void *pvParameters)
     tcpip_adapter_ip_info_t info;
     memset(&info, 0x00, sizeof(info));
     wifi_config_t ap_config = {
-		.ap = {
-			.ssid_len = 0,
-			.channel = wifi_settings.ap_channel,
-			.authmode = WIFI_AUTH_WPA2_PSK,
-			.ssid_hidden = wifi_settings.ap_ssid_hidden,
-			.max_connection = DEFAULT_AP_MAX_CONNECTIONS,
-			.beacon_interval = DEFAULT_AP_BEACON_INTERVAL,
-		},
-	};
+        .ap = {
+            .ssid_len        = 0,
+            .channel         = wifi_settings.ap_channel,
+            .authmode        = WIFI_AUTH_WPA2_PSK,
+            .ssid_hidden     = wifi_settings.ap_ssid_hidden,
+            .max_connection  = DEFAULT_AP_MAX_CONNECTIONS,
+            .beacon_interval = DEFAULT_AP_BEACON_INTERVAL,
+        },
+    };
 
     {
-        uint8_t ap_mac[6];
-        memset(ap_mac, 0, sizeof(ap_mac));
-        ESP_ERROR_CHECK(esp_wifi_get_mac(ESP_IF_WIFI_AP, ap_mac));
-        char tmp_ap_ssid[sizeof(wifi_settings.ap_ssid) - 5];
-        strncpy(tmp_ap_ssid, (const char *)&wifi_settings.ap_ssid[0], sizeof(tmp_ap_ssid));
-        tmp_ap_ssid[sizeof(tmp_ap_ssid) - 1] = '\0';
-        snprintf(
+        ap_mac_t ap_mac = { 0 };
+        ESP_ERROR_CHECK(esp_wifi_get_mac(ESP_IF_WIFI_AP, &ap_mac.mac[0]));
+        ap_ssid_generate(
             (char *)&ap_config.ap.ssid[0],
             sizeof(ap_config.ap.ssid),
-            "%s %02X%02X",
-            tmp_ap_ssid,
-            ap_mac[4],
-            ap_mac[5]);
+            (const char *)&wifi_settings.ap_ssid[0],
+            &ap_mac);
     }
     snprintf((char *)&ap_config.ap.password[0], sizeof(ap_config.ap.password), "%s", wifi_settings.ap_pwd);
 
@@ -1030,7 +977,7 @@ wifi_manager(void *pvParameters)
                      * */
 
                     /* reset saved sta IP */
-                    wifi_manager_safe_update_sta_ip_string((uint32_t)0);
+                    sta_ip_safe_reset(portMAX_DELAY);
 
                     uxBits = xEventGroupGetBits(wifi_manager_event_group);
                     if (uxBits & WIFI_MANAGER_REQUEST_STA_CONNECT_BIT)
@@ -1113,7 +1060,7 @@ wifi_manager(void *pvParameters)
                     xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_STA_CONNECT_BIT);
 
                     /* save IP as a string for the HTTP server host */
-                    wifi_manager_safe_update_sta_ip_string((uint32_t)msg.param);
+                    sta_ip_safe_set((uint32_t)(uintptr_t)msg.param, portMAX_DELAY);
 
                     /* save wifi config in NVS if it wasn't a restored of a connection */
                     if (uxBits & WIFI_MANAGER_REQUEST_RESTORE_STA_BIT)

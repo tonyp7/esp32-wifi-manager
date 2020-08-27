@@ -65,6 +65,7 @@ function to process requests, decode URLs, serve files, etc. etc.
 #include "../../main/includes/ethernet.h"
 #include "cJSON.h"
 #include "ruuvi_gwui_html.h"
+#include "sta_ip_safe.h"
 
 #define RUUVI_GWUI_HTML_ENABLE 1
 
@@ -688,10 +689,9 @@ http_server_netconn_serve(struct netconn *conn)
         int   lenH = 0;
         char *host = http_server_get_header(save_ptr, "Host: ", &lenH);
         /* determine if Host is from the STA IP address */
-        wifi_manager_lock_sta_ip_string(portMAX_DELAY);
-        char *ipStr              = wifi_manager_get_sta_ip_string();
-        bool  access_from_sta_ip = NULL == ipStr || (lenH > 0 && strstr(host, ipStr));
-        wifi_manager_unlock_sta_ip_string();
+
+        const sta_ip_string_t ip_str = sta_ip_safe_get(portMAX_DELAY);
+        bool access_from_sta_ip      = ('\0' == ip_str.buf[0]) || ((lenH > 0) && (NULL != strstr(host, ip_str.buf)));
 
         if (lenH > 0 && !strstr(host, DEFAULT_AP_IP) && !access_from_sta_ip)
         {
