@@ -211,6 +211,11 @@ static void
 http_server_netconn_resp_metrics(struct netconn *conn)
 {
     char *metrics = ruuvi_get_metrics();
+    if (NULL == metrics)
+    {
+        ESP_LOGE(TAG, "%s: Not enough memory", __func__);
+        return;
+    }
     http_server_netconn_printf(
         conn,
         "HTTP/1.1 200 OK\n"
