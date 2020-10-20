@@ -42,7 +42,6 @@ Contains the freeRTOS task for the DNS server that processes the requests.
 #include <esp_event.h>
 #include <esp_log.h>
 #include <esp_err.h>
-#include <nvs_flash.h>
 #include <lwip/err.h>
 #include <lwip/sockets.h>
 #include <lwip/sys.h>
