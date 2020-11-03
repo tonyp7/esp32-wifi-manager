@@ -32,6 +32,7 @@ function to process requests, decode URLs, serve files, etc. etc.
 @see https://github.com/tonyp7/esp32-wifi-manager
 */
 
+#include "http_server.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -41,7 +42,6 @@ function to process requests, decode URLs, serve files, etc. etc.
 #include "freertos/event_groups.h"
 #include "esp_wifi.h"
 #include "esp_event.h"
-#include "esp_log.h"
 #include "lwip/netbuf.h"
 #include "mdns.h"
 #include "lwip/api.h"
@@ -56,20 +56,28 @@ function to process requests, decode URLs, serve files, etc. etc.
 #include "lwip/priv/tcp_priv.h"
 #include "lwip/priv/tcpip_priv.h"
 
-#include "http_server.h"
+#include "wifi_manager_internal.h"
 #include "wifi_manager.h"
 #include "json_access_points.h"
 #include "json_network_info.h"
 
-#include "../../main/includes/ruuvi_gateway.h"
-#include "../../main/includes/ethernet.h"
 #include "cJSON.h"
 #include "ruuvi_gwui_html.h"
 #include "sta_ip_safe.h"
 
+#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
+#include "esp_log.h"
+
 #define RUUVI_GWUI_HTML_ENABLE 1
 
 #define FULLBUF_SIZE 4 * 1024
+
+/**
+ * @brief RTOS task for the HTTP server. Do not start manually.
+ * @see void http_server_start()
+ */
+static _Noreturn void
+http_server_task(void *pvParameters);
 
 //#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
 /* @brief tag used for ESP serial console messages */
@@ -91,35 +99,216 @@ http_server_strdupVprintf(size_t *pLen, const char *fmt, va_list args)
     return buf;
 }
 
-__attribute__((format(printf, 2, 3))) //
+__attribute__((format(printf, 3, 4))) //
 static void
-http_server_netconn_printf(struct netconn *conn, const char *fmt, ...)
+http_server_netconn_printf(struct netconn *conn, bool flag_more, const char *fmt, ...)
 {
     size_t  len = 0;
     va_list args;
     va_start(args, fmt);
     char *buf = http_server_strdupVprintf(&len, fmt, args);
     va_end(args);
-    netconn_write(conn, buf, len, NETCONN_COPY);
+    if (NULL == buf)
+    {
+        return;
+    }
+    ESP_LOGD(TAG, "Respond: %s", buf);
+    uint8_t netconn_flags = (uint8_t)NETCONN_COPY;
+    if (flag_more)
+    {
+        netconn_flags |= (uint8_t)NETCONN_MORE;
+    }
+    netconn_write(conn, buf, len, netconn_flags);
     free(buf);
 }
 
-static void
-http_server_netconn_resp_404(struct netconn *conn)
+static const char *
+http_get_content_type_str(const http_content_type_e content_type)
 {
+    const char *content_type_str = "application/octet-stream";
+    switch (content_type)
+    {
+        case HTTP_CONENT_TYPE_TEXT_HTML:
+            content_type_str = "text/html";
+            break;
+        case HTTP_CONENT_TYPE_TEXT_PLAIN:
+            content_type_str = "text/plain";
+            break;
+        case HTTP_CONENT_TYPE_TEXT_CSS:
+            content_type_str = "text/css";
+            break;
+        case HTTP_CONENT_TYPE_TEXT_JAVASCRIPT:
+            content_type_str = "text/javascript";
+            break;
+        case HTTP_CONENT_TYPE_IMAGE_PNG:
+            content_type_str = "image/png";
+            break;
+        case HTTP_CONENT_TYPE_IMAGE_SVG_XML:
+            content_type_str = "image/svg+xml";
+            break;
+        case HTTP_CONENT_TYPE_APPLICATION_JSON:
+            content_type_str = "application/json";
+            break;
+        case HTTP_CONENT_TYPE_APPLICATION_OCTET_STREAM:
+            content_type_str = "application/octet-stream";
+            break;
+    }
+    return content_type_str;
+}
+
+const char *
+http_get_content_encoding_str(const http_server_resp_t *p_resp)
+{
+    const char *content_encoding_str = "";
+    switch (p_resp->content_encoding)
+    {
+        case HTTP_CONENT_ENCODING_NONE:
+            content_encoding_str = "";
+            break;
+        case HTTP_CONENT_ENCODING_GZIP:
+            content_encoding_str = "Content-Encoding: gzip\n";
+            break;
+    }
+    return content_encoding_str;
+}
+
+const char *
+http_get_cache_control_str(const http_server_resp_t *p_resp)
+{
+    const char *cache_control_str = "";
+    if (p_resp->flag_no_cache)
+    {
+        cache_control_str
+            = "Cache-Control: no-store, no-cache, must-revalidate, max-age=0\r\n"
+              "Pragma: no-cache\r\n";
+    }
+    return cache_control_str;
+}
+
+static void
+write_content_from_flash(struct netconn *conn, const http_server_resp_t *p_resp)
+{
+    const err_t err = netconn_write(conn, p_resp->select_location.memory.p_buf, p_resp->content_len, NETCONN_NOCOPY);
+    if (ERR_OK != err)
+    {
+        ESP_LOGE(TAG, "netconn_write failed, err=%d", err);
+    }
+}
+
+static void
+write_content_from_static_mem(struct netconn *conn, const http_server_resp_t *p_resp)
+{
+    const err_t err = netconn_write(conn, p_resp->select_location.memory.p_buf, p_resp->content_len, NETCONN_COPY);
+    if (ERR_OK != err)
+    {
+        ESP_LOGE(TAG, "netconn_write failed, err=%d", err);
+    }
+}
+
+static void
+write_content_from_heap(struct netconn *conn, const http_server_resp_t *p_resp)
+{
+    const err_t err = netconn_write(conn, p_resp->select_location.memory.p_buf, p_resp->content_len, NETCONN_COPY);
+    if (ERR_OK != err)
+    {
+        ESP_LOGE(TAG, "netconn_write failed, err=%d", err);
+    }
+    free((void *)p_resp->select_location.memory.p_buf);
+}
+
+static void
+write_content_from_fatfs(struct netconn *conn, const http_server_resp_t *p_resp)
+{
+    assert(0); // not implemented yet
+}
+
+static void
+http_server_netconn_resp_200(struct netconn *conn, const http_server_resp_t *p_resp)
+{
+    const bool use_extra_content_type_param = (NULL != p_resp->p_content_type_param)
+                                              && ('\0' != p_resp->p_content_type_param[0]);
+
     http_server_netconn_printf(
         conn,
-        "HTTP/1.1 404 Not Found\r\n"
-        "Content-Length: 0\r\n"
-        "\r\n");
+        true,
+        "HTTP/1.1 200 OK\n"
+        "Content-type: %s; charset=utf-8%s%s\n"
+        "Content-Length: %u\n"
+        "%s"
+        "%s"
+        "\n",
+        http_get_content_type_str(p_resp->content_type),
+        use_extra_content_type_param ? "; " : "",
+        use_extra_content_type_param ? p_resp->p_content_type_param : "",
+        (uint32_t)p_resp->content_len,
+        http_get_content_encoding_str(p_resp),
+        http_get_cache_control_str(p_resp));
+
+    switch (p_resp->content_location)
+    {
+        case HTTP_CONTENT_LOCATION_NO_CONTENT:
+            break;
+        case HTTP_CONTENT_LOCATION_FLASH_MEM:
+            write_content_from_flash(conn, p_resp);
+            break;
+        case HTTP_CONTENT_LOCATION_STATIC_MEM:
+            write_content_from_static_mem(conn, p_resp);
+            break;
+        case HTTP_CONTENT_LOCATION_HEAP:
+            write_content_from_heap(conn, p_resp);
+            break;
+        case HTTP_CONTENT_LOCATION_FATFS:
+            write_content_from_fatfs(conn, p_resp);
+            break;
+    }
+}
+
+static http_server_resp_t
+http_server_resp_200_json(const char *json_content)
+{
+    const bool flag_no_cache = true;
+    return http_server_resp_data_in_static_mem(
+        HTTP_CONENT_TYPE_APPLICATION_JSON,
+        NULL,
+        strlen(json_content),
+        HTTP_CONENT_ENCODING_NONE,
+        (const uint8_t *)json_content,
+        flag_no_cache);
+}
+
+static void
+http_server_netconn_resp_302(struct netconn *conn)
+{
+    ESP_LOGI(TAG, "Respond: 302 Found");
+    http_server_netconn_printf(
+        conn,
+        false,
+        "HTTP/1.1 302 Found\n"
+        "Location: http://%s/\n"
+        "\n",
+        DEFAULT_AP_IP);
 }
 
 static void
 http_server_netconn_resp_400(struct netconn *conn)
 {
+    ESP_LOGW(TAG, "Respond: 400 Bad Request");
     http_server_netconn_printf(
         conn,
+        false,
         "HTTP/1.1 400 Bad Request\r\n"
+        "Content-Length: 0\r\n"
+        "\r\n");
+}
+
+static void
+http_server_netconn_resp_404(struct netconn *conn)
+{
+    ESP_LOGW(TAG, "Respond: 404 Not Found");
+    http_server_netconn_printf(
+        conn,
+        false,
+        "HTTP/1.1 404 Not Found\r\n"
         "Content-Length: 0\r\n"
         "\r\n");
 }
@@ -127,102 +316,13 @@ http_server_netconn_resp_400(struct netconn *conn)
 static void
 http_server_netconn_resp_503(struct netconn *conn)
 {
+    ESP_LOGW(TAG, "Respond: 503 Service Unavailable");
     http_server_netconn_printf(
         conn,
+        false,
         "HTTP/1.1 503 Service Unavailable\r\n"
         "Content-Length: 0\r\n"
         "\r\n");
-}
-
-static void
-http_server_netconn_resp_200_json(struct netconn *conn, const char *json_content)
-{
-    http_server_netconn_printf(
-        conn,
-        "HTTP/1.1 200 OK\r\n"
-        "Content-type: application/json\r\n"
-        "Cache-Control: no-store, no-cache, must-revalidate, max-age=0\r\n"
-        "Pragma: no-cache\r\n"
-        "\r\n");
-    ESP_LOGD(TAG, "Send json to browser: %s", json_content);
-    netconn_write(conn, json_content, strlen(json_content), NETCONN_COPY);
-}
-
-static void
-http_server_netconn_resp_file(struct netconn *conn, const char *file_path)
-{
-    size_t         file_len     = 0;
-    bool           is_gzipped   = false;
-    const uint8_t *file_content = embed_files_find(file_path, &file_len, &is_gzipped);
-    if (NULL == file_content)
-    {
-        http_server_netconn_resp_404(conn);
-        return;
-    }
-    char *file_ext = strrchr(file_path, '.');
-    if (NULL == file_ext)
-    {
-        http_server_netconn_resp_404(conn);
-        return;
-    }
-    char *content_type = NULL;
-    if (0 == strcmp(file_ext, ".html"))
-    {
-        content_type = "text/html";
-    }
-    else if ((0 == strcmp(file_ext, ".css")) || (0 == strcmp(file_ext, ".scss")))
-    {
-        content_type = "text/css";
-    }
-    else if (0 == strcmp(file_ext, ".js"))
-    {
-        content_type = "text/javascript";
-    }
-    else if (0 == strcmp(file_ext, ".png"))
-    {
-        content_type = "image/png";
-    }
-    else if (0 == strcmp(file_ext, ".svg"))
-    {
-        content_type = "image/svg+xml";
-    }
-    else if (0 == strcmp(file_ext, ".ttf"))
-    {
-        content_type = "application/octet-stream";
-    }
-    if (NULL == content_type)
-    {
-        content_type = "application/octet-stream";
-    }
-    http_server_netconn_printf(
-        conn,
-        "HTTP/1.1 200 OK\n"
-        "Content-type: %s\n"
-        "Content-Length: %u\n"
-        "%s"
-        "\n",
-        content_type,
-        (unsigned)file_len,
-        is_gzipped ? "Content-Encoding: gzip\n" : "");
-    netconn_write(conn, file_content, file_len, NETCONN_NOCOPY);
-}
-
-static void
-http_server_netconn_resp_metrics(struct netconn *conn)
-{
-    char *metrics = ruuvi_get_metrics();
-    if (NULL == metrics)
-    {
-        ESP_LOGE(TAG, "%s: Not enough memory", __func__);
-        return;
-    }
-    http_server_netconn_printf(
-        conn,
-        "HTTP/1.1 200 OK\n"
-        "Content-Type: text/plain; version=0.0.4; charset=utf-8\n"
-        "\n");
-    netconn_write(conn, metrics, strlen(metrics), NETCONN_COPY);
-    free(metrics);
 }
 
 void
@@ -232,7 +332,13 @@ http_server_start(void)
     if (task_http_server == NULL)
     {
         ESP_LOGI(TAG, "Run http_server");
-        if (xTaskCreate(&http_server, "http_server", 20 * 1024, NULL, WIFI_MANAGER_TASK_PRIORITY - 1, &task_http_server)
+        if (xTaskCreate(
+                &http_server_task,
+                "http_server",
+                20 * 1024,
+                NULL,
+                WIFI_MANAGER_TASK_PRIORITY - 1,
+                &task_http_server)
             != pdPASS)
         {
             ESP_LOGE(TAG, "xTaskCreate failed: http_server");
@@ -254,8 +360,8 @@ http_server_stop(void)
     }
 }
 
-_Noreturn void
-http_server(void *pvParameters)
+static _Noreturn void
+http_server_task(void *pvParameters)
 {
     struct netconn *conn, *newconn;
     err_t           err;
@@ -337,266 +443,139 @@ get_http_body(char *msg, int len, int *blen)
     return p;
 }
 
-bool
-parse_ruuvi_config_json(const char *body, struct ruuvi_gateway_config_t *c)
+static http_server_resp_t
+http_server_handle_req_get(const char *p_file_name)
 {
-    // TODO replace this parsing with generic implementation
-    bool   ret  = true;
-    cJSON *root = cJSON_Parse(body);
-    if (root)
+    ESP_LOGI(TAG, "GET /%s", p_file_name);
+
+    char *file_ext = strrchr(p_file_name, '.');
+    if ((NULL != file_ext) && (0 == strcmp(file_ext, ".json")))
     {
-        ESP_LOGD(TAG, "settings parsed from posted json:");
-
-        cJSON *ed = cJSON_GetObjectItem(root, "eth_dhcp");
-        if (ed)
+        if (0 == strcmp(p_file_name, "ap.json"))
         {
-            bool eth_dhcp = cJSON_IsTrue(ed);
-            c->eth_dhcp   = eth_dhcp;
-            ESP_LOGD(TAG, "eth_dhcp: %d", eth_dhcp);
-        }
-
-        cJSON *esip = cJSON_GetObjectItem(root, "eth_static_ip");
-        if (esip)
-        {
-            char *eth_static_ip = cJSON_GetStringValue(esip);
-            if (eth_static_ip)
+            /* if we can get the mutex, write the last version of the AP list */
+            if (!wifi_manager_lock_json_buffer((TickType_t)10))
             {
-                snprintf(c->eth_static_ip, sizeof(c->eth_static_ip), "%s", eth_static_ip);
-                ESP_LOGD(TAG, "eth_static_ip: %s", eth_static_ip);
+                ESP_LOGD(TAG, "http_server_netconn_serve: GET /ap.json failed to obtain mutex");
+                ESP_LOGI(TAG, "ap.json: 503");
+                return http_server_resp_503();
             }
-        }
-
-        cJSON *enm = cJSON_GetObjectItem(root, "eth_netmask");
-        if (enm)
-        {
-            char *eth_netmask = cJSON_GetStringValue(enm);
-            if (eth_netmask)
+            const char *buff = json_access_points_get();
+            if (NULL == buff)
             {
-                snprintf(c->eth_netmask, sizeof(c->eth_netmask), "%s", eth_netmask);
-                ESP_LOGD(TAG, "eth_netmask: %s", eth_netmask);
+                ESP_LOGI(TAG, "status.json: 503");
+                return http_server_resp_503();
             }
+            ESP_LOGI(TAG, "ap.json: %s", buff);
+            const http_server_resp_t resp = http_server_resp_200_json(buff);
+            wifi_manager_unlock_json_buffer();
+            return resp;
         }
-
-        cJSON *egw = cJSON_GetObjectItem(root, "eth_gw");
-        if (egw)
+        else if (0 == strcmp(p_file_name, "status.json"))
         {
-            char *eth_gw = cJSON_GetStringValue(egw);
-            if (eth_gw)
+            if (!wifi_manager_lock_json_buffer((TickType_t)10))
             {
-                snprintf(c->eth_gw, sizeof(c->eth_gw), "%s", eth_gw);
-                ESP_LOGD(TAG, "eth_gw: %s", eth_gw);
+                ESP_LOGD(TAG, "http_server_netconn_serve: GET /status failed to obtain mutex");
+                ESP_LOGI(TAG, "status.json: 503");
+                return http_server_resp_503();
             }
-        }
-
-        cJSON *edns1 = cJSON_GetObjectItem(root, "eth_dns1");
-        if (edns1)
-        {
-            char *eth_dns1 = cJSON_GetStringValue(edns1);
-            if (eth_dns1)
+            const char *buff = json_network_info_get();
+            if (NULL == buff)
             {
-                snprintf(c->eth_dns1, sizeof(c->eth_dns1), "%s", eth_dns1);
-                ESP_LOGD(TAG, "eth_dns1: %s", eth_dns1);
+                ESP_LOGI(TAG, "status.json: 503");
+                return http_server_resp_503();
             }
+            ESP_LOGI(TAG, "status.json: %s", buff);
+            const http_server_resp_t resp = http_server_resp_200_json(buff);
+            wifi_manager_unlock_json_buffer();
+            return resp;
         }
+    }
+    return wifi_manager_cb_on_http_get(p_file_name);
+}
 
-        cJSON *edns2 = cJSON_GetObjectItem(root, "eth_dns2");
-        if (edns2)
-        {
-            char *eth_dns2 = cJSON_GetStringValue(edns2);
-            if (eth_dns2)
-            {
-                snprintf(c->eth_dns2, sizeof(c->eth_dns2), "%s", eth_dns2);
-                ESP_LOGD(TAG, "eth_dns2: %s", eth_dns2);
-            }
-        }
+static http_server_resp_t
+http_server_handle_req_delete(const char *p_file_name)
+{
+    ESP_LOGI(TAG, "DELETE /%s", p_file_name);
+    if (0 == strcmp(p_file_name, "connect.json"))
+    {
+        ESP_LOGD(TAG, "http_server_netconn_serve: DELETE /connect.json");
+        /* request a disconnection from wifi and forget about it */
+        wifi_manager_disconnect_async();
+        return http_server_resp_200_json("{}");
+    }
+    return wifi_manager_cb_on_http_delete(p_file_name);
+}
 
-        cJSON *um = cJSON_GetObjectItem(root, "use_mqtt");
-        if (um)
+static http_server_resp_t
+http_server_handle_req_post(const char *p_file_name, char *save_ptr)
+{
+    ESP_LOGI(TAG, "POST /%s", p_file_name);
+    const char *body = strstr(save_ptr, "\r\n\r\n");
+    if (0 == strcmp(p_file_name, "connect.json"))
+    {
+        ESP_LOGD(TAG, "http_server_netconn_serve: POST /connect.json");
+        int   lenS = 0, lenP = 0;
+        char *ssid     = http_server_get_header(save_ptr, "X-Custom-ssid: ", &lenS);
+        char *password = http_server_get_header(save_ptr, "X-Custom-pwd: ", &lenP);
+        if ((NULL != ssid) && (lenS <= MAX_SSID_SIZE) && (NULL != password) && (lenP <= MAX_PASSWORD_SIZE))
         {
-            bool use_mqtt = cJSON_IsTrue(um);
-            c->use_mqtt   = use_mqtt;
-            ESP_LOGD(TAG, "use_mqtt: %d", use_mqtt);
+            wifi_config_t *config = wifi_manager_get_wifi_sta_config();
+            memset(config, 0x00, sizeof(wifi_config_t));
+            memcpy(config->sta.ssid, ssid, lenS);
+            memcpy(config->sta.password, password, lenP);
+            ESP_LOGD(TAG, "http_server_netconn_serve: wifi_manager_connect_async() call");
+            wifi_manager_connect_async();
+            return http_server_resp_200_json("{}");
         }
         else
         {
-            ESP_LOGE(TAG, "use_mqtt not found");
+            /* bad request the authentification header is not complete/not the correct format */
+            return http_server_resp_400();
         }
+    }
+    return wifi_manager_cb_on_http_post(p_file_name, body);
+}
 
-        cJSON *ms = cJSON_GetObjectItem(root, "mqtt_server");
-        if (ms)
-        {
-            char *mqtt_server = cJSON_GetStringValue(ms);
-            if (mqtt_server)
-            {
-                snprintf(c->mqtt_server, sizeof(c->mqtt_server), "%s", mqtt_server);
-                ESP_LOGD(TAG, "mqtt_server: %s", mqtt_server);
-            }
-        }
+static http_server_resp_t
+http_server_handle_req(char *line, char *save_ptr)
+{
+    char *p = strchr(line, ' ');
+    if (NULL == p)
+    {
+        return http_server_resp_400();
+    }
+    const char * http_cmd     = line;
+    const size_t http_cmd_len = p - line;
+    char *       path         = p + 1;
+    if ('/' == path[0])
+    {
+        path += 1;
+    }
+    p = strchr(path, ' ');
+    if (NULL == p)
+    {
+        return http_server_resp_400();
+    }
+    *p = '\0';
 
-        cJSON *mpre = cJSON_GetObjectItem(root, "mqtt_prefix");
-        if (mpre)
-        {
-            char *mqtt_prefix = cJSON_GetStringValue(mpre);
-            if (mqtt_prefix)
-            {
-                snprintf(c->mqtt_prefix, sizeof(c->mqtt_prefix), "%s", mqtt_prefix);
-                ESP_LOGD(TAG, "mqtt_prefix: %s", mqtt_prefix);
-            }
-        }
-
-        cJSON *mpo = cJSON_GetObjectItem(root, "mqtt_port");
-        if (cJSON_IsNumber(mpo) && (mpo->valueint > 0) && (mpo->valueint < 65536))
-        {
-            uint16_t mqtt_port = (uint16_t)mpo->valueint;
-            if (mqtt_port)
-            {
-                c->mqtt_port = mqtt_port;
-                ESP_LOGD(TAG, "mqtt_port: %u", (unsigned)mqtt_port);
-            }
-        }
-        else
-        {
-            ESP_LOGE(TAG, "mqtt port %d is invalid", mpo->valueint);
-        }
-
-        cJSON *mu = cJSON_GetObjectItem(root, "mqtt_user");
-        if (mu)
-        {
-            char *mqtt_user = cJSON_GetStringValue(mu);
-            if (mqtt_user)
-            {
-                snprintf(c->mqtt_user, sizeof(c->mqtt_user), "%s", mqtt_user);
-                ESP_LOGD(TAG, "mqtt_user: %s", mqtt_user);
-            }
-        }
-        else
-        {
-            ESP_LOGE(TAG, "mqtt_user not found");
-        }
-
-        cJSON *mp = cJSON_GetObjectItem(root, "mqtt_pass");
-        if (mp)
-        {
-            char *mqtt_pass = cJSON_GetStringValue(mp);
-            if (mqtt_pass)
-            {
-                snprintf(c->mqtt_pass, sizeof(c->mqtt_pass), "%s", mqtt_pass);
-                ESP_LOGD(TAG, "mqtt_pass: %s", mqtt_pass);
-            }
-        }
-        else
-        {
-            ESP_LOGW(TAG, "mqtt_pass not found or not changed");
-        }
-
-        cJSON *uh = cJSON_GetObjectItem(root, "use_http");
-        if (uh)
-        {
-            bool use_http = cJSON_IsTrue(uh);
-            c->use_http   = use_http;
-            ESP_LOGD(TAG, "use_http: %d", use_http);
-        }
-        else
-        {
-            ESP_LOGE(TAG, "use_http not found");
-        }
-
-        cJSON *hurl = cJSON_GetObjectItem(root, "http_url");
-        if (hurl)
-        {
-            char *http_url = cJSON_GetStringValue(hurl);
-            if (http_url)
-            {
-                snprintf(c->http_url, sizeof(c->http_url), "%s", http_url);
-                ESP_LOGD(TAG, "http_url: %s", http_url);
-            }
-        }
-        else
-        {
-            ESP_LOGE(TAG, "http_url not found");
-        }
-
-        cJSON *huser = cJSON_GetObjectItem(root, "http_user");
-        if (huser)
-        {
-            char *http_user = cJSON_GetStringValue(huser);
-            if (http_user)
-            {
-                snprintf(c->http_user, sizeof(c->http_user), "%s", http_user);
-                ESP_LOGD(TAG, "http_user: %s", http_user);
-            }
-        }
-        else
-        {
-            ESP_LOGE(TAG, "http_user not found");
-        }
-
-        cJSON *hpass = cJSON_GetObjectItem(root, "http_pass");
-        if (hpass)
-        {
-            char *http_pass = cJSON_GetStringValue(hpass);
-            if (http_pass)
-            {
-                snprintf(c->http_pass, sizeof(c->http_pass), "%s", http_pass);
-                ESP_LOGD(TAG, "http_pass: %s", http_pass);
-            }
-        }
-        else
-        {
-            ESP_LOGE(TAG, "http_pass not found");
-        }
-
-        cJSON *uf = cJSON_GetObjectItem(root, "use_filtering");
-        if (uf)
-        {
-            bool use_filtering = cJSON_IsTrue(uf);
-            c->company_filter  = use_filtering;
-            ESP_LOGD(TAG, "use_filtering: %d", use_filtering);
-        }
-        else
-        {
-            ESP_LOGE(TAG, "use_filtering not found");
-        }
-
-        cJSON *cid = cJSON_GetObjectItem(root, "company_id");
-        if (cid)
-        {
-            char *company_id = cJSON_GetStringValue(cid);
-            if (company_id)
-            {
-                uint16_t c_id = (uint16_t)strtol(company_id, NULL, 0);
-                ESP_LOGD(TAG, "company_id: 0x%02x", c_id);
-                c->company_id = c_id;
-            }
-            else
-            {
-                ESP_LOGE(TAG, "company id not found");
-            }
-        }
-
-        cJSON *co = cJSON_GetObjectItem(root, "coordinates");
-        if (co)
-        {
-            char *coordinates = cJSON_GetStringValue(co);
-            if (coordinates)
-            {
-                snprintf(c->coordinates, sizeof(c->coordinates), "%s", coordinates);
-                ESP_LOGD(TAG, "coordinates: %s", coordinates);
-            }
-        }
-        else
-        {
-            ESP_LOGE(TAG, "coordinates not found");
-        }
+    if (0 == strncmp("GET", http_cmd, http_cmd_len))
+    {
+        return http_server_handle_req_get(path);
+    }
+    else if (0 == strncmp("DELETE", http_cmd, http_cmd_len))
+    {
+        return http_server_handle_req_delete(path);
+    }
+    else if (0 == strncmp("POST", http_cmd, http_cmd_len))
+    {
+        return http_server_handle_req_post(path, save_ptr);
     }
     else
     {
-        ESP_LOGE(TAG, "Can't parse json: %s", body);
-        ret = false;
+        return http_server_resp_400();
     }
-
-    cJSON_Delete(root);
-    return ret;
 }
 
 void
@@ -698,173 +677,32 @@ http_server_netconn_serve(struct netconn *conn)
         const sta_ip_string_t ip_str = sta_ip_safe_get(portMAX_DELAY);
         bool access_from_sta_ip      = ('\0' == ip_str.buf[0]) || ((lenH > 0) && (NULL != strstr(host, ip_str.buf)));
 
-        if (lenH > 0 && !strstr(host, DEFAULT_AP_IP) && !access_from_sta_ip)
+        ESP_LOGD(TAG, "Host: %.*s", lenH, host);
+        ESP_LOGD(TAG, "StaticIP: %s", ip_str.buf);
+        if ((lenH > 0) && (NULL == strstr(host, DEFAULT_AP_IP)) && (!access_from_sta_ip))
         {
-            http_server_netconn_printf(
-                conn,
-                "HTTP/1.1 302 Found\n"
-                "Location: http://%s/\n"
-                "\n",
-                DEFAULT_AP_IP);
+            http_server_netconn_resp_302(conn);
         }
         else
         {
-            if (strstr(line, "GET /"))
+            const http_server_resp_t resp = http_server_handle_req(line, save_ptr);
+            switch (resp.http_resp_code)
             {
-                char *file_name = &line[sizeof("GET /") - 1];
-                char *p         = strchr(file_name, ' ');
-                if (NULL == p)
-                {
+                case HTTP_RESP_CODE_200:
+                    http_server_netconn_resp_200(conn, &resp);
+                    break;
+                case HTTP_RESP_CODE_400:
+                    http_server_netconn_resp_400(conn);
+                    break;
+                case HTTP_RESP_CODE_404:
                     http_server_netconn_resp_404(conn);
-                    return;
-                }
-                *p             = '\0';
-                char *file_ext = strrchr(file_name, '.');
-                ESP_LOGI(TAG, "GET /%s", file_name);
-                if ((NULL != file_ext) && (0 == strcmp(file_ext, ".json")))
-                {
-                    if (0 == strcmp(file_name, "ruuvi.json"))
-                    {
-                        char *ruuvi_json = ruuvi_get_conf_json();
-                        ESP_LOGI(TAG, "ruuvi.json: %s", ruuvi_json);
-                        http_server_netconn_resp_200_json(conn, ruuvi_json);
-                        free(ruuvi_json);
-                    }
-                    else if (0 == strcmp(file_name, "ap.json"))
-                    {
-                        /* if we can get the mutex, write the last version of the AP list */
-                        if (wifi_manager_lock_json_buffer((TickType_t)10))
-                        {
-                            const char *buff = json_access_points_get();
-                            ESP_LOGI(TAG, "ap.json: %s", buff);
-                            http_server_netconn_resp_200_json(conn, buff);
-                            wifi_manager_unlock_json_buffer();
-                        }
-                        else
-                        {
-                            ESP_LOGD(TAG, "http_server_netconn_serve: GET /ap.json failed to obtain mutex");
-                            ESP_LOGI(TAG, "ap.json: 503");
-                            http_server_netconn_resp_503(conn);
-                        }
-                        /* request a wifi scan */
-                        // wifi_manager_scan_async();
-                    }
-                    else if (0 == strcmp(file_name, "status.json"))
-                    {
-                        if (wifi_manager_lock_json_buffer((TickType_t)10))
-                        {
-                            const char *buff = json_network_info_get();
-                            if (buff)
-                            {
-                                ESP_LOGI(TAG, "status.json: %s", buff);
-                                http_server_netconn_resp_200_json(conn, buff);
-                                wifi_manager_unlock_json_buffer();
-                            }
-                            else
-                            {
-                                ESP_LOGI(TAG, "status.json: 503");
-                                http_server_netconn_resp_503(conn);
-                            }
-                        }
-                        else
-                        {
-                            ESP_LOGD(TAG, "http_server_netconn_serve: GET /status failed to obtain mutex");
-                            ESP_LOGI(TAG, "status.json: 503");
-                            http_server_netconn_resp_503(conn);
-                        }
-                    }
-                    else
-                    {
-                        http_server_netconn_resp_404(conn);
-                    }
-                }
-                else if (strcmp(file_name, "metrics") == 0)
-                {
-                    http_server_netconn_resp_metrics(conn);
-                }
-                else
-                {
-                    if ('\0' == file_name[0])
-                    {
-                        file_name = "index.html";
-                    }
-                    http_server_netconn_resp_file(conn, file_name);
-                }
-            }
-            else if (strstr(line, "DELETE /"))
-            {
-                char *file_name = &line[sizeof("DELETE /") - 1];
-                char *p         = strchr(file_name, ' ');
-                if (NULL == p)
-                {
-                    http_server_netconn_resp_400(conn);
-                    return;
-                }
-                *p = '\0';
-                ESP_LOGI(TAG, "DELETE /%s", file_name);
-                if (0 == strcmp(file_name, "connect.json"))
-                {
-                    ESP_LOGD(TAG, "http_server_netconn_serve: DELETE /connect.json");
-                    /* request a disconnection from wifi and forget about it */
-                    wifi_manager_disconnect_async();
-                    http_server_netconn_resp_200_json(conn, "{}");
-                }
-            }
-            else if (strstr(line, "POST /"))
-            {
-                char *file_name = &line[sizeof("POST /") - 1];
-                char *p         = strchr(file_name, ' ');
-                if (NULL == p)
-                {
-                    http_server_netconn_resp_400(conn);
-                    return;
-                }
-                *p = '\0';
-                ESP_LOGI(TAG, "POST /%s", file_name);
-                if (0 == strcmp(file_name, "connect.json"))
-                {
-                    ESP_LOGD(TAG, "http_server_netconn_serve: POST /connect.json");
-                    int   lenS = 0, lenP = 0;
-                    char *ssid     = http_server_get_header(save_ptr, "X-Custom-ssid: ", &lenS);
-                    char *password = http_server_get_header(save_ptr, "X-Custom-pwd: ", &lenP);
-                    if (ssid && lenS <= MAX_SSID_SIZE && password && lenP <= MAX_PASSWORD_SIZE)
-                    {
-                        wifi_config_t *config = wifi_manager_get_wifi_sta_config();
-                        memset(config, 0x00, sizeof(wifi_config_t));
-                        memcpy(config->sta.ssid, ssid, lenS);
-                        memcpy(config->sta.password, password, lenP);
-                        ESP_LOGD(TAG, "http_server_netconn_serve: wifi_manager_connect_async() call");
-                        wifi_manager_connect_async();
-                        http_server_netconn_resp_200_json(conn, "{}");
-                    }
-                    else
-                    {
-                        /* bad request the authentification header is not complete/not the correct format */
-                        http_server_netconn_resp_400(conn);
-                    }
-                }
-                else if (0 == strcmp(file_name, "ruuvi.json"))
-                {
-                    ESP_LOGD(TAG, "http_server_netconn_serve: POST /ruuvi.json");
-                    char *body = get_http_body(save_ptr, buflen - (save_ptr - buf), 0);
-                    if (parse_ruuvi_config_json(body, &g_gateway_config))
-                    {
-                        ESP_LOGI(TAG, "settings got from browser:");
-                        settings_print(&g_gateway_config);
-                        settings_save_to_flash(&g_gateway_config);
-                        ruuvi_send_nrf_settings(&g_gateway_config);
-                        ethernet_update_ip();
-                        http_server_netconn_resp_200_json(conn, "{}");
-                    }
-                    else
-                    {
-                        http_server_netconn_resp_400(conn);
-                    }
-                }
-                else
-                {
-                    http_server_netconn_resp_400(conn);
-                }
+                    break;
+                case HTTP_RESP_CODE_503:
+                    http_server_netconn_resp_503(conn);
+                    break;
+                default:
+                    http_server_netconn_resp_503(conn);
+                    break;
             }
         }
     }

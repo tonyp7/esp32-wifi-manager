@@ -14,6 +14,8 @@ if(IDF_VERSION_MAJOR GREATER_EQUAL 4)
             src/json_access_points.h
             src/json_network_info.c
             src/json_network_info.h
+            src/http_server_resp.c
+            src/http_server_resp.h
             src/ruuvi_gwui_html.c
             src/ruuvi_gwui_html.h
             src/sta_ip.h
@@ -26,9 +28,6 @@ if(IDF_VERSION_MAJOR GREATER_EQUAL 4)
             src/wifi_manager.c
             src/wifi_manager.h
             src/wifi_manager_defs.h
-            ../../main/ethernet.c
-            ../../main/settings.c
-            ../../main/metrics.c
         REQUIRES
             log
             nvs_flash
@@ -39,7 +38,6 @@ if(IDF_VERSION_MAJOR GREATER_EQUAL 4)
             json
         INCLUDE_DIRS
             src
-            ../../main/includes
         EMBED_FILES ${EMBED_FILES})
 else()
     set(COMPONENT_SRCDIRS src)

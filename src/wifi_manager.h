@@ -34,6 +34,7 @@ Contains the freeRTOS task and all necessary support
 
 #include "esp_wifi.h"
 #include "wifi_manager_defs.h"
+#include "http_server_resp.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -67,7 +68,11 @@ typedef struct
  * Allocate heap memory for the wifi manager and start the wifi_manager RTOS task
  */
 void
-wifi_manager_start(const WiFiAntConfig_t *pWiFiAntConfig);
+wifi_manager_start(
+    const WiFiAntConfig_t *        pWiFiAntConfig,
+    wifi_manager_http_callback_t   cb_on_http_get,
+    wifi_manager_http_cb_on_post_t cb_on_http_post,
+    wifi_manager_http_callback_t   cb_on_http_delete);
 
 /**
  * Frees up all memory allocated by the wifi_manager and kill the task.
@@ -138,30 +143,6 @@ wifi_manager_scan_async();
  */
 void
 wifi_manager_disconnect_async();
-
-/**
- * @brief Tries to get access to json buffer mutex.
- *
- * The HTTP server can try to access the json to serve clients while the wifi manager thread can try
- * to update it. These two tasks are synchronized through a mutex.
- *
- * The mutex is used by both the access point list json and the connection status json.\n
- * These two resources should technically have their own mutex but we lose some flexibility to save
- * on memory.
- *
- * This is a simple wrapper around freeRTOS function xSemaphoreTake.
- *
- * @param xTicksToWait The time in ticks to wait for the semaphore to become available.
- * @return true in success, false otherwise.
- */
-bool
-wifi_manager_lock_json_buffer(TickType_t xTicksToWait);
-
-/**
- * @brief Releases the json buffer mutex.
- */
-void
-wifi_manager_unlock_json_buffer();
 
 /**
  * @brief Start the mDNS service

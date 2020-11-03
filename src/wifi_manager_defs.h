@@ -33,6 +33,8 @@ Contains the freeRTOS task and all necessary support
 #define ESP32_WIFI_MANAGER_TYPES_H
 
 #include <stdint.h>
+#include <stdbool.h>
+#include <stddef.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -238,6 +240,66 @@ typedef struct network_info_str_t
     char gw[NETWORK_INFO_STRLEN_MAX];
     char netmask[NETWORK_INFO_STRLEN_MAX];
 } network_info_str_t;
+
+typedef enum http_resp_code_e
+{
+    HTTP_RESP_CODE_200 = 200,
+    HTTP_RESP_CODE_400 = 400,
+    HTTP_RESP_CODE_404 = 404,
+    HTTP_RESP_CODE_503 = 503,
+} http_resp_code_e;
+
+typedef enum http_content_type_e
+{
+    HTTP_CONENT_TYPE_TEXT_HTML,
+    HTTP_CONENT_TYPE_TEXT_PLAIN,
+    HTTP_CONENT_TYPE_TEXT_CSS,
+    HTTP_CONENT_TYPE_TEXT_JAVASCRIPT,
+    HTTP_CONENT_TYPE_IMAGE_PNG,
+    HTTP_CONENT_TYPE_IMAGE_SVG_XML,
+    HTTP_CONENT_TYPE_APPLICATION_JSON,
+    HTTP_CONENT_TYPE_APPLICATION_OCTET_STREAM,
+} http_content_type_e;
+
+typedef enum http_content_encoding_e
+{
+    HTTP_CONENT_ENCODING_NONE,
+    HTTP_CONENT_ENCODING_GZIP,
+} http_content_encoding_e;
+
+typedef enum http_content_location_e
+{
+    HTTP_CONTENT_LOCATION_NO_CONTENT,
+    HTTP_CONTENT_LOCATION_FLASH_MEM,
+    HTTP_CONTENT_LOCATION_STATIC_MEM,
+    HTTP_CONTENT_LOCATION_HEAP,
+    HTTP_CONTENT_LOCATION_FATFS,
+} http_content_location_e;
+
+typedef struct http_server_resp_t
+{
+    http_resp_code_e        http_resp_code;
+    http_content_location_e content_location;
+    bool                    flag_no_cache;
+    http_content_type_e     content_type;
+    const char *            p_content_type_param;
+    size_t                  content_len;
+    http_content_encoding_e content_encoding;
+    union
+    {
+        struct
+        {
+            const uint8_t *p_buf;
+        } memory;
+        struct
+        {
+            int fd;
+        } fatfs;
+    } select_location;
+} http_server_resp_t;
+
+typedef http_server_resp_t (*wifi_manager_http_callback_t)(const char *path);
+typedef http_server_resp_t (*wifi_manager_http_cb_on_post_t)(const char *path, const char *body);
 
 #ifdef __cplusplus
 }

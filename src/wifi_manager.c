@@ -29,6 +29,8 @@ Contains the freeRTOS task and all necessary support
 @see https://github.com/tonyp7/esp32-wifi-manager
 */
 
+#include "wifi_manager.h"
+#include "wifi_manager_internal.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -52,7 +54,6 @@ Contains the freeRTOS task and all necessary support
 #include "json.h"
 #include "http_server.h"
 #include "tcpip_adapter.h"
-#include "wifi_manager.h"
 #include "dns_server.h"
 #include "json_network_info.h"
 #include "json_access_points.h"
@@ -74,6 +75,10 @@ wifi_ap_record_t *accessp_records;
 wifi_config_t *wifi_manager_config_sta = NULL;
 
 void (**cb_ptr_arr)(void *) = NULL;
+
+static wifi_manager_http_callback_t   g_wifi_cb_on_http_get;
+static wifi_manager_http_cb_on_post_t g_wifi_cb_on_http_post;
+static wifi_manager_http_callback_t   g_wifi_cb_on_http_delete;
 
 /* @brief tag used for ESP serial console messages */
 static const char TAG[] = "wifi_manager";
@@ -150,13 +155,21 @@ wifi_manager_disconnect_async()
 }
 
 void
-wifi_manager_start(const WiFiAntConfig_t *pWiFiAntConfig)
+wifi_manager_start(
+    const WiFiAntConfig_t *        pWiFiAntConfig,
+    wifi_manager_http_callback_t   cb_on_http_get,
+    wifi_manager_http_cb_on_post_t cb_on_http_post,
+    wifi_manager_http_callback_t   cb_on_http_delete)
 {
     /* disable the default wifi logging */
     // esp_log_level_set(TAG, ESP_LOG_DEBUG);
 
     /* initialize flash memory */
     // nvs_flash_init();
+
+    g_wifi_cb_on_http_get    = cb_on_http_get;
+    g_wifi_cb_on_http_post   = cb_on_http_post;
+    g_wifi_cb_on_http_delete = cb_on_http_delete;
 
     /* memory allocation */
     wifi_manager_queue      = xQueueCreate(3, sizeof(queue_message));
@@ -191,6 +204,36 @@ wifi_manager_start(const WiFiAntConfig_t *pWiFiAntConfig)
         (void *)pWiFiAntConfig,
         WIFI_MANAGER_TASK_PRIORITY,
         &task_wifi_manager);
+}
+
+http_server_resp_t
+wifi_manager_cb_on_http_get(const char *path)
+{
+    if (NULL == g_wifi_cb_on_http_get)
+    {
+        return http_server_resp_404();
+    }
+    return g_wifi_cb_on_http_get(path);
+}
+
+http_server_resp_t
+wifi_manager_cb_on_http_post(const char *path, const char *body)
+{
+    if (NULL == g_wifi_cb_on_http_post)
+    {
+        return http_server_resp_404();
+    }
+    return g_wifi_cb_on_http_post(path, body);
+}
+
+http_server_resp_t
+wifi_manager_cb_on_http_delete(const char *path)
+{
+    if (NULL == g_wifi_cb_on_http_delete)
+    {
+        return http_server_resp_404();
+    }
+    return g_wifi_cb_on_http_delete(path);
 }
 
 esp_err_t
