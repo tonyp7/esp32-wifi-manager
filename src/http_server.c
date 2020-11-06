@@ -62,7 +62,6 @@ function to process requests, decode URLs, serve files, etc. etc.
 #include "json_network_info.h"
 
 #include "cJSON.h"
-#include "ruuvi_gwui_html.h"
 #include "sta_ip_safe.h"
 
 #define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
@@ -71,6 +70,8 @@ function to process requests, decode URLs, serve files, etc. etc.
 #define RUUVI_GWUI_HTML_ENABLE 1
 
 #define FULLBUF_SIZE 4 * 1024
+
+typedef int file_read_result_t;
 
 /**
  * @brief RTOS task for the HTTP server. Do not start manually.
@@ -219,7 +220,40 @@ write_content_from_heap(struct netconn *conn, const http_server_resp_t *p_resp)
 static void
 write_content_from_fatfs(struct netconn *conn, const http_server_resp_t *p_resp)
 {
-    assert(0); // not implemented yet
+    static char tmp_buf[512U];
+    uint32_t    rem_len = p_resp->content_len;
+    while (rem_len > 0)
+    {
+        const uint32_t num_bytes       = (rem_len <= sizeof(tmp_buf)) ? rem_len : sizeof(tmp_buf);
+        const bool     flag_last_block = (num_bytes == rem_len) ? true : false;
+
+        const file_read_result_t read_result = read(p_resp->select_location.fatfs.fd, tmp_buf, num_bytes);
+        if (read_result < 0)
+        {
+            ESP_LOGE(TAG, "Failed to read %u bytes", num_bytes);
+            break;
+        }
+        if (read_result != num_bytes)
+        {
+            ESP_LOGE(TAG, "Read %u bytes, while requested %u bytes", read_result, num_bytes);
+            break;
+        }
+        rem_len -= read_result;
+        uint8_t netconn_flags = (uint8_t)NETCONN_COPY;
+        if (!flag_last_block)
+        {
+            netconn_flags |= (uint8_t)NETCONN_MORE;
+        }
+        ESP_LOGD(TAG, "Send %u bytes", num_bytes);
+        const err_t err = netconn_write(conn, tmp_buf, num_bytes, netconn_flags);
+        if (ERR_OK != err)
+        {
+            ESP_LOGE(TAG, "netconn_write failed, err=%d", err);
+            break;
+        }
+    }
+    ESP_LOGD(TAG, "Close file fd=%d", p_resp->select_location.fatfs.fd);
+    close(p_resp->select_location.fatfs.fd);
 }
 
 static void
