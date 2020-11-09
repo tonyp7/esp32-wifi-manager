@@ -15,20 +15,14 @@ static const char TAG[] = "wifi_manager";
 
 static SemaphoreHandle_t g_sta_ip_safe_mutex = NULL;
 
-#if RUUVI_TESTS_STA_IP_SAFE
-#define STA_IP_SAFE_STATIC_FUNC
-#else
-#define STA_IP_SAFE_STATIC_FUNC static
-#endif
-
-STA_IP_SAFE_STATIC_FUNC
+STA_IP_SAFE_STATIC
 SemaphoreHandle_t
 sta_ip_safe_mutex_get(void)
 {
     return g_sta_ip_safe_mutex;
 }
 
-STA_IP_SAFE_STATIC_FUNC
+STA_IP_SAFE_STATIC
 bool
 sta_ip_safe_lock(const TickType_t ticks_to_wait)
 {
@@ -48,7 +42,7 @@ sta_ip_safe_lock(const TickType_t ticks_to_wait)
     }
 }
 
-STA_IP_SAFE_STATIC_FUNC
+STA_IP_SAFE_STATIC
 void
 sta_ip_safe_unlock(void)
 {

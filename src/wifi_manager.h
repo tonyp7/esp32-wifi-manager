@@ -156,11 +156,6 @@ wifi_manager_initialise_mdns();
 void
 wifi_manager_set_callback(message_code_t message_code, void (*func_ptr)(void *));
 
-BaseType_t
-wifi_manager_send_message(message_code_t code, void *param);
-BaseType_t
-wifi_manager_send_message_to_front(message_code_t code, void *param);
-
 #ifdef __cplusplus
 }
 #endif

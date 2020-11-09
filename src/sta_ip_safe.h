@@ -13,6 +13,16 @@
 #include "freertos/FreeRTOS.h"
 #include "sta_ip.h"
 
+#if !defined(RUUVI_TESTS_STA_IP_SAFE)
+#define RUUVI_TESTS_STA_IP_SAFE (0)
+#endif
+
+#if RUUVI_TESTS_STA_IP_SAFE
+#define STA_IP_SAFE_STATIC
+#else
+#define STA_IP_SAFE_STATIC static
+#endif
+
 #if RUUVI_TESTS_STA_IP_SAFE
 #include "freertos/semphr.h"
 #endif

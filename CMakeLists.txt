@@ -24,6 +24,8 @@ if(IDF_VERSION_MAJOR GREATER_EQUAL 4)
             src/wifi_manager.c
             src/wifi_manager.h
             src/wifi_manager_defs.h
+            src/wifiman_msg.c
+            src/wifiman_msg.h
         REQUIRES
             log
             nvs_flash

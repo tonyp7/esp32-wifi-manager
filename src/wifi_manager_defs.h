@@ -218,13 +218,19 @@ typedef enum connection_request_made_by_code_t
     CONNECTION_REQUEST_MAX                = 0x7fffffff /*force the creation of this enum as a 32 bit int */
 } connection_request_made_by_code_t;
 
+typedef union wifiman_msg_param_t
+{
+    void *    ptr;
+    uintptr_t val;
+} wifiman_msg_param_t;
+
 /**
  * @brief Structure used to store one message in the queue.
  */
 typedef struct
 {
-    message_code_t code;
-    void *         param;
+    message_code_t      code;
+    wifiman_msg_param_t msg_param;
 } queue_message;
 
 typedef struct network_info_str_t
