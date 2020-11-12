@@ -14,12 +14,26 @@ enable_testing()
 add_subdirectory(googletest)
 add_subdirectory(posix_gcc_simulator)
 
+set(RUUVI_ESP_WRAPPERS ${CMAKE_CURRENT_SOURCE_DIR}/ruuvi.esp_wrappers.c)
+set(RUUVI_ESP_WRAPPERS_INC ${RUUVI_ESP_WRAPPERS}/include)
+
+set(RUUVI_ESP_WRAPPERS_TESTS_COMMON ${RUUVI_ESP_WRAPPERS}/tests/common)
+set(RUUVI_ESP_WRAPPERS_TESTS_COMMON_INC ${RUUVI_ESP_WRAPPERS_TESTS_COMMON}/include)
+
+include_directories(
+        ${RUUVI_ESP_WRAPPERS_INC}
+        ${RUUVI_ESP_WRAPPERS_TESTS_COMMON_INC}
+)
+
 include_directories(
         "posix_gcc_simulator/FreeRTOS_Posix"
         "posix_gcc_simulator/FreeRTOS_Posix/FreeRTOS_Kernel/include"
         "posix_gcc_simulator/FreeRTOS_Posix/FreeRTOS_Kernel/include/freertos"
         "posix_gcc_simulator/FreeRTOS_Posix/FreeRTOS_Kernel/portable/GCC/Posix"
 )
+
+add_subdirectory(${RUUVI_ESP_WRAPPERS} ruuvi.esp_wrappers.c)
+add_subdirectory(${RUUVI_ESP_WRAPPERS_TESTS_COMMON} ruuvi.esp_wrappers_tests)
 
 add_subdirectory(lwip)
 
@@ -38,18 +52,12 @@ include_directories(
 #        "${CMAKE_BINARY_DIR}/../../../config/"
 #)
 
-add_subdirectory(test_str_buf)
 add_subdirectory(test_ap_ssid)
 add_subdirectory(test_json)
 add_subdirectory(test_json_network_info)
 add_subdirectory(test_json_access_points)
 add_subdirectory(test_sta_ip_unsafe)
 add_subdirectory(test_sta_ip_safe)
-
-add_test(NAME test_str_buf
-        COMMAND ruuvi_esp32-wifi-manager-test-str_buf
-            --gtest_output=xml:$<TARGET_FILE_DIR:ruuvi_esp32-wifi-manager-test-str_buf>/gtestresults.xml
-)
 
 add_test(NAME test_ap_ssid
         COMMAND ruuvi_esp32-wifi-manager-test-ap_ssid

@@ -7,3 +7,6 @@
 [submodule "tests/posix_gcc_simulator"]
 	path = tests/posix_gcc_simulator
 	url = https://github.com/ruuvi/Posix_GCC_Simulator.git
+[submodule "tests/ruuvi.esp_wrappers.c"]
+	path = tests/ruuvi.esp_wrappers.c
+	url = https://github.com/ruuvi/ruuvi.esp_wrappers.c.git

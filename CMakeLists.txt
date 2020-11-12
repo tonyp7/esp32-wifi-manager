@@ -19,8 +19,6 @@ if(IDF_VERSION_MAJOR GREATER_EQUAL 4)
             src/sta_ip_safe.h
             src/sta_ip_unsafe.c
             src/sta_ip_unsafe.h
-            src/str_buf.c
-            src/str_buf.h
             src/wifi_manager.c
             src/wifi_manager.h
             src/wifi_manager_defs.h
@@ -34,8 +32,11 @@ if(IDF_VERSION_MAJOR GREATER_EQUAL 4)
             lwip
             esp_http_server
             json
+            ruuvi.esp_wrappers.c
         INCLUDE_DIRS
             src
+        PRIV_INCLUDE_DIRS
+            ../ruuvi.esp_wrappers.c/include
         )
 else()
     set(COMPONENT_SRCDIRS src)

@@ -6,9 +6,6 @@ set(ProjectId ruuvi_esp32-wifi-manager-test-sta_ip_safe)
 add_executable(
         ${ProjectId}
         test_sta_ip_safe.cpp
-        TQueue.hpp
-        esp_log_wrapper.cpp
-        esp_log_wrapper.hpp
         ../../src/sta_ip.h
         ../../src/sta_ip_safe.c
         ../../src/sta_ip_safe.h
@@ -48,5 +45,7 @@ target_link_libraries(${ProjectId}
         gtest
         gtest_main
         gcov
+        ruuvi_esp_wrappers
+        ruuvi_esp_wrappers-common_test_funcs
         --coverage
 )

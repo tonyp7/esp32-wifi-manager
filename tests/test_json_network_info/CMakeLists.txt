@@ -5,8 +5,6 @@ set(ProjectId ruuvi_esp32-wifi-manager-test-json_network_info)
 
 add_executable(${ProjectId}
         test_json_network_info.cpp
-        ../../src/str_buf.c
-        ../../src/str_buf.h
         ../../src/json.c
         ../../src/json.h
         ../../src/json_network_info.c
@@ -48,5 +46,7 @@ target_link_libraries(${ProjectId}
         gtest
         gtest_main
         gcov
+        ruuvi_esp_wrappers
+        ruuvi_esp_wrappers-common_test_funcs
         --coverage
 )
