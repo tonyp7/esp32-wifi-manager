@@ -72,8 +72,7 @@ wifi_ap_record_t accessp_records[MAX_AP_NUM];
 
 wifi_config_t wifi_manager_config_sta;
 
-typedef void (*wifi_manager_cb_ptr)(void *);
-wifi_manager_cb_ptr *cb_ptr_arr = NULL;
+wifi_manager_cb_ptr cb_ptr_arr[MESSAGE_CODE_COUNT];
 
 static wifi_manager_http_callback_t   g_wifi_cb_on_http_get;
 static wifi_manager_http_cb_on_post_t g_wifi_cb_on_http_post;
@@ -184,8 +183,6 @@ wifi_manager_start(
     memset(&wifi_manager_config_sta, 0x00, sizeof(wifi_manager_config_sta));
 
     memset(&wifi_settings.sta_static_ip_config, 0x00, sizeof(tcpip_adapter_ip_info_t));
-    cb_ptr_arr = malloc(sizeof(*cb_ptr_arr) * MESSAGE_CODE_COUNT);
-    // TODO: check cb_ptr_arr for NULL
     for (int i = 0; i < MESSAGE_CODE_COUNT; i++)
     {
         cb_ptr_arr[i] = NULL;
@@ -678,9 +675,9 @@ wifi_manager_filter_unique(wifi_ap_record_t *aplist, uint16_t *aps)
 }
 
 void
-wifi_manager_set_callback(message_code_t message_code, void (*func_ptr)(void *))
+wifi_manager_set_callback(message_code_t message_code, wifi_manager_cb_ptr func_ptr)
 {
-    if (cb_ptr_arr && message_code < MESSAGE_CODE_COUNT)
+    if (message_code < MESSAGE_CODE_COUNT)
     {
         cb_ptr_arr[message_code] = func_ptr;
     }
