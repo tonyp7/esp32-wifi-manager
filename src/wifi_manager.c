@@ -42,7 +42,6 @@ Contains the freeRTOS task and all necessary support
 #include "esp_event.h"
 #include "esp_wifi.h"
 #include "esp_wifi_types.h"
-#include "esp_log.h"
 #include "nvs.h"
 #include "nvs_flash.h"
 #include "mdns.h"
@@ -64,6 +63,7 @@ Contains the freeRTOS task and all necessary support
 
 #undef LOG_LOCAL_LEVEL
 #define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
+#include "log.h"
 
 SemaphoreHandle_t wifi_manager_json_mutex = NULL;
 
@@ -327,55 +327,59 @@ wifi_manager_save_sta_config()
     return ESP_OK;
 }
 
+static bool
+wifiman_nvs_get_blob(nvs_handle_t handle, const char *key, void *p_out_buf, size_t length)
+{
+    const esp_err_t esp_err = nvs_get_blob(handle, key, p_out_buf, &length);
+    if (ESP_OK != esp_err)
+    {
+        LOG_ERR_ESP(esp_err, "nvs_get_blob failed for key '%s'", key);
+        return false;
+    }
+    return true;
+}
+
+static bool
+wifiman_read_wifi_sta_config(nvs_handle handle)
+{
+    memset(&wifi_manager_config_sta, 0x00, sizeof(wifi_manager_config_sta));
+
+    if (!wifiman_nvs_get_blob(
+            handle,
+            "ssid",
+            wifi_manager_config_sta.sta.ssid,
+            sizeof(wifi_manager_config_sta.sta.ssid)))
+    {
+        return false;
+    }
+    if (!wifiman_nvs_get_blob(
+            handle,
+            "password",
+            wifi_manager_config_sta.sta.password,
+            sizeof(wifi_manager_config_sta.sta.password)))
+    {
+        return false;
+    }
+    if (!wifiman_nvs_get_blob(handle, "settings", &wifi_settings, sizeof(wifi_settings)))
+    {
+        return false;
+    }
+    return true;
+}
+
 bool
 wifi_manager_fetch_wifi_sta_config()
 {
-
-    nvs_handle handle;
-    esp_err_t  esp_err;
+    nvs_handle handle = 0;
     if (nvs_open(wifi_manager_nvs_namespace, NVS_READONLY, &handle) == ESP_OK)
     {
-        memset(&wifi_manager_config_sta, 0x00, sizeof(wifi_manager_config_sta));
-
-        /* allocate buffer */
-        size_t   sz   = sizeof(wifi_settings);
-        uint8_t *buff = (uint8_t *)malloc(sizeof(uint8_t) * sz);
-        memset(buff, 0x00, sizeof(sz));
-
-        /* ssid */
-        sz      = sizeof(wifi_manager_config_sta.sta.ssid);
-        esp_err = nvs_get_blob(handle, "ssid", buff, &sz);
-        if (esp_err != ESP_OK)
-        {
-            free(buff);
-            return false;
-        }
-        memcpy(wifi_manager_config_sta.sta.ssid, buff, sz);
-
-        /* password */
-        sz      = sizeof(wifi_manager_config_sta.sta.password);
-        esp_err = nvs_get_blob(handle, "password", buff, &sz);
-        if (esp_err != ESP_OK)
-        {
-            free(buff);
-            return false;
-        }
-        memcpy(wifi_manager_config_sta.sta.password, buff, sz);
-        /* memcpy(wifi_manager_config_sta->sta.password, "lewrong", strlen("lewrong")); this is debug to force a wrong
-         * password event. ignore! */
-
-        /* settings */
-        sz      = sizeof(wifi_settings);
-        esp_err = nvs_get_blob(handle, "settings", buff, &sz);
-        if (esp_err != ESP_OK)
-        {
-            free(buff);
-            return false;
-        }
-        memcpy(&wifi_settings, buff, sz);
-
-        free(buff);
+        const bool res = wifiman_read_wifi_sta_config(handle);
         nvs_close(handle);
+        if (!res)
+        {
+            LOG_ERR("%s failed", "wifiman_read_wifi_sta_config");
+            return false;
+        }
 
         ESP_LOGI(
             TAG,
