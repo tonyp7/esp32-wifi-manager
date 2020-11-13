@@ -94,7 +94,6 @@ ATTR_PRINTF(3, 4)
 static void
 http_server_netconn_printf(struct netconn *conn, bool flag_more, const char *fmt, ...)
 {
-    size_t  len = 0;
     va_list args;
     va_start(args, fmt);
     str_buf_t str_buf = str_buf_vprintf_with_alloc(fmt, args);
@@ -109,7 +108,7 @@ http_server_netconn_printf(struct netconn *conn, bool flag_more, const char *fmt
     {
         netconn_flags |= (uint8_t)NETCONN_MORE;
     }
-    netconn_write(conn, str_buf.buf, len, netconn_flags);
+    netconn_write(conn, str_buf.buf, str_buf_get_len(&str_buf), netconn_flags);
     str_buf_free_buf(&str_buf);
 }
 
