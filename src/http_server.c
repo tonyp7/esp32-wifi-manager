@@ -63,6 +63,7 @@ function to process requests, decode URLs, serve files, etc. etc.
 
 #include "cJSON.h"
 #include "sta_ip_safe.h"
+#include "os_task.h"
 
 #define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
 #include "esp_log.h"
@@ -85,7 +86,7 @@ http_server_task(void *pvParameters);
 static const char TAG[] = "http_server";
 
 /* @brief task handle for the http server */
-static TaskHandle_t task_http_server = NULL;
+static os_task_handle_t task_http_server;
 
 static char *
 http_server_strdupVprintf(size_t *pLen, const char *fmt, va_list args)
@@ -366,14 +367,13 @@ http_server_start(void)
     if (task_http_server == NULL)
     {
         ESP_LOGI(TAG, "Run http_server");
-        if (xTaskCreate(
+        if (!os_task_create(
                 &http_server_task,
                 "http_server",
                 20 * 1024,
                 NULL,
                 WIFI_MANAGER_TASK_PRIORITY - 1,
-                &task_http_server)
-            != pdPASS)
+                &task_http_server))
         {
             ESP_LOGE(TAG, "xTaskCreate failed: http_server");
         }

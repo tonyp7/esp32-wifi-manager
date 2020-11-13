@@ -71,7 +71,7 @@ wifiman_msg_send(const message_code_t code, const wifiman_msg_param_t msg_param)
         .code      = code,
         .msg_param = msg_param,
     };
-    if (!xQueueSend(gh_wifiman_msg_queue, &msg, portMAX_DELAY))
+    if (pdTRUE != xQueueSend(gh_wifiman_msg_queue, &msg, portMAX_DELAY))
     {
         // TODO: add LOG_ERR
         return false;
