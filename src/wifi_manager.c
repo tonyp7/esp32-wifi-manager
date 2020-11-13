@@ -67,8 +67,8 @@ Contains the freeRTOS task and all necessary support
 
 SemaphoreHandle_t wifi_manager_json_mutex = NULL;
 
-uint16_t          ap_num = MAX_AP_NUM;
-wifi_ap_record_t *accessp_records;
+uint16_t         ap_num = MAX_AP_NUM;
+wifi_ap_record_t accessp_records[MAX_AP_NUM];
 
 wifi_config_t *wifi_manager_config_sta = NULL;
 
@@ -176,9 +176,6 @@ wifi_manager_start(
     }
     /* memory allocation */
     wifi_manager_json_mutex = xSemaphoreCreateMutex();
-
-    accessp_records = (wifi_ap_record_t *)malloc(sizeof(wifi_ap_record_t) * MAX_AP_NUM);
-    // TODO: check accessp_records for NULL
 
     ESP_ERROR_CHECK(json_access_points_init());
 
@@ -617,8 +614,6 @@ wifi_manager_destroy()
         task_wifi_manager = NULL;
 
         /* heap buffers */
-        free(accessp_records);
-        accessp_records = NULL;
         json_access_points_deinit();
         json_network_info_deinit();
         sta_ip_safe_deinit();
