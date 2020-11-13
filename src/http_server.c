@@ -64,6 +64,8 @@ function to process requests, decode URLs, serve files, etc. etc.
 #include "cJSON.h"
 #include "sta_ip_safe.h"
 #include "os_task.h"
+#include "app_malloc.h"
+#include "str_buf.h"
 
 #define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
 #include "esp_log.h"
@@ -88,40 +90,27 @@ static const char TAG[] = "http_server";
 /* @brief task handle for the http server */
 static os_task_handle_t task_http_server;
 
-static char *
-http_server_strdupVprintf(size_t *pLen, const char *fmt, va_list args)
-{
-    const int len = vsnprintf(NULL, 0, fmt, args);
-    char *    buf = malloc(len + 1);
-    vsnprintf(buf, len + 1, fmt, args);
-    if (NULL != pLen)
-    {
-        *pLen = len;
-    }
-    return buf;
-}
-
-__attribute__((format(printf, 3, 4))) //
+ATTR_PRINTF(3, 4)
 static void
 http_server_netconn_printf(struct netconn *conn, bool flag_more, const char *fmt, ...)
 {
     size_t  len = 0;
     va_list args;
     va_start(args, fmt);
-    char *buf = http_server_strdupVprintf(&len, fmt, args);
+    str_buf_t str_buf = str_buf_vprintf_with_alloc(fmt, args);
     va_end(args);
-    if (NULL == buf)
+    if (NULL == str_buf.buf)
     {
         return;
     }
-    ESP_LOGD(TAG, "Respond: %s", buf);
+    ESP_LOGD(TAG, "Respond: %s", str_buf.buf);
     uint8_t netconn_flags = (uint8_t)NETCONN_COPY;
     if (flag_more)
     {
         netconn_flags |= (uint8_t)NETCONN_MORE;
     }
-    netconn_write(conn, buf, len, netconn_flags);
-    free(buf);
+    netconn_write(conn, str_buf.buf, len, netconn_flags);
+    str_buf_free_buf(&str_buf);
 }
 
 static const char *
@@ -215,7 +204,7 @@ write_content_from_heap(struct netconn *conn, const http_server_resp_t *p_resp)
     {
         ESP_LOGE(TAG, "netconn_write failed, err=%d", err);
     }
-    free((void *)p_resp->select_location.memory.p_buf);
+    app_free_const_pptr((const void **)&p_resp->select_location.memory.p_buf);
 }
 
 static void
