@@ -42,7 +42,6 @@ Contains the freeRTOS task and all necessary support
 #include "esp_event.h"
 #include "esp_wifi.h"
 #include "esp_wifi_types.h"
-#include "esp_log.h"
 #include "nvs.h"
 #include "nvs_flash.h"
 #include "mdns.h"
@@ -64,16 +63,16 @@ Contains the freeRTOS task and all necessary support
 
 #undef LOG_LOCAL_LEVEL
 #define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
+#include "log.h"
 
 SemaphoreHandle_t wifi_manager_json_mutex = NULL;
 
-uint16_t          ap_num = MAX_AP_NUM;
-wifi_ap_record_t *accessp_records;
+uint16_t         ap_num = MAX_AP_NUM;
+wifi_ap_record_t accessp_records[MAX_AP_NUM];
 
-wifi_config_t *wifi_manager_config_sta = NULL;
+wifi_config_t wifi_manager_config_sta;
 
-typedef void (*wifi_manager_cb_ptr)(void *);
-wifi_manager_cb_ptr *cb_ptr_arr = NULL;
+wifi_manager_cb_ptr cb_ptr_arr[MESSAGE_CODE_COUNT];
 
 static wifi_manager_http_callback_t   g_wifi_cb_on_http_get;
 static wifi_manager_http_cb_on_post_t g_wifi_cb_on_http_post;
@@ -177,20 +176,13 @@ wifi_manager_start(
     /* memory allocation */
     wifi_manager_json_mutex = xSemaphoreCreateMutex();
 
-    accessp_records = (wifi_ap_record_t *)malloc(sizeof(wifi_ap_record_t) * MAX_AP_NUM);
-    // TODO: check accessp_records for NULL
-
     ESP_ERROR_CHECK(json_access_points_init());
 
     json_network_info_init();
 
-    wifi_manager_config_sta = (wifi_config_t *)malloc(sizeof(wifi_config_t));
-    // TODO: check wifi_manager_config_sta for NULL
-    memset(wifi_manager_config_sta, 0x00, sizeof(wifi_config_t));
+    memset(&wifi_manager_config_sta, 0x00, sizeof(wifi_manager_config_sta));
 
     memset(&wifi_settings.sta_static_ip_config, 0x00, sizeof(tcpip_adapter_ip_info_t));
-    cb_ptr_arr = malloc(sizeof(*cb_ptr_arr) * MESSAGE_CODE_COUNT);
-    // TODO: check cb_ptr_arr for NULL
     for (int i = 0; i < MESSAGE_CODE_COUNT; i++)
     {
         cb_ptr_arr[i] = NULL;
@@ -276,131 +268,124 @@ wifi_manager_save_sta_config()
     esp_err_t  esp_err;
     ESP_LOGI(TAG, "About to save config to flash");
 
-    if (wifi_manager_config_sta)
-    {
+    esp_err = nvs_open(wifi_manager_nvs_namespace, NVS_READWRITE, &handle);
+    if (esp_err != ESP_OK)
+        return esp_err;
 
-        esp_err = nvs_open(wifi_manager_nvs_namespace, NVS_READWRITE, &handle);
-        if (esp_err != ESP_OK)
-            return esp_err;
+    esp_err = nvs_set_blob(handle, "ssid", wifi_manager_config_sta.sta.ssid, 32);
+    if (esp_err != ESP_OK)
+        return esp_err;
 
-        esp_err = nvs_set_blob(handle, "ssid", wifi_manager_config_sta->sta.ssid, 32);
-        if (esp_err != ESP_OK)
-            return esp_err;
+    esp_err = nvs_set_blob(handle, "password", wifi_manager_config_sta.sta.password, 64);
+    if (esp_err != ESP_OK)
+        return esp_err;
 
-        esp_err = nvs_set_blob(handle, "password", wifi_manager_config_sta->sta.password, 64);
-        if (esp_err != ESP_OK)
-            return esp_err;
+    esp_err = nvs_set_blob(handle, "settings", &wifi_settings, sizeof(wifi_settings));
+    if (esp_err != ESP_OK)
+        return esp_err;
 
-        esp_err = nvs_set_blob(handle, "settings", &wifi_settings, sizeof(wifi_settings));
-        if (esp_err != ESP_OK)
-            return esp_err;
+    esp_err = nvs_commit(handle);
+    if (esp_err != ESP_OK)
+        return esp_err;
 
-        esp_err = nvs_commit(handle);
-        if (esp_err != ESP_OK)
-            return esp_err;
+    nvs_close(handle);
 
-        nvs_close(handle);
-
-        ESP_LOGD(
-            TAG,
-            "wifi_manager_wrote wifi_sta_config: ssid:%s password:%s",
-            wifi_manager_config_sta->sta.ssid,
-            wifi_manager_config_sta->sta.password);
-        ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: SoftAP_ssid: %s", wifi_settings.ap_ssid);
-        ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: SoftAP_pwd: %s", wifi_settings.ap_pwd);
-        ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: SoftAP_channel: %i", wifi_settings.ap_channel);
-        ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: SoftAP_hidden (1 = yes): %i", wifi_settings.ap_ssid_hidden);
-        ESP_LOGD(
-            TAG,
-            "wifi_manager_wrote wifi_settings: SoftAP_bandwidth (1 = 20MHz, 2 = 40MHz): %i",
-            wifi_settings.ap_bandwidth);
-        ESP_LOGD(
-            TAG,
-            "wifi_manager_wrote wifi_settings: sta_only (0 = APSTA, 1 = STA when connected): %i",
-            wifi_settings.sta_only);
-        ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: sta_power_save (1 = yes): %i", wifi_settings.sta_power_save);
-        ESP_LOGD(
-            TAG,
-            "wifi_manager_wrote wifi_settings: sta_static_ip (0 = dhcp client, 1 = static ip): %i",
-            wifi_settings.sta_static_ip);
-        ESP_LOGD(
-            TAG,
-            "wifi_manager_wrote wifi_settings: sta_ip_addr: %s",
-            ip4addr_ntoa(&wifi_settings.sta_static_ip_config.ip));
-        ESP_LOGD(
-            TAG,
-            "wifi_manager_wrote wifi_settings: sta_gw_addr: %s",
-            ip4addr_ntoa(&wifi_settings.sta_static_ip_config.gw));
-        ESP_LOGD(
-            TAG,
-            "wifi_manager_wrote wifi_settings: sta_netmask: %s",
-            ip4addr_ntoa(&wifi_settings.sta_static_ip_config.netmask));
-    }
+    ESP_LOGD(
+        TAG,
+        "wifi_manager_wrote wifi_sta_config: ssid:%s password:%s",
+        wifi_manager_config_sta.sta.ssid,
+        wifi_manager_config_sta.sta.password);
+    ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: SoftAP_ssid: %s", wifi_settings.ap_ssid);
+    ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: SoftAP_pwd: %s", wifi_settings.ap_pwd);
+    ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: SoftAP_channel: %i", wifi_settings.ap_channel);
+    ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: SoftAP_hidden (1 = yes): %i", wifi_settings.ap_ssid_hidden);
+    ESP_LOGD(
+        TAG,
+        "wifi_manager_wrote wifi_settings: SoftAP_bandwidth (1 = 20MHz, 2 = 40MHz): %i",
+        wifi_settings.ap_bandwidth);
+    ESP_LOGD(
+        TAG,
+        "wifi_manager_wrote wifi_settings: sta_only (0 = APSTA, 1 = STA when connected): %i",
+        wifi_settings.sta_only);
+    ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: sta_power_save (1 = yes): %i", wifi_settings.sta_power_save);
+    ESP_LOGD(
+        TAG,
+        "wifi_manager_wrote wifi_settings: sta_static_ip (0 = dhcp client, 1 = static ip): %i",
+        wifi_settings.sta_static_ip);
+    ESP_LOGD(
+        TAG,
+        "wifi_manager_wrote wifi_settings: sta_ip_addr: %s",
+        ip4addr_ntoa(&wifi_settings.sta_static_ip_config.ip));
+    ESP_LOGD(
+        TAG,
+        "wifi_manager_wrote wifi_settings: sta_gw_addr: %s",
+        ip4addr_ntoa(&wifi_settings.sta_static_ip_config.gw));
+    ESP_LOGD(
+        TAG,
+        "wifi_manager_wrote wifi_settings: sta_netmask: %s",
+        ip4addr_ntoa(&wifi_settings.sta_static_ip_config.netmask));
     return ESP_OK;
+}
+
+static bool
+wifiman_nvs_get_blob(nvs_handle_t handle, const char *key, void *p_out_buf, size_t length)
+{
+    const esp_err_t esp_err = nvs_get_blob(handle, key, p_out_buf, &length);
+    if (ESP_OK != esp_err)
+    {
+        LOG_ERR_ESP(esp_err, "nvs_get_blob failed for key '%s'", key);
+        return false;
+    }
+    return true;
+}
+
+static bool
+wifiman_read_wifi_sta_config(nvs_handle handle)
+{
+    memset(&wifi_manager_config_sta, 0x00, sizeof(wifi_manager_config_sta));
+
+    if (!wifiman_nvs_get_blob(
+            handle,
+            "ssid",
+            wifi_manager_config_sta.sta.ssid,
+            sizeof(wifi_manager_config_sta.sta.ssid)))
+    {
+        return false;
+    }
+    if (!wifiman_nvs_get_blob(
+            handle,
+            "password",
+            wifi_manager_config_sta.sta.password,
+            sizeof(wifi_manager_config_sta.sta.password)))
+    {
+        return false;
+    }
+    if (!wifiman_nvs_get_blob(handle, "settings", &wifi_settings, sizeof(wifi_settings)))
+    {
+        return false;
+    }
+    return true;
 }
 
 bool
 wifi_manager_fetch_wifi_sta_config()
 {
-
-    nvs_handle handle;
-    esp_err_t  esp_err;
+    nvs_handle handle = 0;
     if (nvs_open(wifi_manager_nvs_namespace, NVS_READONLY, &handle) == ESP_OK)
     {
-
-        if (wifi_manager_config_sta == NULL)
-        {
-            wifi_manager_config_sta = (wifi_config_t *)malloc(sizeof(wifi_config_t));
-        }
-        memset(wifi_manager_config_sta, 0x00, sizeof(wifi_config_t));
-
-        // memset(&wifi_settings, 0x00, sizeof(struct wifi_settings_t));
-
-        /* allocate buffer */
-        size_t   sz   = sizeof(wifi_settings);
-        uint8_t *buff = (uint8_t *)malloc(sizeof(uint8_t) * sz);
-        memset(buff, 0x00, sizeof(sz));
-
-        /* ssid */
-        sz      = sizeof(wifi_manager_config_sta->sta.ssid);
-        esp_err = nvs_get_blob(handle, "ssid", buff, &sz);
-        if (esp_err != ESP_OK)
-        {
-            free(buff);
-            return false;
-        }
-        memcpy(wifi_manager_config_sta->sta.ssid, buff, sz);
-
-        /* password */
-        sz      = sizeof(wifi_manager_config_sta->sta.password);
-        esp_err = nvs_get_blob(handle, "password", buff, &sz);
-        if (esp_err != ESP_OK)
-        {
-            free(buff);
-            return false;
-        }
-        memcpy(wifi_manager_config_sta->sta.password, buff, sz);
-        /* memcpy(wifi_manager_config_sta->sta.password, "lewrong", strlen("lewrong")); this is debug to force a wrong
-         * password event. ignore! */
-
-        /* settings */
-        sz      = sizeof(wifi_settings);
-        esp_err = nvs_get_blob(handle, "settings", buff, &sz);
-        if (esp_err != ESP_OK)
-        {
-            free(buff);
-            return false;
-        }
-        memcpy(&wifi_settings, buff, sz);
-
-        free(buff);
+        const bool res = wifiman_read_wifi_sta_config(handle);
         nvs_close(handle);
+        if (!res)
+        {
+            LOG_ERR("%s failed", "wifiman_read_wifi_sta_config");
+            return false;
+        }
 
         ESP_LOGI(
             TAG,
             "wifi_manager_fetch_wifi_sta_config: ssid:%s password:%s",
-            wifi_manager_config_sta->sta.ssid,
-            wifi_manager_config_sta->sta.password);
+            wifi_manager_config_sta.sta.ssid,
+            wifi_manager_config_sta.sta.password);
         ESP_LOGI(TAG, "wifi_manager_fetch_wifi_settings: SoftAP_ssid:%s", wifi_settings.ap_ssid);
         ESP_LOGI(TAG, "wifi_manager_fetch_wifi_settings: SoftAP_pwd:%s", wifi_settings.ap_pwd);
         ESP_LOGI(TAG, "wifi_manager_fetch_wifi_settings: SoftAP_channel:%i", wifi_settings.ap_channel);
@@ -437,7 +422,7 @@ wifi_manager_fetch_wifi_sta_config()
             "wifi_manager_fetch_wifi_settings: sta_netmask: %s",
             ip4addr_ntoa(&wifi_settings.sta_static_ip_config.netmask));
 
-        return wifi_manager_config_sta->sta.ssid[0] != '\0';
+        return wifi_manager_config_sta.sta.ssid[0] != '\0';
     }
     else
     {
@@ -564,7 +549,7 @@ wifi_manager_event_handler(void *ctx, esp_event_base_t event_base, int32_t event
 wifi_config_t *
 wifi_manager_get_wifi_sta_config()
 {
-    return wifi_manager_config_sta;
+    return &wifi_manager_config_sta;
 }
 
 const char *
@@ -617,16 +602,9 @@ wifi_manager_destroy()
         task_wifi_manager = NULL;
 
         /* heap buffers */
-        free(accessp_records);
-        accessp_records = NULL;
         json_access_points_deinit();
         json_network_info_deinit();
         sta_ip_safe_deinit();
-        if (wifi_manager_config_sta)
-        {
-            free(wifi_manager_config_sta);
-            wifi_manager_config_sta = NULL;
-        }
 
         /* RTOS objects */
         vSemaphoreDelete(wifi_manager_json_mutex);
@@ -701,9 +679,9 @@ wifi_manager_filter_unique(wifi_ap_record_t *aplist, uint16_t *aps)
 }
 
 void
-wifi_manager_set_callback(message_code_t message_code, void (*func_ptr)(void *))
+wifi_manager_set_callback(message_code_t message_code, wifi_manager_cb_ptr func_ptr)
 {
-    if (cb_ptr_arr && message_code < MESSAGE_CODE_COUNT)
+    if (message_code < MESSAGE_CODE_COUNT)
     {
         cb_ptr_arr[message_code] = func_ptr;
     }
@@ -1039,10 +1017,7 @@ wifi_manager(void *pvParameters)
                     }
 
                     /* erase configuration */
-                    if (wifi_manager_config_sta)
-                    {
-                        memset(wifi_manager_config_sta, 0x00, sizeof(wifi_config_t));
-                    }
+                    memset(&wifi_manager_config_sta, 0x00, sizeof(wifi_manager_config_sta));
 
                     /* save NVS memory */
                     wifi_manager_save_sta_config();

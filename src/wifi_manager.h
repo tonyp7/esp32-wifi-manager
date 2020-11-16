@@ -40,6 +40,8 @@ Contains the freeRTOS task and all necessary support
 extern "C" {
 #endif
 
+typedef void (*wifi_manager_cb_ptr)(void *);
+
 /**
  * The actual WiFi settings in use
  */
@@ -154,7 +156,7 @@ wifi_manager_initialise_mdns();
  * @brief Register a callback to a custom function when specific event message_code happens.
  */
 void
-wifi_manager_set_callback(message_code_t message_code, void (*func_ptr)(void *));
+wifi_manager_set_callback(message_code_t message_code, wifi_manager_cb_ptr func_ptr);
 
 #ifdef __cplusplus
 }
