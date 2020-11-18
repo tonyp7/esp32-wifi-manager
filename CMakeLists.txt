@@ -1,6 +1,8 @@
 if(IDF_VERSION_MAJOR GREATER_EQUAL 4)
     idf_component_register(
         SRCS
+            src/access_points_list.c
+            src/access_points_list.h
             src/ap_mac.h
             src/ap_ssid.c
             src/ap_ssid.h

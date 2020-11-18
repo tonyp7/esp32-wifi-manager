@@ -68,11 +68,11 @@ function to process requests, decode URLs, serve files, etc. etc.
 #include "str_buf.h"
 
 #define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
-#include "esp_log.h"
+#include "log.h"
 
 #define RUUVI_GWUI_HTML_ENABLE 1
 
-#define FULLBUF_SIZE 4 * 1024
+#define FULLBUF_SIZE (4U * 1024U)
 
 typedef int file_read_result_t;
 
@@ -196,7 +196,7 @@ write_content_from_static_mem(struct netconn *conn, const http_server_resp_t *p_
 }
 
 static void
-write_content_from_heap(struct netconn *conn, const http_server_resp_t *p_resp)
+write_content_from_heap(struct netconn *conn, http_server_resp_t *p_resp)
 {
     const err_t err = netconn_write(conn, p_resp->select_location.memory.p_buf, p_resp->content_len, NETCONN_COPY);
     if (ERR_OK != err)
@@ -246,7 +246,7 @@ write_content_from_fatfs(struct netconn *conn, const http_server_resp_t *p_resp)
 }
 
 static void
-http_server_netconn_resp_200(struct netconn *conn, const http_server_resp_t *p_resp)
+http_server_netconn_resp_200(struct netconn *conn, http_server_resp_t *p_resp)
 {
     const bool use_extra_content_type_param = (NULL != p_resp->p_content_type_param)
                                               && ('\0' != p_resp->p_content_type_param[0]);
@@ -600,136 +600,132 @@ http_server_handle_req(char *line, char *save_ptr)
     }
 }
 
-void
-http_server_netconn_serve(struct netconn *conn)
+static bool
+http_server_recv_and_handle(struct netconn *p_conn, char *p_req_buf, uint32_t *p_req_size, bool *p_req_ready)
 {
-    struct netbuf *inbuf;
-    char *         buf = NULL;
-    char           fullbuf[FULLBUF_SIZE + 1];
-    uint           fullsize = 0;
-    u16_t          buflen;
-    err_t          err;
-    const char     new_line[2]   = "\n";
-    bool           request_ready = false;
+    struct netbuf *p_netbuf_in = NULL;
 
-    while (request_ready == false)
+    const err_t err = netconn_recv(p_conn, &p_netbuf_in);
+    if (ERR_OK != err)
     {
-        err = netconn_recv(conn, &inbuf);
-        if (err == ERR_OK)
+        LOG_ERR("netconn recv: %d", err);
+        return false;
+    }
+
+    char *p_buf  = NULL;
+    u16_t buflen = 0;
+    netbuf_data(p_netbuf_in, (void **)&p_buf, &buflen);
+
+    if ((*p_req_size + buflen) > FULLBUF_SIZE)
+    {
+        ESP_LOGW(TAG, "fullbuf full, fullsize: %u, buflen: %d", *p_req_size, buflen);
+        netbuf_delete(p_netbuf_in);
+        return false;
+    }
+    memcpy(&p_req_buf[*p_req_size], p_buf, buflen);
+    *p_req_size += buflen;
+    p_req_buf[*p_req_size] = 0; // zero terminated string
+
+    netbuf_delete(p_netbuf_in);
+
+    // check if there should be more data coming from conn
+    int         field_len         = 0;
+    const char *p_content_len_str = http_server_get_header(p_req_buf, "Content-Length: ", &field_len);
+    if (NULL != p_content_len_str)
+    {
+        const int   content_len = atoi(p_content_len_str);
+        int         body_len    = 0;
+        const char *p_body      = get_http_body(p_req_buf, *p_req_size, &body_len);
+        if (NULL != p_body)
         {
-            netbuf_data(inbuf, (void **)&buf, &buflen);
-
-            if (fullsize + buflen > FULLBUF_SIZE)
+            ESP_LOGD(TAG, "Header Content-Length: %d, HTTP body length: %d", content_len, body_len);
+            if (content_len == body_len)
             {
-                ESP_LOGW(TAG, "fullbuf full, fullsize: %d, buflen: %d", fullsize, buflen);
-                netbuf_delete(inbuf);
-                break;
+                // HTTP request is full
+                *p_req_ready = true;
             }
             else
             {
-                memcpy(fullbuf + fullsize, buf, buflen);
-                fullsize += buflen;
-                fullbuf[fullsize] = 0; // zero terminated string
-            }
-
-            netbuf_delete(inbuf);
-
-            // check if there should be more data coming from conn
-            int   hLen = 0;
-            char *cl   = http_server_get_header(fullbuf, "Content-Length: ", &hLen);
-            if (cl)
-            {
-                int   body_len;
-                int   clen = atoi(cl);
-                char *b    = get_http_body(fullbuf, fullsize, &body_len);
-                if (b)
-                {
-                    ESP_LOGD(TAG, "Header Content-Length: %d, HTTP body length: %d", clen, body_len);
-                    if (clen == body_len)
-                    {
-                        // HTTP request is full
-                        request_ready = true;
-                    }
-                    else
-                    {
-                        ESP_LOGD(TAG, "request not full yet");
-                    }
-                }
-                else
-                {
-                    ESP_LOGD(TAG, "Header Content-Length: %d, body not found", clen);
-                    // read more data
-                }
-            }
-            else
-            {
-                // ESP_LOGD(TAG, "no Content-Length header");
-                request_ready = true;
+                ESP_LOGD(TAG, "request not full yet");
             }
         }
         else
         {
-            ESP_LOGW(TAG, "netconn recv: %d", err);
-            break;
-        }
-    }
-
-    if (!request_ready)
-    {
-        ESP_LOGW(TAG, "the connection was closed by the client side");
-        return;
-    }
-
-    buf            = fullbuf;
-    char *save_ptr = fullbuf;
-    buflen         = fullsize;
-
-    ESP_LOGD(TAG, "req: %s", buf);
-
-    char *line = strtok_r(save_ptr, new_line, &save_ptr);
-
-    if (line)
-    {
-        /* captive portal functionality: redirect to access point IP for HOST that are not the access point IP OR the
-         * STA IP */
-        int   lenH = 0;
-        char *host = http_server_get_header(save_ptr, "Host: ", &lenH);
-        /* determine if Host is from the STA IP address */
-
-        const sta_ip_string_t ip_str = sta_ip_safe_get(portMAX_DELAY);
-        bool access_from_sta_ip      = ('\0' == ip_str.buf[0]) || ((lenH > 0) && (NULL != strstr(host, ip_str.buf)));
-
-        ESP_LOGD(TAG, "Host: %.*s", lenH, host);
-        ESP_LOGD(TAG, "StaticIP: %s", ip_str.buf);
-        if ((lenH > 0) && (NULL == strstr(host, DEFAULT_AP_IP)) && (!access_from_sta_ip))
-        {
-            http_server_netconn_resp_302(conn);
-        }
-        else
-        {
-            const http_server_resp_t resp = http_server_handle_req(line, save_ptr);
-            switch (resp.http_resp_code)
-            {
-                case HTTP_RESP_CODE_200:
-                    http_server_netconn_resp_200(conn, &resp);
-                    break;
-                case HTTP_RESP_CODE_400:
-                    http_server_netconn_resp_400(conn);
-                    break;
-                case HTTP_RESP_CODE_404:
-                    http_server_netconn_resp_404(conn);
-                    break;
-                case HTTP_RESP_CODE_503:
-                    http_server_netconn_resp_503(conn);
-                    break;
-                default:
-                    http_server_netconn_resp_503(conn);
-                    break;
-            }
+            ESP_LOGD(TAG, "Header Content-Length: %d, body not found", content_len);
+            // read more data
         }
     }
     else
     {
-        http_server_netconn_resp_404(conn);
+        *p_req_ready = true;
     }
+    return true;
+}
+
+void
+http_server_netconn_serve(struct netconn *conn)
+{
+    static const char new_line[] = { "\n" };
+
+    char     req_buf[FULLBUF_SIZE + 1];
+    uint32_t req_size  = 0;
+    bool     req_ready = false;
+
+    while (!req_ready)
+    {
+        if (!http_server_recv_and_handle(conn, &req_buf[0], &req_size, &req_ready))
+        {
+            break;
+        }
+    }
+
+    if (!req_ready)
+    {
+        ESP_LOGW(TAG, "the connection was closed by the client side");
+        return;
+    }
+    ESP_LOGD(TAG, "req: %s", req_buf);
+
+    char *save_ptr = req_buf;
+    char *p_line   = strtok_r(save_ptr, new_line, &save_ptr);
+
+    if (NULL == p_line)
+    {
+        http_server_netconn_resp_404(conn);
+        return;
+    }
+    /* captive portal functionality: redirect to access point IP for HOST that are not the access point IP OR the
+     * STA IP */
+    int   host_len = 0;
+    char *p_host   = http_server_get_header(save_ptr, "Host: ", &host_len);
+    /* determine if Host is from the STA IP address */
+
+    const sta_ip_string_t ip_str  = sta_ip_safe_get(portMAX_DELAY);
+    const bool access_from_sta_ip = ('\0' == ip_str.buf[0]) || ((host_len > 0) && (NULL != strstr(p_host, ip_str.buf)));
+
+    ESP_LOGD(TAG, "Host: %.*s", host_len, p_host);
+    ESP_LOGD(TAG, "StaticIP: %s", ip_str.buf);
+    if ((host_len > 0) && (NULL == strstr(p_host, DEFAULT_AP_IP)) && (!access_from_sta_ip))
+    {
+        http_server_netconn_resp_302(conn);
+        return;
+    }
+    http_server_resp_t resp = http_server_handle_req(p_line, save_ptr);
+    switch (resp.http_resp_code)
+    {
+        case HTTP_RESP_CODE_200:
+            http_server_netconn_resp_200(conn, &resp);
+            return;
+        case HTTP_RESP_CODE_400:
+            http_server_netconn_resp_400(conn);
+            return;
+        case HTTP_RESP_CODE_404:
+            http_server_netconn_resp_404(conn);
+            return;
+        case HTTP_RESP_CODE_503:
+            http_server_netconn_resp_503(conn);
+            return;
+    }
+    assert(0);
+    http_server_netconn_resp_503(conn);
 }

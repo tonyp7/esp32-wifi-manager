@@ -50,6 +50,10 @@ json_access_points_init(void)
 void
 json_access_points_deinit(void)
 {
+    /* This is a public API of json_access_points.c
+     * It's empty because internal buffer g_json_access_points_buf is statically allocated
+     * and it does not require deinit actions.
+     * */
 }
 
 void
@@ -69,7 +73,7 @@ json_access_points_generate(const wifi_ap_record_t *p_access_points, const uint3
         const wifi_ap_record_t ap = p_access_points[i];
 
         str_buf_printf(&str_buf, "{\"ssid\":");
-        json_print_escaped_string(&str_buf, (char *)ap.ssid);
+        json_print_escaped_string(&str_buf, (const char *)ap.ssid);
 
         /* print the rest of the json for this access point: no more string to escape */
         str_buf_printf(

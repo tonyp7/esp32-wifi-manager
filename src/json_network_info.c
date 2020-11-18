@@ -46,6 +46,10 @@ json_network_info_init(void)
 void
 json_network_info_deinit(void)
 {
+    /* This is a public API of json_network_info.c
+     * It's empty because internal buffer g_json_network_info_buf is statically allocated
+     * and it does not require deinit actions.
+     * */
 }
 
 const char *

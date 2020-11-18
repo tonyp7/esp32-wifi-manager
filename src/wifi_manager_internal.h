@@ -36,7 +36,7 @@ wifi_manager_lock_json_buffer(TickType_t xTicksToWait);
  * @brief Releases the json buffer mutex.
  */
 void
-wifi_manager_unlock_json_buffer();
+wifi_manager_unlock_json_buffer(void);
 
 http_server_resp_t
 wifi_manager_cb_on_http_get(const char *path);

@@ -9,8 +9,12 @@
 #include "wifi_manager_defs.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
+#include "log.h"
 
 static QueueHandle_t gh_wifiman_msg_queue;
+
+/* @brief tag used for ESP serial console messages */
+static const char TAG[] = "wifi_manager";
 
 bool
 wifiman_msg_init(void)
@@ -20,6 +24,7 @@ wifiman_msg_init(void)
     gh_wifiman_msg_queue = xQueueCreate(queue_length, sizeof(queue_message));
     if (NULL == gh_wifiman_msg_queue)
     {
+        LOG_ERR("%s failed", "xQueueCreate");
         return false;
     }
     return true;
@@ -38,6 +43,7 @@ wifiman_msg_recv(queue_message *p_msg)
     const BaseType_t xStatus = xQueueReceive(gh_wifiman_msg_queue, p_msg, portMAX_DELAY);
     if (pdPASS != xStatus)
     {
+        LOG_ERR("%s failed", "xQueueReceive");
         return false;
     }
     return true;
@@ -73,7 +79,7 @@ wifiman_msg_send(const message_code_t code, const wifiman_msg_param_t msg_param)
     };
     if (pdTRUE != xQueueSend(gh_wifiman_msg_queue, &msg, portMAX_DELAY))
     {
-        // TODO: add LOG_ERR
+        LOG_ERR("%s failed", "xQueueSend");
         return false;
     }
     return true;

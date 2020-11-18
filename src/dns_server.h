@@ -121,11 +121,9 @@ typedef struct __attribute__((__packed__)) dns_answer_t
 } dns_answer_t;
 
 void
-dns_server(void *pvParameters);
+dns_server_start(void);
 void
-dns_server_start();
-void
-dns_server_stop();
+dns_server_stop(void);
 
 #ifdef __cplusplus
 }
