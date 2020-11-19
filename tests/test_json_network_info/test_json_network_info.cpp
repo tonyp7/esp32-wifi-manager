@@ -73,7 +73,9 @@ TEST_F(TestJsonNetworkInfo, test_generate_connection_ok) // NOLINT
         { "192.168.0.1" },
         { "255.255.255.0" },
     };
-    json_network_info_generate("test_ssid", &network_info, UPDATE_CONNECTION_OK);
+
+    const wifi_ssid_t ssid = { "test_ssid" };
+    json_network_info_generate(&ssid, &network_info, UPDATE_CONNECTION_OK);
     const char *json_str = json_network_info_get();
     ASSERT_EQ(
         string("{"
@@ -93,7 +95,8 @@ TEST_F(TestJsonNetworkInfo, test_generate_failed_attempt) // NOLINT
         { "192.168.0.1" },
         { "255.255.255.0" },
     };
-    json_network_info_generate("test_ssid", &network_info, UPDATE_FAILED_ATTEMPT);
+    const wifi_ssid_t ssid = { "test_ssid" };
+    json_network_info_generate(&ssid, &network_info, UPDATE_FAILED_ATTEMPT);
     const char *json_str = json_network_info_get();
     ASSERT_EQ(
         string("{"
@@ -113,7 +116,8 @@ TEST_F(TestJsonNetworkInfo, test_generate_user_disconnect) // NOLINT
         { "192.168.0.1" },
         { "255.255.255.0" },
     };
-    json_network_info_generate("test_ssid", &network_info, UPDATE_USER_DISCONNECT);
+    const wifi_ssid_t ssid = { "test_ssid" };
+    json_network_info_generate(&ssid, &network_info, UPDATE_USER_DISCONNECT);
     const char *json_str = json_network_info_get();
     ASSERT_EQ(
         string("{"
@@ -133,7 +137,8 @@ TEST_F(TestJsonNetworkInfo, test_generate_lost_connection) // NOLINT
         { "192.168.0.1" },
         { "255.255.255.0" },
     };
-    json_network_info_generate("test_ssid", &network_info, UPDATE_LOST_CONNECTION);
+    const wifi_ssid_t ssid = { "test_ssid" };
+    json_network_info_generate(&ssid, &network_info, UPDATE_LOST_CONNECTION);
     const char *json_str = json_network_info_get();
     ASSERT_EQ(
         string("{"

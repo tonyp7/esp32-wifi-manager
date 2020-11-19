@@ -30,6 +30,20 @@ OTHER DEALINGS IN THE SOFTWARE.
 #include <stdbool.h>
 #include "str_buf.h"
 
+static void
+json_print_char_escaped(str_buf_t *p_str_buf, const char in_chr)
+{
+    if (in_chr >= '\x20')
+    {
+        /* normal character, copy */
+        str_buf_printf(p_str_buf, "%c", in_chr);
+    }
+    else
+    {
+        str_buf_printf(p_str_buf, "\\u%04x", in_chr);
+    }
+}
+
 bool
 json_print_escaped_string(str_buf_t *p_str_buf, const char *p_input_str)
 {
@@ -72,15 +86,7 @@ json_print_escaped_string(str_buf_t *p_str_buf, const char *p_input_str)
                 str_buf_printf(p_str_buf, "\\t");
                 break;
             default:
-                if (in_chr >= '\x20')
-                {
-                    /* normal character, copy */
-                    str_buf_printf(p_str_buf, "%c", in_chr);
-                }
-                else
-                {
-                    str_buf_printf(p_str_buf, "\\u%04x", in_chr);
-                }
+                json_print_char_escaped(p_str_buf, in_chr);
                 break;
         }
     }

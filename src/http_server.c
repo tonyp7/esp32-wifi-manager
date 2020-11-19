@@ -66,6 +66,7 @@ function to process requests, decode URLs, serve files, etc. etc.
 #include "os_task.h"
 #include "app_malloc.h"
 #include "str_buf.h"
+#include "wifi_sta_config.h"
 
 #define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
 #include "log.h"
@@ -81,7 +82,7 @@ typedef int file_read_result_t;
  * @see void http_server_start()
  */
 static _Noreturn void
-http_server_task(void *pvParameters);
+http_server_task(void *p_param);
 
 //#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
 /* @brief tag used for ESP serial console messages */
@@ -355,10 +356,11 @@ http_server_start(void)
     if (task_http_server == NULL)
     {
         ESP_LOGI(TAG, "Run http_server");
+        const uint32_t stack_depth = 20U * 1024U;
         if (!os_task_create(
                 &http_server_task,
                 "http_server",
-                20 * 1024,
+                stack_depth,
                 NULL,
                 WIFI_MANAGER_TASK_PRIORITY - 1,
                 &task_http_server))
@@ -383,12 +385,13 @@ http_server_stop(void)
 }
 
 static _Noreturn void
-http_server_task(void *pvParameters)
+http_server_task(ATTR_UNUSED void *p_param)
 {
     struct netconn *conn, *newconn;
     err_t           err;
-    conn = netconn_new(NETCONN_TCP);
-    netconn_bind(conn, IP_ADDR_ANY, 80);
+    conn                  = netconn_new(NETCONN_TCP);
+    const u16_t http_port = 80U;
+    netconn_bind(conn, IP_ADDR_ANY, http_port);
     netconn_listen(conn);
     ESP_LOGI(TAG, "HTTP Server listening on 80/tcp");
     for (;;)
@@ -432,7 +435,7 @@ http_server_get_header(char *request, char *header_name, int *len)
     {
         ret = ptr + strlen(header_name);
         ptr = ret;
-        while (*ptr != '\0' && *ptr != '\n' && *ptr != '\r')
+        while ((*ptr != '\0') && (*ptr != '\n') && (*ptr != '\r'))
         {
             (*len)++;
             ptr++;
@@ -442,26 +445,21 @@ http_server_get_header(char *request, char *header_name, int *len)
     return NULL;
 }
 
-char *
-get_http_body(char *msg, int len, int *blen)
+static char *
+get_http_body(char *msg, uint32_t len, uint32_t *p_body_len)
 {
     char *newlines = "\r\n\r\n";
     char *p        = strstr(msg, newlines);
-    if (p)
-    {
-        p += strlen(newlines);
-    }
-    else
+    if (NULL == p)
     {
         ESP_LOGD(TAG, "http body not found: %s", msg);
         return 0;
     }
-
-    if (blen)
+    p += strlen(newlines);
+    if (NULL != p_body_len)
     {
-        *blen = len - (p - msg);
+        *p_body_len = len - (uint32_t)(ptrdiff_t)(p - msg);
     }
-
     return p;
 }
 
@@ -476,7 +474,8 @@ http_server_handle_req_get(const char *p_file_name)
         if (0 == strcmp(p_file_name, "ap.json"))
         {
             /* if we can get the mutex, write the last version of the AP list */
-            if (!wifi_manager_lock_json_buffer((TickType_t)10))
+            const TickType_t ticks_to_wait = 10U;
+            if (!wifi_manager_lock_json_buffer(ticks_to_wait))
             {
                 ESP_LOGD(TAG, "http_server_netconn_serve: GET /ap.json failed to obtain mutex");
                 ESP_LOGI(TAG, "ap.json: 503");
@@ -495,7 +494,8 @@ http_server_handle_req_get(const char *p_file_name)
         }
         else if (0 == strcmp(p_file_name, "status.json"))
         {
-            if (!wifi_manager_lock_json_buffer((TickType_t)10))
+            const TickType_t ticks_to_wait = 10U;
+            if (!wifi_manager_lock_json_buffer(ticks_to_wait))
             {
                 ESP_LOGD(TAG, "http_server_netconn_serve: GET /status failed to obtain mutex");
                 ESP_LOGI(TAG, "status.json: 503");
@@ -543,10 +543,8 @@ http_server_handle_req_post(const char *p_file_name, char *save_ptr)
         char *password = http_server_get_header(save_ptr, "X-Custom-pwd: ", &lenP);
         if ((NULL != ssid) && (lenS <= MAX_SSID_SIZE) && (NULL != password) && (lenP <= MAX_PASSWORD_SIZE))
         {
-            wifi_config_t *config = wifi_manager_get_wifi_sta_config();
-            memset(config, 0x00, sizeof(wifi_config_t));
-            memcpy(config->sta.ssid, ssid, lenS);
-            memcpy(config->sta.password, password, lenP);
+            wifi_sta_config_set_ssid_and_password(ssid, lenS, password, lenP);
+
             ESP_LOGD(TAG, "http_server_netconn_serve: wifi_manager_connect_async() call");
             wifi_manager_connect_async();
             return http_server_resp_200_json("{}");
@@ -569,7 +567,7 @@ http_server_handle_req(char *line, char *save_ptr)
         return http_server_resp_400();
     }
     const char * http_cmd     = line;
-    const size_t http_cmd_len = p - line;
+    const size_t http_cmd_len = (size_t)(ptrdiff_t)(p - line);
     char *       path         = p + 1;
     if ('/' == path[0])
     {
@@ -634,7 +632,7 @@ http_server_recv_and_handle(struct netconn *p_conn, char *p_req_buf, uint32_t *p
     if (NULL != p_content_len_str)
     {
         const int   content_len = atoi(p_content_len_str);
-        int         body_len    = 0;
+        uint32_t    body_len    = 0;
         const char *p_body      = get_http_body(p_req_buf, *p_req_size, &body_len);
         if (NULL != p_body)
         {

@@ -83,6 +83,7 @@ case $1 in
         gcovr . --delete --sonarqube $BUILD_TESTS/test-coverage.xml
         test ${?} -eq 0 || exit 1
         find . -type f -name '*.gcno' -delete
+        ls -la $BUILD_TESTS/test-coverage.xml
 
         echo Run sonar-scanner
         # sonar.tests is getting from sonar-project.properties

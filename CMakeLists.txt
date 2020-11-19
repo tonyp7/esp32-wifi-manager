@@ -1,6 +1,10 @@
 if(IDF_VERSION_MAJOR GREATER_EQUAL 4)
     idf_component_register(
         SRCS
+            src/include/wifi_manager.h
+            src/include/wifi_manager_defs.h
+            src/include/http_server_resp.h
+            src/include/http_server.h
             src/access_points_list.c
             src/access_points_list.h
             src/ap_mac.h
@@ -15,15 +19,14 @@ if(IDF_VERSION_MAJOR GREATER_EQUAL 4)
             src/json_network_info.c
             src/json_network_info.h
             src/http_server_resp.c
-            src/http_server_resp.h
             src/sta_ip.h
             src/sta_ip_safe.c
             src/sta_ip_safe.h
             src/sta_ip_unsafe.c
             src/sta_ip_unsafe.h
             src/wifi_manager.c
-            src/wifi_manager.h
-            src/wifi_manager_defs.h
+            src/wifi_sta_config.c
+            src/wifi_sta_config.h
             src/wifiman_msg.c
             src/wifiman_msg.h
         REQUIRES
@@ -36,7 +39,7 @@ if(IDF_VERSION_MAJOR GREATER_EQUAL 4)
             json
             ruuvi.esp_wrappers.c
         INCLUDE_DIRS
-            src
+            src/include
         PRIV_INCLUDE_DIRS
             ../ruuvi.esp_wrappers.c/include
         )

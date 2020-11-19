@@ -65,7 +65,8 @@ dns_server(ATTR_UNUSED void *p_params);
 void
 dns_server_start(void)
 {
-    if (!os_task_create(&dns_server, "dns_server", 3072, NULL, WIFI_MANAGER_TASK_PRIORITY - 1, &task_dns_server))
+    const uint32_t stack_depth = 3072U;
+    if (!os_task_create(&dns_server, "dns_server", stack_depth, NULL, WIFI_MANAGER_TASK_PRIORITY - 1, &task_dns_server))
     {
         LOG_ERR("Can't create thread");
     }
@@ -89,8 +90,9 @@ replace_non_ascii_with_dots(char *p_domain)
     {
         if ((*p_ch < ' ') || (*p_ch > 'z'))
         {
-            *p_ch = '.'; /* technically we should test if the first two bits are 00 (e.g. if( (*c & 0xC0) == 0x00)
-                          *c = '.') but this makes the code a lot more readable */
+            /* Technically we should test if the first two bits are 00 (e.g. '0x00 == (*p_ch & 0xC0)')
+             * but this makes the code a lot more readable */
+            *p_ch = '.';
         }
     }
 }
@@ -152,13 +154,13 @@ dns_server_handle_req(const ip4_addr_t *p_ip_resolved)
 
     /* create DNS answer at the end of the query*/
     dns_answer_t *dns_answer = (dns_answer_t *)&response[length];
-    dns_answer->NAME         = __bswap_16(
+    dns_answer->NAME         = htons(
         0xC00C); /* This is a pointer to the beginning of the question.
                           * As per DNS standard, first two bits must be set to 11 for some odd reason hence 0xC0 */
-    dns_answer->TYPE     = __bswap_16(DNS_ANSWER_TYPE_A);
-    dns_answer->CLASS    = __bswap_16(DNS_ANSWER_CLASS_IN);
+    dns_answer->TYPE     = htons(DNS_ANSWER_TYPE_A);
+    dns_answer->CLASS    = htons(DNS_ANSWER_CLASS_IN);
     dns_answer->TTL      = (uint32_t)0x00000000; /* no caching. Avoids DNS poisoning since this is a DNS hijack */
-    dns_answer->RDLENGTH = __bswap_16(0x0004);   /* 4 byte => size of an ipv4 address */
+    dns_answer->RDLENGTH = htons(0x0004);        /* 4 byte => size of an ipv4 address */
     dns_answer->RDATA    = p_ip_resolved->addr;
 
     int err = sendto(socket_fd, response, length + sizeof(dns_answer_t), 0, (struct sockaddr *)&client, client_len);

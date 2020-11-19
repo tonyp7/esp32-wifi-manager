@@ -42,24 +42,6 @@ extern "C" {
 
 typedef void (*wifi_manager_cb_ptr)(void *);
 
-/**
- * The actual WiFi settings in use
- */
-struct wifi_settings_t
-{
-    uint8_t                 ap_ssid[MAX_SSID_SIZE];
-    uint8_t                 ap_pwd[MAX_PASSWORD_SIZE];
-    uint8_t                 ap_channel;
-    uint8_t                 ap_ssid_hidden;
-    wifi_bandwidth_t        ap_bandwidth;
-    bool                    sta_only;
-    wifi_ps_type_t          sta_power_save;
-    bool                    sta_static_ip;
-    tcpip_adapter_ip_info_t sta_static_ip_config;
-};
-
-extern struct wifi_settings_t wifi_settings;
-
 typedef struct
 {
     wifi_ant_gpio_config_t wifiAntGpioConfig;
@@ -67,7 +49,7 @@ typedef struct
 } WiFiAntConfig_t;
 
 /**
- * Allocate heap memory for the wifi manager and start the wifi_manager RTOS task
+ * @brief Allocate heap memory for the wifi manager and start the wifi_manager RTOS task.
  */
 void
 wifi_manager_start(
@@ -77,50 +59,16 @@ wifi_manager_start(
     wifi_manager_http_callback_t   cb_on_http_delete);
 
 /**
- * Frees up all memory allocated by the wifi_manager and kill the task.
+ * @brief Stop wifi manager and deallocate resources.
  */
-void
-wifi_manager_destroy(void);
-
-/**
- * Filters the AP scan list to unique SSIDs
- */
-void
-filter_unique(wifi_ap_record_t *aplist, uint16_t *ap_num);
-
-/**
- * @brief clears the current STA wifi config in flash ram storage.
- */
-esp_err_t
-wifi_manager_clear_sta_config(void);
-
-/**
- * @brief saves the current STA wifi config to flash ram storage.
- */
-esp_err_t
-wifi_manager_save_sta_config(void);
-
-/**
- * @brief fetch a previously STA wifi config in the flash ram storage.
- * @return true if a previously saved config was found, false otherwise.
- */
-bool
-wifi_manager_fetch_wifi_sta_config(void);
-
-wifi_config_t *
-wifi_manager_get_wifi_sta_config(void);
-
-const char *
-wifi_manager_get_wifi_sta_ssid(void);
-
 void
 wifi_manager_stop(void);
 
 /**
- * @brief A standard wifi event handler as recommended by Espressif
+ * @brief clears the current STA wifi config in flash ram storage.
  */
-void
-wifi_manager_event_handler(void *ctx, esp_event_base_t event_base, int32_t event_id, void *event_data);
+bool
+wifi_manager_clear_sta_config(void);
 
 /**
  * @brief requests a connection to an access point that will be process in the main task thread.

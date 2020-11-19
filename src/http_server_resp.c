@@ -11,11 +11,13 @@ static http_server_resp_t
 http_server_resp_err(const http_resp_code_e http_resp_code)
 {
     const http_server_resp_t resp = {
-        .http_resp_code                  = http_resp_code,
-        .content_location                = HTTP_CONTENT_LOCATION_NO_CONTENT,
-        .content_type                    = HTTP_CONENT_TYPE_TEXT_HTML,
-        .content_len                     = 0,
-        .content_encoding                = HTTP_CONENT_ENCODING_NONE,
+        .http_resp_code       = http_resp_code,
+        .content_location     = HTTP_CONTENT_LOCATION_NO_CONTENT,
+        .flag_no_cache        = false,
+        .content_type         = HTTP_CONENT_TYPE_TEXT_HTML,
+        .p_content_type_param = NULL,
+        .content_len          = 0,
+        .content_encoding     = HTTP_CONENT_ENCODING_NONE,
         .select_location = {
             .memory = {
                 .p_buf = NULL,
@@ -54,6 +56,7 @@ http_server_resp_data_in_flash(
     const http_server_resp_t resp = {
         .http_resp_code       = HTTP_RESP_CODE_200,
         .content_location     = HTTP_CONTENT_LOCATION_FLASH_MEM,
+        .flag_no_cache        = false,
         .content_type         = content_type,
         .p_content_type_param = p_content_type_param,
         .content_len          = content_len,
@@ -130,6 +133,7 @@ http_server_resp_data_from_file(
     const http_server_resp_t resp = {
         .http_resp_code       = HTTP_RESP_CODE_200,
         .content_location     = HTTP_CONTENT_LOCATION_FATFS,
+        .flag_no_cache        = false,
         .content_type         = content_type,
         .p_content_type_param = p_content_type_param,
         .content_len          = content_len,

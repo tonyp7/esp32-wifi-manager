@@ -20,7 +20,7 @@ void
 ap_list_clear_identical_ap(wifi_ap_record_t *p_ap_src, wifi_ap_record_t *p_ap_dst)
 {
     /* same SSID, different auth mode is skipped */
-    if ((strcmp((const char *)p_ap_src->ssid, (const char *)p_ap_dst->ssid) == 0)
+    if ((0 == strcmp((const char *)p_ap_src->ssid, (const char *)p_ap_dst->ssid))
         && (p_ap_src->authmode == p_ap_dst->authmode))
     {
         /* save the rssi for the display */
@@ -40,7 +40,7 @@ ap_list_clear_identical_aps(wifi_ap_record_t *p_arr_of_ap, const number_wifi_acc
     {
         return;
     }
-    for (uint32_t i = 0; i < num_aps - 1; ++i)
+    for (uint32_t i = 0; i < (num_aps - 1); ++i)
     {
         wifi_ap_record_t *p_ap = &p_arr_of_ap[i];
         if ('\0' == p_ap->ssid[0])

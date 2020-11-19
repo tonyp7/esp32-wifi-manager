@@ -46,11 +46,21 @@ extern "C" {
  */
 #define MAX_SSID_SIZE 32
 
+typedef struct wifi_ssid_t
+{
+    char ssid_buf[MAX_SSID_SIZE];
+} wifi_ssid_t;
+
 /**
  * @brief Defines the maximum size of a WPA2 passkey. 64 is IEEE standard.
  * @warning limit is also hard coded in wifi_config_t. Never extend this value.
  */
 #define MAX_PASSWORD_SIZE 64
+
+typedef struct wifi_password_t
+{
+    char password_buf[MAX_PASSWORD_SIZE];
+} wifi_password_t;
 
 /**
  * @brief Defines the maximum number of access points that can be scanned.

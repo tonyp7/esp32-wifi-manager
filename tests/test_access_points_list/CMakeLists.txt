@@ -9,7 +9,7 @@ add_executable(${ProjectId}
         include/esp_event_base.h
         ../../src/access_points_list.c
         ../../src/access_points_list.h
-        ../../src/wifi_manager_defs.h
+        ../../src/include/wifi_manager_defs.h
 )
 
 set_target_properties(${ProjectId} PROPERTIES
@@ -20,6 +20,7 @@ set_target_properties(${ProjectId} PROPERTIES
 target_include_directories(${ProjectId} PUBLIC
         ${gtest_SOURCE_DIR}/include
         ${gtest_SOURCE_DIR}
+        ../../src/include
         ../../src
         include
         ${CMAKE_CURRENT_SOURCE_DIR}
