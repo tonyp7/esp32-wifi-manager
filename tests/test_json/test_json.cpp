@@ -44,7 +44,17 @@ TestJson::~TestJson()
 
 /*** Unit-Tests *******************************************************************************************************/
 
-TEST_F(TestJson, test_null_output_buf) // NOLINT
+TEST_F(TestJson, test_null_output_buf_null_input_buf) // NOLINT
+{
+    ASSERT_FALSE(json_print_escaped_string(nullptr, nullptr));
+}
+
+TEST_F(TestJson, test_null_output_buf_nonnull_input_buf) // NOLINT
+{
+    ASSERT_FALSE(json_print_escaped_string(nullptr, "abc"));
+}
+
+TEST_F(TestJson, test_nullptr_in_output_buf) // NOLINT
 {
     str_buf_t str_buf = STR_BUF_INIT(nullptr, 0);
     ASSERT_FALSE(json_print_escaped_string(&str_buf, nullptr));
@@ -390,4 +400,162 @@ TEST_F(TestJson, test_ascii) // NOLINT
     quoted_ascii_str += ascii_str;
     quoted_ascii_str += "\"";
     ASSERT_EQ(quoted_ascii_str, string(buf));
+}
+
+TEST_F(TestJson, test_overflow_on_closing_quote) // NOLINT
+{
+    char buf[5];
+
+    memset(buf, 0, sizeof(buf));
+    str_buf_t str_buf = STR_BUF_INIT_WITH_ARR(buf);
+    ASSERT_TRUE(json_print_escaped_string(&str_buf, "ab"));
+    ASSERT_EQ("\"ab\"", string(buf));
+
+    memset(buf, 0, sizeof(buf));
+    str_buf = STR_BUF_INIT_WITH_ARR(buf);
+    ASSERT_FALSE(json_print_escaped_string(&str_buf, "abc"));
+}
+
+TEST_F(TestJson, test_overflow_on_escaped_char) // NOLINT
+{
+    char      buf[9];
+    str_buf_t str_buf = STR_BUF_INIT_WITH_ARR(buf);
+    ASSERT_TRUE(json_print_escaped_string(&str_buf, "\x1f"));
+    ASSERT_EQ("\"\\u001f\"", string(buf));
+
+    memset(buf, 0, sizeof(buf));
+    str_buf = STR_BUF_INIT_WITH_ARR(buf);
+    ASSERT_FALSE(json_print_escaped_string(&str_buf, "a\x1f"));
+
+    memset(buf, 0, sizeof(buf));
+    str_buf = STR_BUF_INIT_WITH_ARR(buf);
+    ASSERT_FALSE(json_print_escaped_string(&str_buf, "ab\x1f"));
+}
+
+TEST_F(TestJson, test_overflow_on_unescaped_char) // NOLINT
+{
+    char      buf[4];
+    str_buf_t str_buf = STR_BUF_INIT_WITH_ARR(buf);
+    ASSERT_TRUE(json_print_escaped_string(&str_buf, "A"));
+    ASSERT_EQ("\"A\"", string(buf));
+
+    memset(buf, 0, sizeof(buf));
+    str_buf = STR_BUF_INIT_WITH_ARR(buf);
+    ASSERT_FALSE(json_print_escaped_string(&str_buf, "aA"));
+
+    memset(buf, 0, sizeof(buf));
+    str_buf = STR_BUF_INIT_WITH_ARR(buf);
+    ASSERT_FALSE(json_print_escaped_string(&str_buf, "abA"));
+}
+
+TEST_F(TestJson, test_overflow_on_escaped_quote) // NOLINT
+{
+    char      buf[5];
+    str_buf_t str_buf = STR_BUF_INIT_WITH_ARR(buf);
+    ASSERT_TRUE(json_print_escaped_string(&str_buf, "\""));
+    ASSERT_EQ("\"\\\"\"", string(buf));
+
+    memset(buf, 0, sizeof(buf));
+    str_buf = STR_BUF_INIT_WITH_ARR(buf);
+    ASSERT_FALSE(json_print_escaped_string(&str_buf, "a\""));
+
+    memset(buf, 0, sizeof(buf));
+    str_buf = STR_BUF_INIT_WITH_ARR(buf);
+    ASSERT_FALSE(json_print_escaped_string(&str_buf, "ab\""));
+}
+
+TEST_F(TestJson, test_overflow_on_escaped_slash) // NOLINT
+{
+    char      buf[5];
+    str_buf_t str_buf = STR_BUF_INIT_WITH_ARR(buf);
+    ASSERT_TRUE(json_print_escaped_string(&str_buf, "\\"));
+    ASSERT_EQ("\"\\\\\"", string(buf));
+
+    memset(buf, 0, sizeof(buf));
+    str_buf = STR_BUF_INIT_WITH_ARR(buf);
+    ASSERT_FALSE(json_print_escaped_string(&str_buf, "a\\"));
+
+    memset(buf, 0, sizeof(buf));
+    str_buf = STR_BUF_INIT_WITH_ARR(buf);
+    ASSERT_FALSE(json_print_escaped_string(&str_buf, "ab\\"));
+}
+
+TEST_F(TestJson, test_overflow_on_escaped_ctrl_b) // NOLINT
+{
+    char      buf[5];
+    str_buf_t str_buf = STR_BUF_INIT_WITH_ARR(buf);
+    ASSERT_TRUE(json_print_escaped_string(&str_buf, "\b"));
+    ASSERT_EQ("\"\\b\"", string(buf));
+
+    memset(buf, 0, sizeof(buf));
+    str_buf = STR_BUF_INIT_WITH_ARR(buf);
+    ASSERT_FALSE(json_print_escaped_string(&str_buf, "a\b"));
+
+    memset(buf, 0, sizeof(buf));
+    str_buf = STR_BUF_INIT_WITH_ARR(buf);
+    ASSERT_FALSE(json_print_escaped_string(&str_buf, "ab\b"));
+}
+
+TEST_F(TestJson, test_overflow_on_escaped_ctrl_f) // NOLINT
+{
+    char      buf[5];
+    str_buf_t str_buf = STR_BUF_INIT_WITH_ARR(buf);
+    ASSERT_TRUE(json_print_escaped_string(&str_buf, "\f"));
+    ASSERT_EQ("\"\\f\"", string(buf));
+
+    memset(buf, 0, sizeof(buf));
+    str_buf = STR_BUF_INIT_WITH_ARR(buf);
+    ASSERT_FALSE(json_print_escaped_string(&str_buf, "a\f"));
+
+    memset(buf, 0, sizeof(buf));
+    str_buf = STR_BUF_INIT_WITH_ARR(buf);
+    ASSERT_FALSE(json_print_escaped_string(&str_buf, "ab\f"));
+}
+
+TEST_F(TestJson, test_overflow_on_escaped_ctrl_n) // NOLINT
+{
+    char      buf[5];
+    str_buf_t str_buf = STR_BUF_INIT_WITH_ARR(buf);
+    ASSERT_TRUE(json_print_escaped_string(&str_buf, "\n"));
+    ASSERT_EQ("\"\\n\"", string(buf));
+
+    memset(buf, 0, sizeof(buf));
+    str_buf = STR_BUF_INIT_WITH_ARR(buf);
+    ASSERT_FALSE(json_print_escaped_string(&str_buf, "a\n"));
+
+    memset(buf, 0, sizeof(buf));
+    str_buf = STR_BUF_INIT_WITH_ARR(buf);
+    ASSERT_FALSE(json_print_escaped_string(&str_buf, "ab\n"));
+}
+
+TEST_F(TestJson, test_overflow_on_escaped_ctrl_r) // NOLINT
+{
+    char      buf[5];
+    str_buf_t str_buf = STR_BUF_INIT_WITH_ARR(buf);
+    ASSERT_TRUE(json_print_escaped_string(&str_buf, "\r"));
+    ASSERT_EQ("\"\\r\"", string(buf));
+
+    memset(buf, 0, sizeof(buf));
+    str_buf = STR_BUF_INIT_WITH_ARR(buf);
+    ASSERT_FALSE(json_print_escaped_string(&str_buf, "a\r"));
+
+    memset(buf, 0, sizeof(buf));
+    str_buf = STR_BUF_INIT_WITH_ARR(buf);
+    ASSERT_FALSE(json_print_escaped_string(&str_buf, "ab\r"));
+}
+
+TEST_F(TestJson, test_overflow_on_escaped_ctrl_t) // NOLINT
+{
+    char      buf[5];
+    str_buf_t str_buf = STR_BUF_INIT_WITH_ARR(buf);
+    ASSERT_TRUE(json_print_escaped_string(&str_buf, "\t"));
+    ASSERT_EQ("\"\\t\"", string(buf));
+
+    memset(buf, 0, sizeof(buf));
+    str_buf = STR_BUF_INIT_WITH_ARR(buf);
+    ASSERT_FALSE(json_print_escaped_string(&str_buf, "a\t"));
+
+    memset(buf, 0, sizeof(buf));
+    str_buf = STR_BUF_INIT_WITH_ARR(buf);
+    ASSERT_FALSE(json_print_escaped_string(&str_buf, "ab\t"));
 }

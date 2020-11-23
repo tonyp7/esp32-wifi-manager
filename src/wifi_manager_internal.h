@@ -9,6 +9,7 @@
 #define RUUVI_WIFI_MANAGER_INTERNAL_H
 
 #include "wifi_manager_defs.h"
+#include "http_req.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -26,11 +27,11 @@ extern "C" {
  *
  * This is a simple wrapper around freeRTOS function xSemaphoreTake.
  *
- * @param xTicksToWait The time in ticks to wait for the semaphore to become available.
+ * @param ticks_to_wait The time in ticks to wait for the semaphore to become available.
  * @return true in success, false otherwise.
  */
 bool
-wifi_manager_lock_json_buffer(TickType_t xTicksToWait);
+wifi_manager_lock_json_buffer(const TickType_t ticks_to_wait);
 
 /**
  * @brief Releases the json buffer mutex.
@@ -39,13 +40,13 @@ void
 wifi_manager_unlock_json_buffer(void);
 
 http_server_resp_t
-wifi_manager_cb_on_http_get(const char *path);
+wifi_manager_cb_on_http_get(const char *p_path);
 
 http_server_resp_t
-wifi_manager_cb_on_http_post(const char *path, const char *body);
+wifi_manager_cb_on_http_post(const char *p_path, const http_req_body_t http_body);
 
 http_server_resp_t
-wifi_manager_cb_on_http_delete(const char *path);
+wifi_manager_cb_on_http_delete(const char *p_path);
 
 #ifdef __cplusplus
 }

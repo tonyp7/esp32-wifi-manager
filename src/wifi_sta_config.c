@@ -10,8 +10,8 @@
 #include <string.h>
 #include "nvs.h"
 #include "esp_wifi_types.h"
-#include "log.h"
 #include "wifi_manager_defs.h"
+#include "log.h"
 
 static const char TAG[] = "wifi_manager";
 
@@ -55,10 +55,10 @@ static wifi_settings_t g_wifi_settings = {
 static wifi_config_t g_wifi_config_sta;
 
 _Static_assert(
-    sizeof(g_wifi_config_sta.sta.ssid) == MAX_SSID_SIZE,
+    MAX_SSID_SIZE == sizeof(g_wifi_config_sta.sta.ssid),
     "sizeof(g_wifi_config_sta.sta.ssid) == MAX_SSID_SIZE");
 _Static_assert(
-    sizeof(g_wifi_config_sta.sta.password) == MAX_PASSWORD_SIZE,
+    MAX_PASSWORD_SIZE == sizeof(g_wifi_config_sta.sta.password),
     "sizeof(g_wifi_config_sta.sta.password) == MAX_PASSWORD_SIZE");
 
 void
@@ -69,7 +69,7 @@ wifi_sta_config_init(void)
 }
 
 static bool
-wifi_sta_nvs_open(nvs_open_mode_t open_mode, nvs_handle_t *p_handle)
+wifi_sta_nvs_open(const nvs_open_mode_t open_mode, nvs_handle_t *p_handle)
 {
     const char *    nvs_name = wifi_manager_nvs_namespace;
     const esp_err_t err      = nvs_open(nvs_name, open_mode, p_handle);
@@ -82,7 +82,7 @@ wifi_sta_nvs_open(nvs_open_mode_t open_mode, nvs_handle_t *p_handle)
 }
 
 static bool
-wifi_sta_nvs_set_blob(nvs_handle_t handle, const char *key, const void *value, const size_t length)
+wifi_sta_nvs_set_blob(const nvs_handle_t handle, const char *key, const void *value, const size_t length)
 {
     const esp_err_t esp_err = nvs_set_blob(handle, key, value, length);
     if (ESP_OK != esp_err)
@@ -94,7 +94,7 @@ wifi_sta_nvs_set_blob(nvs_handle_t handle, const char *key, const void *value, c
 }
 
 static bool
-wifi_sta_nvs_get_blob(nvs_handle_t handle, const char *key, void *p_out_buf, size_t length)
+wifi_sta_nvs_get_blob(const nvs_handle_t handle, const char *key, void *p_out_buf, size_t length)
 {
     const esp_err_t esp_err = nvs_get_blob(handle, key, p_out_buf, &length);
     if (ESP_OK != esp_err)
@@ -106,7 +106,7 @@ wifi_sta_nvs_get_blob(nvs_handle_t handle, const char *key, void *p_out_buf, siz
 }
 
 static bool
-wifi_sta_nvs_commit(nvs_handle_t handle)
+wifi_sta_nvs_commit(const nvs_handle_t handle)
 {
     const esp_err_t esp_err = nvs_commit(handle);
     if (ESP_OK != esp_err)
@@ -119,16 +119,16 @@ wifi_sta_nvs_commit(nvs_handle_t handle)
 
 static bool
 wifi_sta_config_set_by_handle(
-    nvs_handle             handle,
-    const char *           ssid,
-    const char *           password,
+    const nvs_handle       handle,
+    const char *           p_ssid,
+    const char *           p_password,
     const wifi_settings_t *p_wifi_settings)
 {
-    if (!wifi_sta_nvs_set_blob(handle, "ssid", ssid, MAX_SSID_SIZE))
+    if (!wifi_sta_nvs_set_blob(handle, "ssid", p_ssid, MAX_SSID_SIZE))
     {
         return false;
     }
-    if (!wifi_sta_nvs_set_blob(handle, "password", password, MAX_PASSWORD_SIZE))
+    if (!wifi_sta_nvs_set_blob(handle, "password", p_password, MAX_PASSWORD_SIZE))
     {
         return false;
     }
@@ -196,13 +196,17 @@ wifi_sta_config_clear(void)
 }
 
 static bool
-wifi_sta_config_read_by_handle(nvs_handle handle, char *p_ssid, char *p_password, wifi_settings_t *p_wifi_settings)
+wifi_sta_config_read_by_handle(
+    const nvs_handle handle,
+    char *           p_ssid,
+    char *           p_password,
+    wifi_settings_t *p_wifi_settings)
 {
-    if (!wifi_sta_nvs_get_blob(handle, "ssid", p_ssid, sizeof(g_wifi_config_sta.sta.ssid)))
+    if (!wifi_sta_nvs_get_blob(handle, "ssid", p_ssid, MAX_SSID_SIZE))
     {
         return false;
     }
-    if (!wifi_sta_nvs_get_blob(handle, "password", p_password, sizeof(g_wifi_config_sta.sta.password)))
+    if (!wifi_sta_nvs_get_blob(handle, "password", p_password, MAX_PASSWORD_SIZE))
     {
         return false;
     }
@@ -282,14 +286,19 @@ wifi_sta_config_get_ssid(void)
 
 void
 wifi_sta_config_set_ssid_and_password(
-    const char * ssid,
+    const char * p_ssid,
     const size_t ssid_len,
-    const char * password,
+    const char * p_password,
     const size_t password_len)
 {
     wifi_config_t *p_wifi_config = &g_wifi_config_sta;
 
     memset(p_wifi_config, 0x00, sizeof(*p_wifi_config));
-    snprintf((char *)p_wifi_config->sta.ssid, sizeof(p_wifi_config->sta.ssid), "%.*s", ssid_len, ssid);
-    snprintf((char *)p_wifi_config->sta.password, sizeof(p_wifi_config->sta.password), "%.*s", password_len, password);
+    snprintf((char *)p_wifi_config->sta.ssid, sizeof(p_wifi_config->sta.ssid), "%.*s", ssid_len, p_ssid);
+    snprintf(
+        (char *)p_wifi_config->sta.password,
+        sizeof(p_wifi_config->sta.password),
+        "%.*s",
+        password_len,
+        p_password);
 }

@@ -47,7 +47,7 @@ extern "C" {
 /**
  * @brief RCODE values used in a DNS header message
  */
-typedef enum dns_reply_code_t
+typedef enum dns_reply_code_e
 {
     DNS_REPLY_CODE_NO_ERROR            = 0,
     DNS_REPLY_CODE_FORM_ERROR          = 1,
@@ -58,17 +58,17 @@ typedef enum dns_reply_code_t
     DNS_REPLY_CODE_YXDOMAIN            = 6,
     DNS_REPLY_CODE_YXRRSET             = 7,
     DNS_REPLY_CODE_NXRRSET             = 8
-} dns_reply_code_t;
+} dns_reply_code_e;
 
 /**
  * @brief OPCODE values used in a DNS header message
  */
-typedef enum dns_opcode_code_t
+typedef enum dns_opcode_code_e
 {
     DNS_OPCODE_QUERY  = 0,
     DNS_OPCODE_IQUERY = 1,
     DNS_OPCODE_STATUS = 2
-} dns_opcode_code_t;
+} dns_opcode_code_e;
 
 /**
  * @brief Represents a 12 byte DNS header.
@@ -76,22 +76,22 @@ typedef enum dns_opcode_code_t
  */
 typedef struct __attribute__((__packed__)) dns_header_t
 {
-    uint16_t ID;         // identification number
-    uint8_t  RD : 1;     // recursion desired
-    uint8_t  TC : 1;     // truncated message
-    uint8_t  AA : 1;     // authoritive answer
-    uint8_t  OPCode : 4; // message_type
-    uint8_t  QR : 1;     // query/response flag
-    uint8_t  RCode : 4;  // response code
-    uint8_t  Z : 3;      // its z! reserved
-    uint8_t  RA : 1;     // recursion available
-    uint16_t QDCount;    // number of question entries
-    uint16_t ANCount;    // number of answer entries
-    uint16_t NSCount;    // number of authority entries
-    uint16_t ARCount;    // number of resource entries
+    uint16_t identifier;                    // identification number
+    uint8_t  flag_recursion_desired : 1;    // recursion desired
+    uint8_t  flag_truncation : 1;           // truncated message
+    uint8_t  flag_authoritative_answer : 1; // authoritive answer
+    uint8_t  operation_code : 4;            // message_type
+    uint8_t  flag_query_response : 1;       // query/response flag
+    uint8_t  response_ode : 4;              // response code
+    uint8_t  zero_bits : 3;                 // its z! reserved
+    uint8_t  flag_recursion_available : 1;  // recursion available
+    uint16_t question_count;                // number of question entries
+    uint16_t answer_record_count;           // number of answer entries
+    uint16_t authority_record_count;        // number of authority entries
+    uint16_t additional_record_count;       // number of resource entries
 } dns_header_t;
 
-typedef enum dns_answer_type_t
+typedef enum dns_answer_type_e
 {
     DNS_ANSWER_TYPE_A     = 1,
     DNS_ANSWER_TYPE_NS    = 2,
@@ -102,26 +102,27 @@ typedef enum dns_answer_type_t
     DNS_ANSWER_TYPE_MX    = 15,
     DNS_ANSWER_TYPE_SRV   = 33,
     DNS_ANSWER_TYPE_AAAA  = 28
-} dns_answer_type_t;
+} dns_answer_type_e;
 
-typedef enum dns_answer_class_t
+typedef enum dns_answer_class_e
 {
     DNS_ANSWER_CLASS_IN = 1
-} dns_answer_class_t;
+} dns_answer_class_e;
 
 typedef struct __attribute__((__packed__)) dns_answer_t
 {
-    uint16_t NAME;  /* for the sake of simplicity only 16 bit pointers are supported */
-    uint16_t TYPE;  /* Unsigned 16 bit value. The resource record types - determines the content of the RDATA field. */
-    uint16_t CLASS; /* Class of response. */
-    uint32_t TTL;   /* The time in seconds that the record may be cached. A value of 0 indicates the record should not
-                       be cached. */
-    uint16_t RDLENGTH; /* Unsigned 16-bit value that defines the length in bytes of the RDATA record. */
-    uint32_t RDATA;    /* For the sake of simplicity only ipv4 is supported, and as such it's a unsigned 32 bit */
+    uint16_t domain_name;       /* for the sake of simplicity only 16 bit pointers are supported */
+    uint16_t dns_response_type; /* The resource record types - determines the content of the dns_response_data field. */
+    uint16_t dns_response_class;
+    uint32_t time_to_live_seconds; /* The time that the record may be cached. A value of 0 indicates the record should
+                                      not be cached. */
+    uint16_t dns_response_data_length;
+    uint32_t dns_response_data; /* For the sake of simplicity only ipv4 is supported */
 } dns_answer_t;
 
-void
+bool
 dns_server_start(void);
+
 void
 dns_server_stop(void);
 

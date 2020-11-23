@@ -1,17 +1,12 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.7)
 
-project(ruuvi_esp32-wifi-manager-test-sta_ip_safe)
-set(ProjectId ruuvi_esp32-wifi-manager-test-sta_ip_safe)
+project(ruuvi_esp32-wifi-manager-test-http_server_resp)
+set(ProjectId ruuvi_esp32-wifi-manager-test-http_server_resp)
 
-add_executable(
-        ${ProjectId}
-        test_sta_ip_safe.cpp
-        ../../src/sta_ip.h
-        ../../src/sta_ip_safe.c
-        ../../src/sta_ip_safe.h
-        ../../src/sta_ip_unsafe.c
-        ../../src/sta_ip_unsafe.h
-        ../esp_simul/stub_func.c
+add_executable(${ProjectId}
+        test_http_server_resp.cpp
+        ../../src/http_server_resp.c
+        ../../src/include/http_server_resp.h
 )
 
 set_target_properties(${ProjectId} PROPERTIES
@@ -29,7 +24,7 @@ target_include_directories(${ProjectId} PUBLIC
 )
 
 target_compile_definitions(${ProjectId} PUBLIC
-        RUUVI_TESTS_STA_IP_SAFE=1
+        RUUVI_TESTS_HTTP_SERVER_RESP=1
 )
 
 target_compile_options(${ProjectId} PUBLIC
@@ -40,12 +35,16 @@ target_compile_options(${ProjectId} PUBLIC
         --coverage
 )
 
+# CMake has a target_link_options starting from version 3.13
+#target_link_options(${ProjectId} PUBLIC
+#        --coverage
+#)
+
 target_link_libraries(${ProjectId}
-        lwip
-        FreeRTOS_Posix
         gtest
         gtest_main
         gcov
+        ruuvi_esp_wrappers
         ruuvi_esp_wrappers-common_test_funcs
         --coverage
 )

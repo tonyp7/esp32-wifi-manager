@@ -34,6 +34,7 @@ Contains the freeRTOS task and all necessary support
 #include <stddef.h>
 #include "json.h"
 #include "wifi_manager_defs.h"
+#include "esp_type_wrapper.h"
 
 static char g_json_network_info_buf[JSON_IP_INFO_SIZE];
 
@@ -60,9 +61,9 @@ json_network_info_get(void)
 
 void
 json_network_info_generate(
-    const wifi_ssid_t *       p_ssid,
-    const network_info_str_t *p_network_info,
-    update_reason_code_t      update_reason_code)
+    const wifi_ssid_t *        p_ssid,
+    const network_info_str_t * p_network_info,
+    const update_reason_code_e update_reason_code)
 {
     if (NULL == p_ssid)
     {
@@ -78,23 +79,13 @@ json_network_info_generate(
     str_buf_printf(&str_buf, "{\"ssid\":");
     json_print_escaped_string(&str_buf, p_ssid->ssid_buf);
 
-    if (UPDATE_CONNECTION_OK != update_reason_code)
-    {
-        static const network_info_str_t g_network_info_empty = {
-            .ip      = { "0" },
-            .gw      = { "0" },
-            .netmask = { "0" },
-        };
-        p_network_info = &g_network_info_empty;
-    }
-
     str_buf_printf(
         &str_buf,
         ",\"ip\":\"%s\",\"netmask\":\"%s\",\"gw\":\"%s\",\"urc\":%d}\n",
         p_network_info->ip,
         p_network_info->netmask,
         p_network_info->gw,
-        (int)update_reason_code);
+        (printf_int_t)update_reason_code);
 }
 
 void

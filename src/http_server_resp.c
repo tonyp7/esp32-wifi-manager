@@ -128,7 +128,7 @@ http_server_resp_data_from_file(
     const char *                  p_content_type_param,
     const size_t                  content_len,
     const http_content_encoding_e content_encoding,
-    const int                     fd)
+    const socket_t                fd)
 {
     const http_server_resp_t resp = {
         .http_resp_code       = HTTP_RESP_CODE_200,

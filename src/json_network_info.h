@@ -56,9 +56,9 @@ json_network_info_get(void);
  */
 void
 json_network_info_generate(
-    const wifi_ssid_t *       p_ssid,
-    const network_info_str_t *p_network_info,
-    update_reason_code_t      update_reason_code);
+    const wifi_ssid_t *        p_ssid,
+    const network_info_str_t * p_network_info,
+    const update_reason_code_e update_reason_code);
 
 /**
  * @brief Clears the connection status json.

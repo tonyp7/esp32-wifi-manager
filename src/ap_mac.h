@@ -14,7 +14,7 @@
 extern "C" {
 #endif
 
-typedef struct ap_mac_tag
+typedef struct ap_mac_t
 {
     uint8_t mac[6];
 } ap_mac_t;

@@ -49,17 +49,17 @@ wifiman_msg_recv(queue_message *p_msg)
     return true;
 }
 
-connection_request_made_by_code_t
+connection_request_made_by_code_e
 wifiman_conv_param_to_conn_req(const wifiman_msg_param_t *p_param)
 {
-    const connection_request_made_by_code_t conn_req = (connection_request_made_by_code_t)p_param->val;
+    const connection_request_made_by_code_e conn_req = (connection_request_made_by_code_e)p_param->val;
     return conn_req;
 }
 
 sta_ip_address_t
 wifiman_conv_param_to_ip_addr(const wifiman_msg_param_t *p_param)
 {
-    const sta_ip_address_t ip_addr = (sta_ip_address_t)p_param->val;
+    const sta_ip_address_t ip_addr = p_param->val;
     return ip_addr;
 }
 
@@ -71,7 +71,7 @@ wifiman_conv_param_to_reason(const wifiman_msg_param_t *p_param)
 }
 
 static bool
-wifiman_msg_send(const message_code_t code, const wifiman_msg_param_t msg_param)
+wifiman_msg_send(const message_code_e code, const wifiman_msg_param_t msg_param)
 {
     const queue_message msg = {
         .code      = code,
@@ -104,7 +104,7 @@ wifiman_msg_send_cmd_start_ap(void)
 }
 
 bool
-wifiman_msg_send_cmd_connect_sta(const connection_request_made_by_code_t conn_req_code)
+wifiman_msg_send_cmd_connect_sta(const connection_request_made_by_code_e conn_req_code)
 {
     const wifiman_msg_param_t msg_param = {
         .val = conn_req_code,

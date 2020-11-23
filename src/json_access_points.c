@@ -68,7 +68,7 @@ json_access_points_generate(const wifi_ap_record_t *p_access_points, const uint3
     str_buf_t str_buf = STR_BUF_INIT_WITH_ARR(g_json_access_points_buf);
     str_buf_printf(&str_buf, "[");
     const uint32_t num_ap_checked = (num_access_points <= MAX_AP_NUM) ? num_access_points : MAX_AP_NUM;
-    for (uint32_t i = 0; i < num_ap_checked; i++)
+    for (uint32_t i = 0; i < num_ap_checked; ++i)
     {
         const wifi_ap_record_t ap = p_access_points[i];
 

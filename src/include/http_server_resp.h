@@ -9,6 +9,7 @@
 #define WIFI_MANAGER_HTTP_SERVER_RESP_H
 
 #include "wifi_manager_defs.h"
+#include "esp_type_wrapper.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -55,7 +56,7 @@ http_server_resp_data_from_file(
     const char *                  p_content_type_param,
     const size_t                  content_len,
     const http_content_encoding_e content_encoding,
-    const int                     fd);
+    const socket_t                fd);
 
 #ifdef __cplusplus
 }

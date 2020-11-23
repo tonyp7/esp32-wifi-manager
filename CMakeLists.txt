@@ -11,13 +11,15 @@ if(IDF_VERSION_MAJOR GREATER_EQUAL 4)
             src/ap_ssid.c
             src/ap_ssid.h
             src/dns_server.c
-            src/http_server.c
             src/json.c
             src/json.h
             src/json_access_points.c
             src/json_access_points.h
             src/json_network_info.c
             src/json_network_info.h
+            src/http_req.c
+            src/http_req.h
+            src/http_server.c
             src/http_server_resp.c
             src/sta_ip.h
             src/sta_ip_safe.c

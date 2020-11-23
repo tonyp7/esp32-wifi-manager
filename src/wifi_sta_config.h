@@ -75,9 +75,9 @@ wifi_sta_config_get_ssid(void);
 
 void
 wifi_sta_config_set_ssid_and_password(
-    const char * ssid,
+    const char * p_ssid,
     const size_t ssid_len,
-    const char * password,
+    const char * p_password,
     const size_t password_len);
 
 #ifdef __cplusplus

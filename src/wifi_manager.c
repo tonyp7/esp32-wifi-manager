@@ -62,6 +62,7 @@ Contains the freeRTOS task and all necessary support
 #include "wifiman_msg.h"
 #include "access_points_list.h"
 #include "wifi_sta_config.h"
+#include "http_req.h"
 
 #define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
 #include "log.h"
@@ -69,21 +70,21 @@ Contains the freeRTOS task and all necessary support
 /* @brief tag used for ESP serial console messages */
 static const char TAG[] = "wifi_manager";
 
-static SemaphoreHandle_t wifi_manager_json_mutex = NULL;
+static SemaphoreHandle_t gh_wifi_json_mutex = NULL;
 
-static uint16_t         ap_num = MAX_AP_NUM;
-static wifi_ap_record_t accessp_records[MAX_AP_NUM];
+static uint16_t         g_wifi_ap_num = MAX_AP_NUM;
+static wifi_ap_record_t g_wifi_accessp_records[MAX_AP_NUM];
 
-static wifi_manager_cb_ptr cb_ptr_arr[MESSAGE_CODE_COUNT];
+static wifi_manager_cb_ptr g_wifi_cb_ptr_arr[MESSAGE_CODE_COUNT];
 
 static wifi_manager_http_callback_t   g_wifi_cb_on_http_get;
 static wifi_manager_http_cb_on_post_t g_wifi_cb_on_http_post;
 static wifi_manager_http_callback_t   g_wifi_cb_on_http_delete;
 
 /* @brief task handle for the main wifi_manager task */
-static TaskHandle_t task_wifi_manager = NULL;
+static TaskHandle_t gh_wifi_manager_task = NULL;
 
-static EventGroupHandle_t wifi_manager_event_group;
+static EventGroupHandle_t g_wifi_manager_event_group;
 
 /* @brief indicate that the ESP32 is currently connected. */
 #define WIFI_MANAGER_WIFI_CONNECTED_BIT (BIT0)
@@ -129,7 +130,7 @@ wifi_manager_disconnect_async(void)
 
 void
 wifi_manager_start(
-    const WiFiAntConfig_t *        pWiFiAntConfig,
+    const WiFiAntConfig_t *        p_wifi_ant_config,
     wifi_manager_http_callback_t   cb_on_http_get,
     wifi_manager_http_cb_on_post_t cb_on_http_post,
     wifi_manager_http_callback_t   cb_on_http_delete)
@@ -144,7 +145,7 @@ wifi_manager_start(
         return;
     }
     /* memory allocation */
-    wifi_manager_json_mutex = xSemaphoreCreateMutex();
+    gh_wifi_json_mutex = xSemaphoreCreateMutex();
 
     ESP_ERROR_CHECK(json_access_points_init());
 
@@ -152,12 +153,12 @@ wifi_manager_start(
 
     wifi_sta_config_init();
 
-    for (int i = 0; i < MESSAGE_CODE_COUNT; i++)
+    for (message_code_e i = 0; i < MESSAGE_CODE_COUNT; ++i)
     {
-        cb_ptr_arr[i] = NULL;
+        g_wifi_cb_ptr_arr[i] = NULL;
     }
     sta_ip_safe_init();
-    wifi_manager_event_group = xEventGroupCreate();
+    g_wifi_manager_event_group = xEventGroupCreate();
 
     /* start wifi manager task */
     const char *   task_name   = "wifi_manager";
@@ -166,42 +167,42 @@ wifi_manager_start(
             &wifi_manager,
             task_name,
             stack_depth,
-            (const void *)pWiFiAntConfig,
+            (const void *)p_wifi_ant_config,
             WIFI_MANAGER_TASK_PRIORITY,
-            &task_wifi_manager))
+            &gh_wifi_manager_task))
     {
         LOG_ERR("Can't create thread: %s", task_name);
     }
 }
 
 http_server_resp_t
-wifi_manager_cb_on_http_get(const char *path)
+wifi_manager_cb_on_http_get(const char *p_path)
 {
     if (NULL == g_wifi_cb_on_http_get)
     {
         return http_server_resp_404();
     }
-    return g_wifi_cb_on_http_get(path);
+    return g_wifi_cb_on_http_get(p_path);
 }
 
 http_server_resp_t
-wifi_manager_cb_on_http_post(const char *path, const char *body)
+wifi_manager_cb_on_http_post(const char *p_path, const http_req_body_t http_body)
 {
     if (NULL == g_wifi_cb_on_http_post)
     {
         return http_server_resp_404();
     }
-    return g_wifi_cb_on_http_post(path, body);
+    return g_wifi_cb_on_http_post(p_path, http_body.ptr);
 }
 
 http_server_resp_t
-wifi_manager_cb_on_http_delete(const char *path)
+wifi_manager_cb_on_http_delete(const char *p_path)
 {
     if (NULL == g_wifi_cb_on_http_delete)
     {
         return http_server_resp_404();
     }
-    return g_wifi_cb_on_http_delete(path);
+    return g_wifi_cb_on_http_delete(p_path);
 }
 
 bool
@@ -214,51 +215,55 @@ wifi_manager_clear_sta_config(void)
  * @brief Generates the connection status json: ssid and IP addresses.
  * @note This is not thread-safe and should be called only if wifi_manager_lock_json_buffer call is successful.
  */
-void
-wifi_manager_generate_ip_info_json(update_reason_code_t update_reason_code)
+static void
+wifi_manager_generate_ip_info_json(const update_reason_code_e update_reason_code)
 {
     tcpip_adapter_ip_info_t ip_info = { 0 };
     ESP_ERROR_CHECK(tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_STA, &ip_info));
     const wifi_ssid_t ssid = wifi_sta_config_get_ssid();
 
-    network_info_str_t ip_info_str = { 0 };
-    snprintf(ip_info_str.ip, sizeof(ip_info_str.ip), "%s", ip4addr_ntoa(&ip_info.ip));
-    snprintf(ip_info_str.netmask, sizeof(ip_info_str.netmask), "%s", ip4addr_ntoa(&ip_info.netmask));
-    snprintf(ip_info_str.gw, sizeof(ip_info_str.gw), "%s", ip4addr_ntoa(&ip_info.gw));
-
+    network_info_str_t ip_info_str = {
+        .ip      = { "0" },
+        .gw      = { "0" },
+        .netmask = { "0" },
+    };
+    if (UPDATE_CONNECTION_OK == update_reason_code)
+    {
+        snprintf(ip_info_str.ip, sizeof(ip_info_str.ip), "%s", ip4addr_ntoa(&ip_info.ip));
+        snprintf(ip_info_str.netmask, sizeof(ip_info_str.netmask), "%s", ip4addr_ntoa(&ip_info.netmask));
+        snprintf(ip_info_str.gw, sizeof(ip_info_str.gw), "%s", ip4addr_ntoa(&ip_info.gw));
+    }
     json_network_info_generate(&ssid, &ip_info_str, update_reason_code);
 }
 
 bool
-wifi_manager_lock_json_buffer(TickType_t xTicksToWait)
+wifi_manager_lock_json_buffer(const TickType_t ticks_to_wait)
 {
-    if (wifi_manager_json_mutex)
-    {
-        if (xSemaphoreTake(wifi_manager_json_mutex, xTicksToWait) == pdTRUE)
-        {
-            return true;
-        }
-        else
-        {
-            return false;
-        }
-    }
-    else
+    if (NULL == gh_wifi_json_mutex)
     {
         return false;
     }
+    if (pdTRUE != xSemaphoreTake(gh_wifi_json_mutex, ticks_to_wait))
+    {
+        return false;
+    }
+    return true;
 }
 
 void
 wifi_manager_unlock_json_buffer(void)
 {
-    xSemaphoreGive(wifi_manager_json_mutex);
+    xSemaphoreGive(gh_wifi_json_mutex);
 }
 
 static void
-wifi_manager_event_handler(ATTR_UNUSED void *p_ctx, esp_event_base_t event_base, int32_t event_id, void *event_data)
+wifi_manager_event_handler(
+    ATTR_UNUSED void *     p_ctx,
+    const esp_event_base_t event_base,
+    const int32_t          event_id,
+    void *                 event_data)
 {
-    if (event_base == WIFI_EVENT)
+    if (WIFI_EVENT == event_base)
     {
         switch (event_id)
         {
@@ -267,7 +272,7 @@ wifi_manager_event_handler(ATTR_UNUSED void *p_ctx, esp_event_base_t event_base,
                 break;
             case WIFI_EVENT_SCAN_DONE:
                 ESP_LOGD(TAG, "WIFI_EVENT_SCAN_DONE");
-                xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_SCAN_BIT);
+                xEventGroupClearBits(g_wifi_manager_event_group, WIFI_MANAGER_SCAN_BIT);
                 wifiman_msg_send_ev_scan_done();
                 break;
             case WIFI_EVENT_STA_AUTHMODE_CHANGE:
@@ -275,7 +280,7 @@ wifi_manager_event_handler(ATTR_UNUSED void *p_ctx, esp_event_base_t event_base,
                 break;
             case WIFI_EVENT_AP_START:
                 ESP_LOGI(TAG, "WIFI_EVENT_AP_START");
-                xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_AP_STARTED_BIT);
+                xEventGroupSetBits(g_wifi_manager_event_group, WIFI_MANAGER_AP_STARTED_BIT);
                 wifi_manager_scan_async();
                 break;
             case WIFI_EVENT_AP_STOP:
@@ -284,11 +289,11 @@ wifi_manager_event_handler(ATTR_UNUSED void *p_ctx, esp_event_base_t event_base,
                 break;
             case WIFI_EVENT_AP_STACONNECTED: /* a user disconnected from the SoftAP */
                 ESP_LOGI(TAG, "WIFI_EVENT_AP_STACONNECTED");
-                xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_AP_STA_CONNECTED_BIT);
+                xEventGroupSetBits(g_wifi_manager_event_group, WIFI_MANAGER_AP_STA_CONNECTED_BIT);
                 break;
             case WIFI_EVENT_AP_STADISCONNECTED:
                 ESP_LOGI(TAG, "WIFI_EVENT_AP_STADISCONNECTED");
-                xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_AP_STA_CONNECTED_BIT);
+                xEventGroupClearBits(g_wifi_manager_event_group, WIFI_MANAGER_AP_STA_CONNECTED_BIT);
                 break;
             case WIFI_EVENT_STA_START:
                 ESP_LOGI(TAG, "WIFI_EVENT_STA_START");
@@ -303,27 +308,25 @@ wifi_manager_event_handler(ATTR_UNUSED void *p_ctx, esp_event_base_t event_base,
                 ESP_LOGI(TAG, "WIFI_EVENT_STA_DISCONNECTED");
                 /* if a DISCONNECT message is posted while a scan is in progress this scan will NEVER end, causing scan
                  * to never work again. For this reason SCAN_BIT is cleared too */
-                xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_WIFI_CONNECTED_BIT | WIFI_MANAGER_SCAN_BIT);
-                wifi_event_sta_disconnected_t *disconnected = (wifi_event_sta_disconnected_t *)event_data;
+                xEventGroupClearBits(
+                    g_wifi_manager_event_group,
+                    WIFI_MANAGER_WIFI_CONNECTED_BIT | WIFI_MANAGER_SCAN_BIT);
+                const wifi_event_sta_disconnected_t *p_disconnected = (const wifi_event_sta_disconnected_t *)event_data;
                 /* post disconnect event with reason code */
-                wifiman_msg_send_ev_disconnected(disconnected->reason);
+                wifiman_msg_send_ev_disconnected(p_disconnected->reason);
                 break;
             default:
                 break;
         }
     }
-    else if (event_base == IP_EVENT)
+    else if (IP_EVENT == event_base)
     {
-        switch (event_id)
+        if (IP_EVENT_STA_GOT_IP == event_id)
         {
-            case IP_EVENT_STA_GOT_IP:
-                ESP_LOGI(TAG, "IP_EVENT_STA_GOT_IP");
-                xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_WIFI_CONNECTED_BIT);
-                ip_event_got_ip_t *ipevent = (ip_event_got_ip_t *)event_data;
-                wifiman_msg_send_ev_got_ip(ipevent->ip_info.ip.addr);
-                break;
-            default:
-                break;
+            ESP_LOGI(TAG, "IP_EVENT_STA_GOT_IP");
+            xEventGroupSetBits(g_wifi_manager_event_group, WIFI_MANAGER_WIFI_CONNECTED_BIT);
+            const ip_event_got_ip_t *p_ip_event = (const ip_event_got_ip_t *)event_data;
+            wifiman_msg_send_ev_got_ip(p_ip_event->ip_info.ip.addr);
         }
     }
     else
@@ -354,10 +357,10 @@ static void
 wifi_manager_destroy(void)
 {
     ESP_LOGI(TAG, "%s", __func__);
-    if (task_wifi_manager)
+    if (NULL != gh_wifi_manager_task)
     {
-        vTaskDelete(task_wifi_manager);
-        task_wifi_manager = NULL;
+        vTaskDelete(gh_wifi_manager_task);
+        gh_wifi_manager_task = NULL;
 
         /* heap buffers */
         json_access_points_deinit();
@@ -365,10 +368,10 @@ wifi_manager_destroy(void)
         sta_ip_safe_deinit();
 
         /* RTOS objects */
-        vSemaphoreDelete(wifi_manager_json_mutex);
-        wifi_manager_json_mutex = NULL;
-        vEventGroupDelete(wifi_manager_event_group);
-        wifi_manager_event_group = NULL;
+        vSemaphoreDelete(gh_wifi_json_mutex);
+        gh_wifi_json_mutex = NULL;
+        vEventGroupDelete(g_wifi_manager_event_group);
+        g_wifi_manager_event_group = NULL;
         wifiman_msg_deinit();
     }
 }
@@ -391,11 +394,11 @@ wifi_manager_stop(void)
 }
 
 void
-wifi_manager_set_callback(message_code_t message_code, wifi_manager_cb_ptr func_ptr)
+wifi_manager_set_callback(const message_code_e message_code, wifi_manager_cb_ptr func_ptr)
 {
     if (message_code < MESSAGE_CODE_COUNT)
     {
-        cb_ptr_arr[message_code] = func_ptr;
+        g_wifi_cb_ptr_arr[message_code] = func_ptr;
     }
 }
 
@@ -406,14 +409,14 @@ wifi_handle_ev_scan_done(void)
     /* As input param, it stores max AP number ap_records can hold. As output param, it receives the
      * actual AP number this API returns.
      * As a consequence, ap_num MUST be reset to MAX_AP_NUM at every scan */
-    ap_num = MAX_AP_NUM;
-    ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&ap_num, accessp_records));
+    g_wifi_ap_num = MAX_AP_NUM;
+    ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&g_wifi_ap_num, g_wifi_accessp_records));
     /* make sure the http server isn't trying to access the list while it gets refreshed */
     if (wifi_manager_lock_json_buffer(pdMS_TO_TICKS(1000)))
     {
         /* Will remove the duplicate SSIDs from the list and update ap_num */
-        ap_num = ap_list_filter_unique(accessp_records, ap_num);
-        json_access_points_generate(accessp_records, ap_num);
+        g_wifi_ap_num = ap_list_filter_unique(g_wifi_accessp_records, g_wifi_ap_num);
+        json_access_points_generate(g_wifi_accessp_records, g_wifi_ap_num);
         wifi_manager_unlock_json_buffer();
     }
     else
@@ -432,10 +435,10 @@ wifi_handle_cmd_start_wifi_scan(void)
 
     /* if a scan is already in progress this message is simply ignored thanks to the
      * WIFI_MANAGER_SCAN_BIT uxBit */
-    const EventBits_t uxBits = xEventGroupGetBits(wifi_manager_event_group);
+    const EventBits_t uxBits = xEventGroupGetBits(g_wifi_manager_event_group);
     if (0 == (uxBits & (uint32_t)WIFI_MANAGER_SCAN_BIT))
     {
-        xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_SCAN_BIT);
+        xEventGroupSetBits(g_wifi_manager_event_group, WIFI_MANAGER_SCAN_BIT);
         /* wifi scanner config */
         const wifi_scan_config_t scan_config = {
             .ssid        = NULL,
@@ -489,21 +492,21 @@ wifi_handle_cmd_connect_sta(const wifiman_msg_param_t *p_param)
      * Param in that case is a boolean indicating if the request was made automatically
      * by the wifi_manager.
      * */
-    const connection_request_made_by_code_t conn_req = wifiman_conv_param_to_conn_req(p_param);
+    const connection_request_made_by_code_e conn_req = wifiman_conv_param_to_conn_req(p_param);
     if (CONNECTION_REQUEST_USER == conn_req)
     {
-        xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_STA_CONNECT_BIT);
+        xEventGroupSetBits(g_wifi_manager_event_group, WIFI_MANAGER_REQUEST_STA_CONNECT_BIT);
     }
     else if (CONNECTION_REQUEST_RESTORE_CONNECTION == conn_req)
     {
-        xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_RESTORE_STA_BIT);
+        xEventGroupSetBits(g_wifi_manager_event_group, WIFI_MANAGER_REQUEST_RESTORE_STA_BIT);
     }
     else
     {
         // MISRA C:2012, 15.7 - All if...else if constructs shall be terminated with an else statement
     }
 
-    const EventBits_t uxBits = xEventGroupGetBits(wifi_manager_event_group);
+    const EventBits_t uxBits = xEventGroupGetBits(g_wifi_manager_event_group);
     if (0 != (uxBits & (uint32_t)WIFI_MANAGER_WIFI_CONNECTED_BIT))
     {
         wifiman_msg_send_cmd_disconnect_sta();
@@ -587,14 +590,14 @@ wifi_handle_ev_disconnected(const wifiman_msg_param_t *p_param)
     /* reset saved sta IP */
     sta_ip_safe_reset(portMAX_DELAY);
 
-    const EventBits_t uxBits = xEventGroupGetBits(wifi_manager_event_group);
-    if (0 != (uxBits & (uint32_t)WIFI_MANAGER_REQUEST_STA_CONNECT_BIT))
+    const EventBits_t event_bits = xEventGroupGetBits(g_wifi_manager_event_group);
+    if (0 != (event_bits & (uint32_t)WIFI_MANAGER_REQUEST_STA_CONNECT_BIT))
     {
-        ESP_LOGI(TAG, "uxBits & WIFI_MANAGER_REQUEST_STA_CONNECT_BIT");
+        ESP_LOGI(TAG, "event_bits & WIFI_MANAGER_REQUEST_STA_CONNECT_BIT");
         /* there are no retries when it's a user requested connection by design. This avoids a user
          * hanging too much in case they typed a wrong password for instance. Here we simply clear the
          * request bit and move on */
-        xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_STA_CONNECT_BIT);
+        xEventGroupClearBits(g_wifi_manager_event_group, WIFI_MANAGER_REQUEST_STA_CONNECT_BIT);
 
         if (wifi_manager_lock_json_buffer(portMAX_DELAY))
         {
@@ -602,12 +605,12 @@ wifi_handle_ev_disconnected(const wifiman_msg_param_t *p_param)
             wifi_manager_unlock_json_buffer();
         }
     }
-    else if (0 != (uxBits & (uint32_t)WIFI_MANAGER_REQUEST_DISCONNECT_BIT))
+    else if (0 != (event_bits & (uint32_t)WIFI_MANAGER_REQUEST_DISCONNECT_BIT))
     {
-        ESP_LOGI(TAG, "uxBits & WIFI_MANAGER_REQUEST_DISCONNECT_BIT");
+        ESP_LOGI(TAG, "event_bits & WIFI_MANAGER_REQUEST_DISCONNECT_BIT");
         /* user manually requested a disconnect so the lost connection is a normal event. Clear the flag
          * and restart the AP */
-        xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_DISCONNECT_BIT);
+        xEventGroupClearBits(g_wifi_manager_event_group, WIFI_MANAGER_REQUEST_DISCONNECT_BIT);
 
         if (wifi_manager_lock_json_buffer(portMAX_DELAY))
         {
@@ -647,19 +650,19 @@ wifi_handle_ev_got_ip(const wifiman_msg_param_t *p_param)
 {
     ESP_LOGI(TAG, "MESSAGE: EVENT_STA_GOT_IP");
 
-    const EventBits_t uxBits = xEventGroupGetBits(wifi_manager_event_group);
+    const EventBits_t event_bits = xEventGroupGetBits(g_wifi_manager_event_group);
 
     /* reset connection requests bits -- doesn't matter if it was set or not */
-    xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_STA_CONNECT_BIT);
+    xEventGroupClearBits(g_wifi_manager_event_group, WIFI_MANAGER_REQUEST_STA_CONNECT_BIT);
 
     /* save IP as a string for the HTTP server host */
     const sta_ip_address_t ip_addr = wifiman_conv_param_to_ip_addr(p_param);
     sta_ip_safe_set(ip_addr, portMAX_DELAY);
 
     /* save wifi config in NVS if it wasn't a restored of a connection */
-    if (0 != (uxBits & (uint32_t)WIFI_MANAGER_REQUEST_RESTORE_STA_BIT))
+    if (0 != (event_bits & (uint32_t)WIFI_MANAGER_REQUEST_RESTORE_STA_BIT))
     {
-        xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_RESTORE_STA_BIT);
+        xEventGroupClearBits(g_wifi_manager_event_group, WIFI_MANAGER_REQUEST_RESTORE_STA_BIT);
     }
     else
     {
@@ -675,7 +678,7 @@ wifi_handle_ev_got_ip(const wifiman_msg_param_t *p_param)
     }
     else
     {
-        abort();
+        ESP_ERROR_CHECK(ESP_FAIL);
     }
 
     /* bring down DNS hijack */
@@ -688,7 +691,7 @@ wifi_handle_cmd_disconnect_sta(void)
     ESP_LOGI(TAG, "MESSAGE: ORDER_DISCONNECT_STA");
 
     /* precise this is coming from a user request */
-    xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_DISCONNECT_BIT);
+    xEventGroupSetBits(g_wifi_manager_event_group, WIFI_MANAGER_REQUEST_DISCONNECT_BIT);
 
     /* order wifi discconect */
     ESP_ERROR_CHECK(esp_wifi_disconnect());
@@ -742,9 +745,9 @@ wifi_manager_main_loop(void)
             default:
                 break;
         }
-        if (cb_ptr_arr[msg.code])
+        if (NULL != g_wifi_cb_ptr_arr[msg.code])
         {
-            (*cb_ptr_arr[msg.code])(NULL);
+            (*g_wifi_cb_ptr_arr[msg.code])(NULL);
         }
     }
 }
@@ -756,16 +759,27 @@ wifi_manager_set_ant_config(const WiFiAntConfig_t *p_wifi_ant_config)
     {
         return;
     }
-    esp_err_t err = esp_wifi_set_ant_gpio(&p_wifi_ant_config->wifiAntGpioConfig);
+    esp_err_t err = esp_wifi_set_ant_gpio(&p_wifi_ant_config->wifi_ant_gpio_config);
     if (ESP_OK != err)
     {
         ESP_LOGE(TAG, "esp_wifi_set_ant_gpio failed, res=%d", err);
     }
-    err = esp_wifi_set_ant(&p_wifi_ant_config->wifiAntConfig);
+    err = esp_wifi_set_ant(&p_wifi_ant_config->wifi_ant_config);
     if (ESP_OK != err)
     {
         ESP_LOGE(TAG, "esp_wifi_set_ant failed, res=%d", err);
     }
+}
+
+static void
+wifi_manager_generate_ssid_from_orig_and_mac(
+    char *       p_ssid_str_buf,
+    const size_t ssid_max_len,
+    const char * p_orig_ap_ssid)
+{
+    ap_mac_t ap_mac = { 0 };
+    ESP_ERROR_CHECK(esp_wifi_get_mac(ESP_IF_WIFI_AP, &ap_mac.mac[0]));
+    ap_ssid_generate(p_ssid_str_buf, ssid_max_len, p_orig_ap_ssid, &ap_mac);
 }
 
 static wifi_config_t
@@ -792,15 +806,10 @@ wifi_manager_generate_ap_config(const struct wifi_settings_t *p_wifi_settings)
         },
     };
 
-    {
-        ap_mac_t ap_mac = { 0 };
-        ESP_ERROR_CHECK(esp_wifi_get_mac(ESP_IF_WIFI_AP, &ap_mac.mac[0]));
-        ap_ssid_generate(
-            (char *)&ap_config.ap.ssid[0],
-            sizeof(ap_config.ap.ssid),
-            (const char *)&p_wifi_settings->ap_ssid[0],
-            &ap_mac);
-    }
+    wifi_manager_generate_ssid_from_orig_and_mac(
+        (char *)&ap_config.ap.ssid[0],
+        sizeof(ap_config.ap.ssid),
+        (const char *)&p_wifi_settings->ap_ssid[0]);
     snprintf((char *)&ap_config.ap.password[0], sizeof(ap_config.ap.password), "%s", p_wifi_settings->ap_pwd);
     return ap_config;
 }
@@ -867,7 +876,7 @@ wifi_manager(const void *p_params)
     tcpip_adapter_init();
 
     /* event handler and event group for the wifi driver */
-    wifi_manager_event_group = xEventGroupCreate();
+    g_wifi_manager_event_group = xEventGroupCreate();
 
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_manager_event_handler, NULL));

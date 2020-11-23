@@ -87,7 +87,7 @@ ap_list_reorder(wifi_ap_record_t *p_arr_of_ap, const number_wifi_access_points_t
             {
                 p_first_free = p_ap;
             }
-            num_unique_aps--;
+            num_unique_aps -= 1;
             continue;
         }
         if (NULL != p_first_free)

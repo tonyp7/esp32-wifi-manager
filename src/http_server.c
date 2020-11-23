@@ -67,15 +67,13 @@ function to process requests, decode URLs, serve files, etc. etc.
 #include "app_malloc.h"
 #include "str_buf.h"
 #include "wifi_sta_config.h"
+#include "http_req.h"
+#include "esp_type_wrapper.h"
 
 #define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
 #include "log.h"
 
-#define RUUVI_GWUI_HTML_ENABLE 1
-
 #define FULLBUF_SIZE (4U * 1024U)
-
-typedef int file_read_result_t;
 
 /**
  * @brief RTOS task for the HTTP server. Do not start manually.
@@ -84,16 +82,15 @@ typedef int file_read_result_t;
 static _Noreturn void
 http_server_task(void *p_param);
 
-//#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
 /* @brief tag used for ESP serial console messages */
 static const char TAG[] = "http_server";
 
 /* @brief task handle for the http server */
-static os_task_handle_t task_http_server;
+static os_task_handle_t gh_http_task;
 
 ATTR_PRINTF(3, 4)
 static void
-http_server_netconn_printf(struct netconn *conn, bool flag_more, const char *fmt, ...)
+http_server_netconn_printf(struct netconn *p_conn, const bool flag_more, const char *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
@@ -109,7 +106,7 @@ http_server_netconn_printf(struct netconn *conn, bool flag_more, const char *fmt
     {
         netconn_flags |= (uint8_t)NETCONN_MORE;
     }
-    netconn_write(conn, str_buf.buf, str_buf_get_len(&str_buf), netconn_flags);
+    netconn_write(p_conn, str_buf.buf, str_buf_get_len(&str_buf), netconn_flags);
     str_buf_free_buf(&str_buf);
 }
 
@@ -177,9 +174,9 @@ http_get_cache_control_str(const http_server_resp_t *p_resp)
 }
 
 static void
-write_content_from_flash(struct netconn *conn, const http_server_resp_t *p_resp)
+write_content_from_flash(struct netconn *p_conn, const http_server_resp_t *p_resp)
 {
-    const err_t err = netconn_write(conn, p_resp->select_location.memory.p_buf, p_resp->content_len, NETCONN_NOCOPY);
+    const err_t err = netconn_write(p_conn, p_resp->select_location.memory.p_buf, p_resp->content_len, NETCONN_NOCOPY);
     if (ERR_OK != err)
     {
         ESP_LOGE(TAG, "netconn_write failed, err=%d", err);
@@ -187,9 +184,9 @@ write_content_from_flash(struct netconn *conn, const http_server_resp_t *p_resp)
 }
 
 static void
-write_content_from_static_mem(struct netconn *conn, const http_server_resp_t *p_resp)
+write_content_from_static_mem(struct netconn *p_conn, const http_server_resp_t *p_resp)
 {
-    const err_t err = netconn_write(conn, p_resp->select_location.memory.p_buf, p_resp->content_len, NETCONN_COPY);
+    const err_t err = netconn_write(p_conn, p_resp->select_location.memory.p_buf, p_resp->content_len, NETCONN_COPY);
     if (ERR_OK != err)
     {
         ESP_LOGE(TAG, "netconn_write failed, err=%d", err);
@@ -197,9 +194,9 @@ write_content_from_static_mem(struct netconn *conn, const http_server_resp_t *p_
 }
 
 static void
-write_content_from_heap(struct netconn *conn, http_server_resp_t *p_resp)
+write_content_from_heap(struct netconn *p_conn, http_server_resp_t *p_resp)
 {
-    const err_t err = netconn_write(conn, p_resp->select_location.memory.p_buf, p_resp->content_len, NETCONN_COPY);
+    const err_t err = netconn_write(p_conn, p_resp->select_location.memory.p_buf, p_resp->content_len, NETCONN_COPY);
     if (ERR_OK != err)
     {
         ESP_LOGE(TAG, "netconn_write failed, err=%d", err);
@@ -208,7 +205,7 @@ write_content_from_heap(struct netconn *conn, http_server_resp_t *p_resp)
 }
 
 static void
-write_content_from_fatfs(struct netconn *conn, const http_server_resp_t *p_resp)
+write_content_from_fatfs(struct netconn *p_conn, const http_server_resp_t *p_resp)
 {
     static char tmp_buf[512U];
     uint32_t    rem_len = p_resp->content_len;
@@ -235,7 +232,7 @@ write_content_from_fatfs(struct netconn *conn, const http_server_resp_t *p_resp)
             netconn_flags |= (uint8_t)NETCONN_MORE;
         }
         ESP_LOGD(TAG, "Send %u bytes", num_bytes);
-        const err_t err = netconn_write(conn, tmp_buf, num_bytes, netconn_flags);
+        const err_t err = netconn_write(p_conn, tmp_buf, num_bytes, netconn_flags);
         if (ERR_OK != err)
         {
             ESP_LOGE(TAG, "netconn_write failed, err=%d", err);
@@ -247,24 +244,24 @@ write_content_from_fatfs(struct netconn *conn, const http_server_resp_t *p_resp)
 }
 
 static void
-http_server_netconn_resp_200(struct netconn *conn, http_server_resp_t *p_resp)
+http_server_netconn_resp_200(struct netconn *p_conn, http_server_resp_t *p_resp)
 {
     const bool use_extra_content_type_param = (NULL != p_resp->p_content_type_param)
                                               && ('\0' != p_resp->p_content_type_param[0]);
 
     http_server_netconn_printf(
-        conn,
+        p_conn,
         true,
         "HTTP/1.1 200 OK\n"
         "Content-type: %s; charset=utf-8%s%s\n"
-        "Content-Length: %u\n"
+        "Content-Length: %lu\n"
         "%s"
         "%s"
         "\n",
         http_get_content_type_str(p_resp->content_type),
         use_extra_content_type_param ? "; " : "",
         use_extra_content_type_param ? p_resp->p_content_type_param : "",
-        (uint32_t)p_resp->content_len,
+        (printf_ulong_t)p_resp->content_len,
         http_get_content_encoding_str(p_resp),
         http_get_cache_control_str(p_resp));
 
@@ -273,39 +270,39 @@ http_server_netconn_resp_200(struct netconn *conn, http_server_resp_t *p_resp)
         case HTTP_CONTENT_LOCATION_NO_CONTENT:
             break;
         case HTTP_CONTENT_LOCATION_FLASH_MEM:
-            write_content_from_flash(conn, p_resp);
+            write_content_from_flash(p_conn, p_resp);
             break;
         case HTTP_CONTENT_LOCATION_STATIC_MEM:
-            write_content_from_static_mem(conn, p_resp);
+            write_content_from_static_mem(p_conn, p_resp);
             break;
         case HTTP_CONTENT_LOCATION_HEAP:
-            write_content_from_heap(conn, p_resp);
+            write_content_from_heap(p_conn, p_resp);
             break;
         case HTTP_CONTENT_LOCATION_FATFS:
-            write_content_from_fatfs(conn, p_resp);
+            write_content_from_fatfs(p_conn, p_resp);
             break;
     }
 }
 
 static http_server_resp_t
-http_server_resp_200_json(const char *json_content)
+http_server_resp_200_json(const char *p_json_content)
 {
     const bool flag_no_cache = true;
     return http_server_resp_data_in_static_mem(
         HTTP_CONENT_TYPE_APPLICATION_JSON,
         NULL,
-        strlen(json_content),
+        strlen(p_json_content),
         HTTP_CONENT_ENCODING_NONE,
-        (const uint8_t *)json_content,
+        (const uint8_t *)p_json_content,
         flag_no_cache);
 }
 
 static void
-http_server_netconn_resp_302(struct netconn *conn)
+http_server_netconn_resp_302(struct netconn *p_conn)
 {
     ESP_LOGI(TAG, "Respond: 302 Found");
     http_server_netconn_printf(
-        conn,
+        p_conn,
         false,
         "HTTP/1.1 302 Found\n"
         "Location: http://%s/\n"
@@ -314,11 +311,11 @@ http_server_netconn_resp_302(struct netconn *conn)
 }
 
 static void
-http_server_netconn_resp_400(struct netconn *conn)
+http_server_netconn_resp_400(struct netconn *p_conn)
 {
     ESP_LOGW(TAG, "Respond: 400 Bad Request");
     http_server_netconn_printf(
-        conn,
+        p_conn,
         false,
         "HTTP/1.1 400 Bad Request\r\n"
         "Content-Length: 0\r\n"
@@ -326,11 +323,11 @@ http_server_netconn_resp_400(struct netconn *conn)
 }
 
 static void
-http_server_netconn_resp_404(struct netconn *conn)
+http_server_netconn_resp_404(struct netconn *p_conn)
 {
     ESP_LOGW(TAG, "Respond: 404 Not Found");
     http_server_netconn_printf(
-        conn,
+        p_conn,
         false,
         "HTTP/1.1 404 Not Found\r\n"
         "Content-Length: 0\r\n"
@@ -338,11 +335,11 @@ http_server_netconn_resp_404(struct netconn *conn)
 }
 
 static void
-http_server_netconn_resp_503(struct netconn *conn)
+http_server_netconn_resp_503(struct netconn *p_conn)
 {
     ESP_LOGW(TAG, "Respond: 503 Service Unavailable");
     http_server_netconn_printf(
-        conn,
+        p_conn,
         false,
         "HTTP/1.1 503 Service Unavailable\r\n"
         "Content-Length: 0\r\n"
@@ -352,8 +349,7 @@ http_server_netconn_resp_503(struct netconn *conn)
 void
 http_server_start(void)
 {
-    esp_log_level_set(TAG, ESP_LOG_DEBUG);
-    if (task_http_server == NULL)
+    if (NULL == gh_http_task)
     {
         ESP_LOGI(TAG, "Run http_server");
         const uint32_t stack_depth = 20U * 1024U;
@@ -363,7 +359,7 @@ http_server_start(void)
                 stack_depth,
                 NULL,
                 WIFI_MANAGER_TASK_PRIORITY - 1,
-                &task_http_server))
+                &gh_http_task))
         {
             ESP_LOGE(TAG, "xTaskCreate failed: http_server");
         }
@@ -377,37 +373,36 @@ http_server_start(void)
 void
 http_server_stop(void)
 {
-    if (task_http_server)
+    if (NULL != gh_http_task)
     {
-        vTaskDelete(task_http_server);
-        task_http_server = NULL;
+        vTaskDelete(gh_http_task);
+        gh_http_task = NULL;
     }
 }
 
 static _Noreturn void
 http_server_task(ATTR_UNUSED void *p_param)
 {
-    struct netconn *conn, *newconn;
-    err_t           err;
-    conn                  = netconn_new(NETCONN_TCP);
-    const u16_t http_port = 80U;
-    netconn_bind(conn, IP_ADDR_ANY, http_port);
-    netconn_listen(conn);
+    struct netconn *p_conn    = netconn_new(NETCONN_TCP);
+    const u16_t     http_port = 80U;
+    netconn_bind(p_conn, IP_ADDR_ANY, http_port);
+    netconn_listen(p_conn);
     ESP_LOGI(TAG, "HTTP Server listening on 80/tcp");
     for (;;)
     {
-        err = netconn_accept(conn, &newconn);
-        if (err == ERR_OK)
+        struct netconn *p_new_conn = NULL;
+        const err_t     err        = netconn_accept(p_conn, &p_new_conn);
+        if (ERR_OK == err)
         {
-            http_server_netconn_serve(newconn);
-            netconn_close(newconn);
-            netconn_delete(newconn);
+            http_server_netconn_serve(p_new_conn);
+            netconn_close(p_new_conn);
+            netconn_delete(p_new_conn);
         }
-        else if (err == ERR_TIMEOUT)
+        else if (ERR_TIMEOUT == err)
         {
             ESP_LOGE(TAG, "http_server: netconn_accept ERR_TIMEOUT");
         }
-        else if (err == ERR_ABRT)
+        else if (ERR_ABRT == err)
         {
             ESP_LOGE(TAG, "http_server: netconn_accept ERR_ABRT");
         }
@@ -417,50 +412,29 @@ http_server_task(ATTR_UNUSED void *p_param)
         }
         taskYIELD(); /* allows the freeRTOS scheduler to take over if needed. */
     }
-    netconn_close(conn);
-    netconn_delete(conn);
+    netconn_close(p_conn);
+    netconn_delete(p_conn);
 
     vTaskDelete(NULL);
 }
 
-char *
-http_server_get_header(char *request, char *header_name, int *len)
+static const char *
+get_http_body(const char *msg, uint32_t len, uint32_t *p_body_len)
 {
-    *len      = 0;
-    char *ret = NULL;
-    char *ptr = NULL;
+    static const char g_newlines[] = "\r\n\r\n";
 
-    ptr = strstr(request, header_name);
-    if (ptr)
-    {
-        ret = ptr + strlen(header_name);
-        ptr = ret;
-        while ((*ptr != '\0') && (*ptr != '\n') && (*ptr != '\r'))
-        {
-            (*len)++;
-            ptr++;
-        }
-        return ret;
-    }
-    return NULL;
-}
-
-static char *
-get_http_body(char *msg, uint32_t len, uint32_t *p_body_len)
-{
-    char *newlines = "\r\n\r\n";
-    char *p        = strstr(msg, newlines);
-    if (NULL == p)
+    const char *p_body = strstr(msg, g_newlines);
+    if (NULL == p_body)
     {
         ESP_LOGD(TAG, "http body not found: %s", msg);
         return 0;
     }
-    p += strlen(newlines);
+    p_body += strlen(g_newlines);
     if (NULL != p_body_len)
     {
-        *p_body_len = len - (uint32_t)(ptrdiff_t)(p - msg);
+        *p_body_len = len - (uint32_t)(ptrdiff_t)(p_body - msg);
     }
-    return p;
+    return p_body;
 }
 
 static http_server_resp_t
@@ -468,7 +442,7 @@ http_server_handle_req_get(const char *p_file_name)
 {
     ESP_LOGI(TAG, "GET /%s", p_file_name);
 
-    char *file_ext = strrchr(p_file_name, '.');
+    const char *file_ext = strrchr(p_file_name, '.');
     if ((NULL != file_ext) && (0 == strcmp(file_ext, ".json")))
     {
         if (0 == strcmp(p_file_name, "ap.json"))
@@ -531,66 +505,62 @@ http_server_handle_req_delete(const char *p_file_name)
 }
 
 static http_server_resp_t
-http_server_handle_req_post(const char *p_file_name, char *save_ptr)
+http_server_handle_req_post_connect_json(const http_req_header_t http_header)
 {
-    ESP_LOGI(TAG, "POST /%s", p_file_name);
-    const char *body = strstr(save_ptr, "\r\n\r\n");
-    if (0 == strcmp(p_file_name, "connect.json"))
+    ESP_LOGD(TAG, "http_server_netconn_serve: POST /connect.json");
+    uint32_t    len_ssid     = 0;
+    uint32_t    len_password = 0;
+    const char *p_ssid       = http_req_header_get_field(http_header, "X-Custom-ssid:", &len_ssid);
+    const char *p_password   = http_req_header_get_field(http_header, "X-Custom-pwd:", &len_password);
+    if ((NULL != p_ssid) && (len_ssid <= MAX_SSID_SIZE) && (NULL != p_password) && (len_password <= MAX_PASSWORD_SIZE))
     {
-        ESP_LOGD(TAG, "http_server_netconn_serve: POST /connect.json");
-        int   lenS = 0, lenP = 0;
-        char *ssid     = http_server_get_header(save_ptr, "X-Custom-ssid: ", &lenS);
-        char *password = http_server_get_header(save_ptr, "X-Custom-pwd: ", &lenP);
-        if ((NULL != ssid) && (lenS <= MAX_SSID_SIZE) && (NULL != password) && (lenP <= MAX_PASSWORD_SIZE))
-        {
-            wifi_sta_config_set_ssid_and_password(ssid, lenS, password, lenP);
+        wifi_sta_config_set_ssid_and_password(p_ssid, len_ssid, p_password, len_password);
 
-            ESP_LOGD(TAG, "http_server_netconn_serve: wifi_manager_connect_async() call");
-            wifi_manager_connect_async();
-            return http_server_resp_200_json("{}");
-        }
-        else
-        {
-            /* bad request the authentification header is not complete/not the correct format */
-            return http_server_resp_400();
-        }
+        ESP_LOGD(TAG, "http_server_netconn_serve: wifi_manager_connect_async() call");
+        wifi_manager_connect_async();
+        return http_server_resp_200_json("{}");
     }
-    return wifi_manager_cb_on_http_post(p_file_name, body);
+    else
+    {
+        /* bad request the authentification header is not complete/not the correct format */
+        return http_server_resp_400();
+    }
 }
 
 static http_server_resp_t
-http_server_handle_req(char *line, char *save_ptr)
+http_server_handle_req_post(
+    const char *            p_file_name,
+    const http_req_header_t http_header,
+    const http_req_body_t   http_body)
 {
-    char *p = strchr(line, ' ');
-    if (NULL == p)
+    ESP_LOGI(TAG, "POST /%s", p_file_name);
+    if (0 == strcmp(p_file_name, "connect.json"))
     {
-        return http_server_resp_400();
+        return http_server_handle_req_post_connect_json(http_header);
     }
-    const char * http_cmd     = line;
-    const size_t http_cmd_len = (size_t)(ptrdiff_t)(p - line);
-    char *       path         = p + 1;
+    return wifi_manager_cb_on_http_post(p_file_name, http_body);
+}
+
+static http_server_resp_t
+http_server_handle_req(const http_req_info_t *p_req_info)
+{
+    const char *path = p_req_info->http_uri.ptr;
     if ('/' == path[0])
     {
         path += 1;
     }
-    p = strchr(path, ' ');
-    if (NULL == p)
-    {
-        return http_server_resp_400();
-    }
-    *p = '\0';
 
-    if (0 == strncmp("GET", http_cmd, http_cmd_len))
+    if (0 == strcmp("GET", p_req_info->http_cmd.ptr))
     {
         return http_server_handle_req_get(path);
     }
-    else if (0 == strncmp("DELETE", http_cmd, http_cmd_len))
+    else if (0 == strcmp("DELETE", p_req_info->http_cmd.ptr))
     {
         return http_server_handle_req_delete(path);
     }
-    else if (0 == strncmp("POST", http_cmd, http_cmd_len))
+    else if (0 == strcmp("POST", p_req_info->http_cmd.ptr))
     {
-        return http_server_handle_req_post(path, save_ptr);
+        return http_server_handle_req_post(path, p_req_info->http_header, p_req_info->http_body);
     }
     else
     {
@@ -627,13 +597,16 @@ http_server_recv_and_handle(struct netconn *p_conn, char *p_req_buf, uint32_t *p
     netbuf_delete(p_netbuf_in);
 
     // check if there should be more data coming from conn
-    int         field_len         = 0;
-    const char *p_content_len_str = http_server_get_header(p_req_buf, "Content-Length: ", &field_len);
+    uint32_t                field_len  = 0;
+    const http_req_header_t req_header = {
+        .ptr = p_req_buf,
+    };
+    const char *p_content_len_str = http_req_header_get_field(req_header, "Content-Length:", &field_len);
     if (NULL != p_content_len_str)
     {
-        const int   content_len = atoi(p_content_len_str);
-        uint32_t    body_len    = 0;
-        const char *p_body      = get_http_body(p_req_buf, *p_req_size, &body_len);
+        const uint32_t content_len = (uint32_t)strtoul(p_content_len_str, NULL, 10);
+        uint32_t       body_len    = 0;
+        const char *   p_body      = get_http_body(p_req_buf, *p_req_size, &body_len);
         if (NULL != p_body)
         {
             ESP_LOGD(TAG, "Header Content-Length: %d, HTTP body length: %d", content_len, body_len);
@@ -661,17 +634,15 @@ http_server_recv_and_handle(struct netconn *p_conn, char *p_req_buf, uint32_t *p
 }
 
 void
-http_server_netconn_serve(struct netconn *conn)
+http_server_netconn_serve(struct netconn *p_conn)
 {
-    static const char new_line[] = { "\n" };
-
     char     req_buf[FULLBUF_SIZE + 1];
     uint32_t req_size  = 0;
     bool     req_ready = false;
 
     while (!req_ready)
     {
-        if (!http_server_recv_and_handle(conn, &req_buf[0], &req_size, &req_ready))
+        if (!http_server_recv_and_handle(p_conn, &req_buf[0], &req_size, &req_ready))
         {
             break;
         }
@@ -684,18 +655,23 @@ http_server_netconn_serve(struct netconn *conn)
     }
     ESP_LOGD(TAG, "req: %s", req_buf);
 
-    char *save_ptr = req_buf;
-    char *p_line   = strtok_r(save_ptr, new_line, &save_ptr);
+    const http_req_info_t req_info = http_req_parse(req_buf);
 
-    if (NULL == p_line)
+    ESP_LOGD(TAG, "p_http_cmd: %s", req_info.http_cmd.ptr);
+    ESP_LOGD(TAG, "p_http_uri: %s", req_info.http_uri.ptr);
+    ESP_LOGD(TAG, "p_http_ver: %s", req_info.http_ver.ptr);
+    ESP_LOGD(TAG, "p_http_header: %s", req_info.http_header.ptr);
+    ESP_LOGD(TAG, "p_http_body: %s", req_info.http_body.ptr);
+
+    if (!req_info.is_success)
     {
-        http_server_netconn_resp_404(conn);
+        http_server_netconn_resp_400(p_conn);
         return;
     }
     /* captive portal functionality: redirect to access point IP for HOST that are not the access point IP OR the
      * STA IP */
-    int   host_len = 0;
-    char *p_host   = http_server_get_header(save_ptr, "Host: ", &host_len);
+    uint32_t    host_len = 0;
+    const char *p_host   = http_req_header_get_field(req_info.http_header, "Host:", &host_len);
     /* determine if Host is from the STA IP address */
 
     const sta_ip_string_t ip_str  = sta_ip_safe_get(portMAX_DELAY);
@@ -705,25 +681,25 @@ http_server_netconn_serve(struct netconn *conn)
     ESP_LOGD(TAG, "StaticIP: %s", ip_str.buf);
     if ((host_len > 0) && (NULL == strstr(p_host, DEFAULT_AP_IP)) && (!access_from_sta_ip))
     {
-        http_server_netconn_resp_302(conn);
+        http_server_netconn_resp_302(p_conn);
         return;
     }
-    http_server_resp_t resp = http_server_handle_req(p_line, save_ptr);
+    http_server_resp_t resp = http_server_handle_req(&req_info);
     switch (resp.http_resp_code)
     {
         case HTTP_RESP_CODE_200:
-            http_server_netconn_resp_200(conn, &resp);
+            http_server_netconn_resp_200(p_conn, &resp);
             return;
         case HTTP_RESP_CODE_400:
-            http_server_netconn_resp_400(conn);
+            http_server_netconn_resp_400(p_conn);
             return;
         case HTTP_RESP_CODE_404:
-            http_server_netconn_resp_404(conn);
+            http_server_netconn_resp_404(p_conn);
             return;
         case HTTP_RESP_CODE_503:
-            http_server_netconn_resp_503(conn);
+            http_server_netconn_resp_503(p_conn);
             return;
     }
     assert(0);
-    http_server_netconn_resp_503(conn);
+    http_server_netconn_resp_503(p_conn);
 }

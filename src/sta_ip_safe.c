@@ -6,17 +6,16 @@
  */
 
 #include "sta_ip_safe.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/semphr.h"
+#include "os_mutex.h"
 #include "esp_log.h"
 #include "sta_ip_unsafe.h"
 
 static const char TAG[] = "wifi_manager";
 
-static SemaphoreHandle_t g_sta_ip_safe_mutex = NULL;
+static os_mutex_t g_sta_ip_safe_mutex;
 
 STA_IP_SAFE_STATIC
-SemaphoreHandle_t
+os_mutex_t
 sta_ip_safe_mutex_get(void)
 {
     return g_sta_ip_safe_mutex;
@@ -26,33 +25,26 @@ STA_IP_SAFE_STATIC
 bool
 sta_ip_safe_lock(const TickType_t ticks_to_wait)
 {
-    SemaphoreHandle_t mutex = sta_ip_safe_mutex_get();
-    if (NULL == mutex)
+    os_mutex_t h_mutex = sta_ip_safe_mutex_get();
+    if (NULL == h_mutex)
     {
         ESP_LOGE(TAG, "%s: Mutex is not initialized", __func__);
         return false;
     }
-    if (xSemaphoreTake(mutex, ticks_to_wait) == pdTRUE)
-    {
-        return true;
-    }
-    else
-    {
-        return false;
-    }
+    return os_mutex_lock_with_timeout(h_mutex, ticks_to_wait);
 }
 
 STA_IP_SAFE_STATIC
 void
 sta_ip_safe_unlock(void)
 {
-    SemaphoreHandle_t mutex = sta_ip_safe_mutex_get();
-    if (NULL == mutex)
+    os_mutex_t h_mutex = sta_ip_safe_mutex_get();
+    if (NULL == h_mutex)
     {
         ESP_LOGE(TAG, "%s: Mutex is not initialized", __func__);
         return;
     }
-    xSemaphoreGive(mutex);
+    os_mutex_unlock(h_mutex);
 }
 
 bool
@@ -63,7 +55,7 @@ sta_ip_safe_init(void)
         ESP_LOGE(TAG, "%s: Mutex was already initialized", __func__);
         return false;
     }
-    g_sta_ip_safe_mutex = xSemaphoreCreateMutex();
+    g_sta_ip_safe_mutex = os_mutex_create();
     if (NULL == g_sta_ip_safe_mutex)
     {
         ESP_LOGE(TAG, "%s: Failed to create mutex", __func__);
@@ -82,12 +74,7 @@ sta_ip_safe_deinit(void)
     {
         sta_ip_safe_unlock();
     }
-    SemaphoreHandle_t mutex = sta_ip_safe_mutex_get();
-    if (NULL != mutex)
-    {
-        vSemaphoreDelete(mutex);
-        g_sta_ip_safe_mutex = NULL;
-    }
+    os_mutex_delete(&g_sta_ip_safe_mutex);
 }
 
 bool

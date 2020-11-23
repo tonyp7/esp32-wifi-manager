@@ -30,17 +30,17 @@ OTHER DEALINGS IN THE SOFTWARE.
 #include <stdbool.h>
 #include "str_buf.h"
 
-static void
+static bool
 json_print_char_escaped(str_buf_t *p_str_buf, const char in_chr)
 {
     if (in_chr >= '\x20')
     {
         /* normal character, copy */
-        str_buf_printf(p_str_buf, "%c", in_chr);
+        return str_buf_printf(p_str_buf, "%c", in_chr);
     }
     else
     {
-        str_buf_printf(p_str_buf, "\\u%04x", in_chr);
+        return str_buf_printf(p_str_buf, "\\u%04x", in_chr);
     }
 }
 
@@ -64,30 +64,35 @@ json_print_escaped_string(str_buf_t *p_str_buf, const char *p_input_str)
     for (const char *in_ptr = p_input_str; '\0' != *in_ptr; ++in_ptr)
     {
         const char in_chr = *in_ptr;
+        bool       res    = false;
         switch (in_chr)
         {
             case '\\':
             case '\"':
-                str_buf_printf(p_str_buf, "\\%c", in_chr);
+                res = str_buf_printf(p_str_buf, "\\%c", in_chr);
                 break;
             case '\b':
-                str_buf_printf(p_str_buf, "\\b");
+                res = str_buf_printf(p_str_buf, "\\b");
                 break;
             case '\f':
-                str_buf_printf(p_str_buf, "\\f");
+                res = str_buf_printf(p_str_buf, "\\f");
                 break;
             case '\n':
-                str_buf_printf(p_str_buf, "\\n");
+                res = str_buf_printf(p_str_buf, "\\n");
                 break;
             case '\r':
-                str_buf_printf(p_str_buf, "\\r");
+                res = str_buf_printf(p_str_buf, "\\r");
                 break;
             case '\t':
-                str_buf_printf(p_str_buf, "\\t");
+                res = str_buf_printf(p_str_buf, "\\t");
                 break;
             default:
-                json_print_char_escaped(p_str_buf, in_chr);
+                res = json_print_char_escaped(p_str_buf, in_chr);
                 break;
+        }
+        if (!res)
+        {
+            return false;
         }
     }
     if (!str_buf_printf(p_str_buf, "\""))

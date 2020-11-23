@@ -14,7 +14,7 @@ extern "C" {
 
 typedef uint32_t sta_ip_address_t;
 
-typedef struct sta_ip_string
+typedef struct sta_ip_string_t
 {
     char buf[17];
 } sta_ip_string_t;

@@ -44,8 +44,8 @@ typedef void (*wifi_manager_cb_ptr)(void *);
 
 typedef struct
 {
-    wifi_ant_gpio_config_t wifiAntGpioConfig;
-    wifi_ant_config_t      wifiAntConfig;
+    wifi_ant_gpio_config_t wifi_ant_gpio_config;
+    wifi_ant_config_t      wifi_ant_config;
 } WiFiAntConfig_t;
 
 /**
@@ -53,7 +53,7 @@ typedef struct
  */
 void
 wifi_manager_start(
-    const WiFiAntConfig_t *        pWiFiAntConfig,
+    const WiFiAntConfig_t *        p_wifi_ant_config,
     wifi_manager_http_callback_t   cb_on_http_get,
     wifi_manager_http_cb_on_post_t cb_on_http_post,
     wifi_manager_http_callback_t   cb_on_http_delete);
@@ -92,7 +92,7 @@ wifi_manager_disconnect_async(void);
  * @brief Register a callback to a custom function when specific event message_code happens.
  */
 void
-wifi_manager_set_callback(message_code_t message_code, wifi_manager_cb_ptr func_ptr);
+wifi_manager_set_callback(const message_code_e message_code, wifi_manager_cb_ptr func_ptr);
 
 #ifdef __cplusplus
 }
