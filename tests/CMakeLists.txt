@@ -6,10 +6,6 @@ add_definitions(
         -DRUUVI_TESTS=1
 )
 
-include_directories(
-        esp_simul
-)
-
 enable_testing()
 add_subdirectory(googletest)
 add_subdirectory(posix_gcc_simulator)
@@ -34,6 +30,8 @@ include_directories(
 
 add_subdirectory(${RUUVI_ESP_WRAPPERS} ruuvi.esp_wrappers.c)
 add_subdirectory(${RUUVI_ESP_WRAPPERS_TESTS_COMMON} ruuvi.esp_wrappers_tests)
+
+add_subdirectory(esp_simul)
 
 add_subdirectory(lwip)
 

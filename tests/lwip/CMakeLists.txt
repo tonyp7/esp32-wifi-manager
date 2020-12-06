@@ -115,3 +115,5 @@ add_library(lwip STATIC
         ${LWIP_CONTRIB}
         "${CMAKE_CURRENT_SOURCE_DIR}/extra/tapif.c"
 )
+
+target_link_libraries(lwip esp_simul)

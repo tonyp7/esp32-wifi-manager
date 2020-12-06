@@ -32,6 +32,7 @@
 #ifndef LWIP_LWIPOPTS_H
 #define LWIP_LWIPOPTS_H
 
+#include <stdint.h>
 #include "arch/cc.h"
 #include "sdkconfig.h"
 
@@ -233,6 +234,8 @@ a lot of data that needs to be copied, this should be set high. */
 #define LWIP_AUTOIP             (LWIP_DHCP)
 
 /* ---------- SNTP options --------- */
+#define SNTP_SERVER_DNS            1
+
 extern void sntp_set_system_time(uint32_t sec);
 #define SNTP_SET_SYSTEM_TIME(s) sntp_set_system_time(s)
 

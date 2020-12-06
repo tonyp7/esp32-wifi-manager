@@ -9,7 +9,6 @@ add_executable(
         ../../src/sta_ip.h
         ../../src/sta_ip_unsafe.c
         ../../src/sta_ip_unsafe.h
-        ../esp_simul/stub_func.c
 )
 
 set_target_properties(${ProjectId} PROPERTIES
@@ -46,5 +45,6 @@ target_link_libraries(${ProjectId}
         gcov
         ruuvi_esp_wrappers
         ruuvi_esp_wrappers-common_test_funcs
+        esp_simul
         --coverage
 )

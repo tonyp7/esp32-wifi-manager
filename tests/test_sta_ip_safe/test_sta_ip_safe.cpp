@@ -85,6 +85,12 @@ TestStaIpSafe::~TestStaIpSafe() = default;
 
 extern "C" {
 
+unsigned int
+lwip_port_rand(void)
+{
+    return (unsigned int)random();
+}
+
 os_mutex_t
 os_mutex_create(void)
 {

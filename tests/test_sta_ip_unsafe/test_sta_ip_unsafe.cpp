@@ -46,6 +46,12 @@ TestStaIpUnsafe::~TestStaIpUnsafe() = default;
 extern "C" {
 #endif
 
+unsigned int
+lwip_port_rand(void)
+{
+    return (unsigned int)random();
+}
+
 #ifdef __cplusplus
 }
 #endif
