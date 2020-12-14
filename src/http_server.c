@@ -64,13 +64,13 @@ function to process requests, decode URLs, serve files, etc. etc.
 #include "cJSON.h"
 #include "sta_ip_safe.h"
 #include "os_task.h"
-#include "app_malloc.h"
+#include "os_malloc.h"
 #include "str_buf.h"
 #include "wifi_sta_config.h"
 #include "http_req.h"
 #include "esp_type_wrapper.h"
 
-#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
+#define LOG_LOCAL_LEVEL LOG_LEVEL_DEBUG
 #include "log.h"
 
 #define FULLBUF_SIZE (4U * 1024U)
@@ -201,7 +201,7 @@ write_content_from_heap(struct netconn *p_conn, http_server_resp_t *p_resp)
     {
         ESP_LOGE(TAG, "netconn_write failed, err=%d", err);
     }
-    app_free_const_pptr((const void **)&p_resp->select_location.memory.p_buf);
+    os_free(p_resp->select_location.memory.p_buf);
 }
 
 static void

@@ -85,6 +85,13 @@ TestStaIpSafe::~TestStaIpSafe() = default;
 
 extern "C" {
 
+const char *
+os_task_get_name(void)
+{
+    static const char g_task_name[] = "main";
+    return const_cast<char *>(g_task_name);
+}
+
 unsigned int
 lwip_port_rand(void)
 {
@@ -171,15 +178,7 @@ freertosStartup(void *arg)
     return nullptr;
 }
 
-#define TEST_CHECK_LOG_RECORD(level_, msg_) \
-    do \
-    { \
-        ASSERT_FALSE(esp_log_wrapper_is_empty()); \
-        const LogRecord log_record = esp_log_wrapper_pop(); \
-        ASSERT_EQ(level_, log_record.level); \
-        ASSERT_EQ(string("wifi_manager"), log_record.tag); \
-        ASSERT_EQ(string(msg_), log_record.message); \
-    } while (0)
+#define TEST_CHECK_LOG_RECORD(level_, msg_) ESP_LOG_WRAPPER_TEST_CHECK_LOG_RECORD("wifi_manager", level_, msg_)
 
 /*** Unit-Tests *******************************************************************************************************/
 
@@ -206,8 +205,8 @@ TEST_F(TestStaIpSafe, test_all) // NOLINT
         ASSERT_TRUE(nullptr == sta_ip_safe_mutex_get());
         ASSERT_FALSE(sta_ip_safe_lock((TickType_t)0));
         sta_ip_safe_unlock();
-        TEST_CHECK_LOG_RECORD(ESP_LOG_ERROR, "sta_ip_safe_lock: Mutex is not initialized");
-        TEST_CHECK_LOG_RECORD(ESP_LOG_ERROR, "sta_ip_safe_unlock: Mutex is not initialized");
+        TEST_CHECK_LOG_RECORD(ESP_LOG_ERROR, "Mutex is not initialized");
+        TEST_CHECK_LOG_RECORD(ESP_LOG_ERROR, "Mutex is not initialized");
         ASSERT_TRUE(esp_log_wrapper_is_empty());
     }
 
@@ -218,7 +217,7 @@ TEST_F(TestStaIpSafe, test_all) // NOLINT
         ASSERT_FALSE(sta_ip_safe_init());
         this->flag_mutex_create_fail = false;
 
-        TEST_CHECK_LOG_RECORD(ESP_LOG_ERROR, "sta_ip_safe_init: Failed to create mutex");
+        TEST_CHECK_LOG_RECORD(ESP_LOG_ERROR, "Failed to create mutex");
         ASSERT_TRUE(esp_log_wrapper_is_empty());
         ASSERT_TRUE(nullptr == sta_ip_safe_mutex_get());
     }
@@ -233,7 +232,7 @@ TEST_F(TestStaIpSafe, test_all) // NOLINT
         ASSERT_TRUE(nullptr != sta_ip_safe_mutex_get());
 
         ASSERT_FALSE(sta_ip_safe_init());
-        TEST_CHECK_LOG_RECORD(ESP_LOG_ERROR, "sta_ip_safe_init: Mutex was already initialized");
+        TEST_CHECK_LOG_RECORD(ESP_LOG_ERROR, "Mutex was already initialized");
         ASSERT_TRUE(esp_log_wrapper_is_empty());
 
         const sta_ip_string_t ip_str = sta_ip_safe_get((TickType_t)0);
@@ -241,7 +240,7 @@ TEST_F(TestStaIpSafe, test_all) // NOLINT
         sta_ip_safe_deinit();
         ASSERT_TRUE(nullptr == sta_ip_safe_mutex_get());
         sta_ip_safe_deinit();
-        TEST_CHECK_LOG_RECORD(ESP_LOG_ERROR, "sta_ip_safe_lock: Mutex is not initialized");
+        TEST_CHECK_LOG_RECORD(ESP_LOG_ERROR, "Mutex is not initialized");
         ASSERT_TRUE(esp_log_wrapper_is_empty());
     }
 
@@ -269,14 +268,14 @@ TEST_F(TestStaIpSafe, test_all) // NOLINT
 
         const sta_ip_address_t ip_address = sta_ip_safe_conv_str_to_ip("192.168.1.10");
         ASSERT_FALSE(sta_ip_safe_set(ip_address, (TickType_t)0));
-        TEST_CHECK_LOG_RECORD(ESP_LOG_ERROR, "sta_ip_safe_lock: Mutex is not initialized");
+        TEST_CHECK_LOG_RECORD(ESP_LOG_ERROR, "Mutex is not initialized");
         TEST_CHECK_LOG_RECORD(ESP_LOG_WARN, "sta_ip_safe_set: Timeout waiting mutex");
         ASSERT_TRUE(esp_log_wrapper_is_empty());
 
         const sta_ip_string_t ip_str = sta_ip_safe_get((TickType_t)0);
         ASSERT_EQ(string(""), string(ip_str.buf));
         ASSERT_TRUE(nullptr == sta_ip_safe_mutex_get());
-        TEST_CHECK_LOG_RECORD(ESP_LOG_ERROR, "sta_ip_safe_lock: Mutex is not initialized");
+        TEST_CHECK_LOG_RECORD(ESP_LOG_ERROR, "Mutex is not initialized");
         TEST_CHECK_LOG_RECORD(ESP_LOG_WARN, "sta_ip_safe_get: Timeout waiting mutex");
         ASSERT_TRUE(esp_log_wrapper_is_empty());
     }

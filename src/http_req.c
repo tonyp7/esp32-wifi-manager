@@ -129,7 +129,7 @@ http_req_header_get_field(const http_req_header_t req_header, const char *field_
     }
     else
     {
-        *p_len = p_end - p_val;
+        *p_len = (uint32_t)(ptrdiff_t)(p_end - p_val);
     }
     return p_val;
 }

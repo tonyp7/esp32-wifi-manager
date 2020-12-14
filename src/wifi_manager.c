@@ -64,7 +64,7 @@ Contains the freeRTOS task and all necessary support
 #include "wifi_sta_config.h"
 #include "http_req.h"
 
-#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
+#define LOG_LOCAL_LEVEL LOG_LEVEL_DEBUG
 #include "log.h"
 
 /* @brief tag used for ESP serial console messages */
