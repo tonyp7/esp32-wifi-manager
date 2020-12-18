@@ -305,16 +305,12 @@ wifi_manager_event_handler(
                 LOG_INFO("WIFI_EVENT_STA_CONNECTED");
                 break;
             case WIFI_EVENT_STA_DISCONNECTED:
+            {
                 LOG_INFO("WIFI_EVENT_STA_DISCONNECTED");
-                /* if a DISCONNECT message is posted while a scan is in progress this scan will NEVER end, causing scan
-                 * to never work again. For this reason SCAN_BIT is cleared too */
-                xEventGroupClearBits(
-                    g_wifi_manager_event_group,
-                    WIFI_MANAGER_WIFI_CONNECTED_BIT | WIFI_MANAGER_SCAN_BIT);
                 const wifi_event_sta_disconnected_t *p_disconnected = (const wifi_event_sta_disconnected_t *)event_data;
-                /* post disconnect event with reason code */
                 wifiman_msg_send_ev_disconnected(p_disconnected->reason);
                 break;
+            }
             default:
                 break;
         }
@@ -324,7 +320,6 @@ wifi_manager_event_handler(
         if (IP_EVENT_STA_GOT_IP == event_id)
         {
             LOG_INFO("IP_EVENT_STA_GOT_IP");
-            xEventGroupSetBits(g_wifi_manager_event_group, WIFI_MANAGER_WIFI_CONNECTED_BIT);
             const ip_event_got_ip_t *p_ip_event = (const ip_event_got_ip_t *)event_data;
             wifiman_msg_send_ev_got_ip(p_ip_event->ip_info.ip.addr);
         }
@@ -587,10 +582,15 @@ wifi_handle_ev_disconnected(const wifiman_msg_param_t *p_param)
     const wifiman_disconnection_reason_t reason = wifiman_conv_param_to_reason(p_param);
     LOG_INFO("MESSAGE: EVENT_STA_DISCONNECTED with Reason code: %d", reason);
 
+    /* if a DISCONNECT message is posted while a scan is in progress this scan will NEVER end, causing scan
+     * to never work again. For this reason SCAN_BIT is cleared too */
+    const EventBits_t event_bits = xEventGroupClearBits(
+        g_wifi_manager_event_group,
+        WIFI_MANAGER_WIFI_CONNECTED_BIT | WIFI_MANAGER_SCAN_BIT);
+
     /* reset saved sta IP */
     sta_ip_safe_reset(portMAX_DELAY);
 
-    const EventBits_t event_bits = xEventGroupGetBits(g_wifi_manager_event_group);
     if (0 != (event_bits & (uint32_t)WIFI_MANAGER_REQUEST_STA_CONNECT_BIT))
     {
         LOG_INFO("event_bits & WIFI_MANAGER_REQUEST_STA_CONNECT_BIT");
@@ -650,21 +650,17 @@ wifi_handle_ev_got_ip(const wifiman_msg_param_t *p_param)
 {
     LOG_INFO("MESSAGE: EVENT_STA_GOT_IP");
 
-    const EventBits_t event_bits = xEventGroupGetBits(g_wifi_manager_event_group);
-
-    /* reset connection requests bits -- doesn't matter if it was set or not */
-    xEventGroupClearBits(g_wifi_manager_event_group, WIFI_MANAGER_REQUEST_STA_CONNECT_BIT);
+    const EventBits_t event_bits = xEventGroupClearBits(
+        g_wifi_manager_event_group,
+        WIFI_MANAGER_REQUEST_STA_CONNECT_BIT | WIFI_MANAGER_REQUEST_RESTORE_STA_BIT);
+    xEventGroupSetBits(g_wifi_manager_event_group, WIFI_MANAGER_WIFI_CONNECTED_BIT);
 
     /* save IP as a string for the HTTP server host */
     const sta_ip_address_t ip_addr = wifiman_conv_param_to_ip_addr(p_param);
     sta_ip_safe_set(ip_addr, portMAX_DELAY);
 
     /* save wifi config in NVS if it wasn't a restored of a connection */
-    if (0 != (event_bits & (uint32_t)WIFI_MANAGER_REQUEST_RESTORE_STA_BIT))
-    {
-        xEventGroupClearBits(g_wifi_manager_event_group, WIFI_MANAGER_REQUEST_RESTORE_STA_BIT);
-    }
-    else
+    if (0 == (event_bits & (uint32_t)WIFI_MANAGER_REQUEST_RESTORE_STA_BIT))
     {
         wifi_sta_config_save();
     }
@@ -693,8 +689,11 @@ wifi_handle_cmd_disconnect_sta(void)
     /* precise this is coming from a user request */
     xEventGroupSetBits(g_wifi_manager_event_group, WIFI_MANAGER_REQUEST_DISCONNECT_BIT);
 
-    /* order wifi discconect */
-    ESP_ERROR_CHECK(esp_wifi_disconnect());
+    const esp_err_t err = esp_wifi_disconnect();
+    if (ESP_OK != err)
+    {
+        LOG_ERR_ESP(err, "%s failed", "esp_wifi_disconnect");
+    }
 }
 
 ATTR_NORETURN
