@@ -576,7 +576,7 @@ wifi_handle_cmd_connect_sta(const wifiman_msg_param_t *p_param)
  *
  * @param p_param - pointer to wifiman_msg_param_t
  */
-static void
+static bool
 wifi_handle_ev_disconnected(const wifiman_msg_param_t *p_param)
 {
     const wifiman_disconnection_reason_t reason = wifiman_conv_param_to_reason(p_param);
@@ -636,6 +636,11 @@ wifi_handle_ev_disconnected(const wifiman_msg_param_t *p_param)
 
         wifiman_msg_send_cmd_connect_sta(CONNECTION_REQUEST_AUTO_RECONNECT);
     }
+    if (0 == (event_bits & (uint32_t)WIFI_MANAGER_WIFI_CONNECTED_BIT))
+    {
+        return false;
+    }
+    return true;
 }
 
 static void
@@ -715,6 +720,7 @@ wifi_manager_main_loop(void)
             vTaskDelay(delay_ms / portTICK_PERIOD_MS);
             continue;
         }
+        bool flag_do_not_call_cb = false;
         switch (msg.code)
         {
             case EVENT_SCAN_DONE:
@@ -730,7 +736,10 @@ wifi_manager_main_loop(void)
                 wifi_handle_cmd_connect_sta(&msg.msg_param);
                 break;
             case EVENT_STA_DISCONNECTED:
-                wifi_handle_ev_disconnected(&msg.msg_param);
+                if (!wifi_handle_ev_disconnected(&msg.msg_param))
+                {
+                    flag_do_not_call_cb = true;
+                }
                 break;
             case ORDER_START_AP:
                 wifi_handle_cmd_start_ip();
@@ -746,7 +755,10 @@ wifi_manager_main_loop(void)
         }
         if (NULL != g_wifi_cb_ptr_arr[msg.code])
         {
-            (*g_wifi_cb_ptr_arr[msg.code])(NULL);
+            if (!flag_do_not_call_cb)
+            {
+                (*g_wifi_cb_ptr_arr[msg.code])(NULL);
+            }
         }
     }
 }
