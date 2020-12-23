@@ -47,6 +47,7 @@ extern "C" {
  *  you may want to relocate the wifi manager to another URL, for instance /wifimanager
  */
 #define WEBAPP_LOCATION 					CONFIG_WEBAPP_LOCATION
+#define CAPTIVE_PORTAL_LOCATION 		    CONFIG_CAPTIVE_PORTAL_LOCATION
 
 
 /** 
