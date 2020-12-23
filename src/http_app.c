@@ -431,6 +431,7 @@ void http_app_start(bool lru_purge_enable){
 		/* generate the URLs */
 		if(http_root_url == NULL){
 			int root_len = strlen(WEBAPP_LOCATION);
+            int captive_portal_len = strlen(CAPTIVE_PORTAL_LOCATION);
 
 			/* all the pages */
 			const char page_js[] = "code.js";
@@ -450,12 +451,15 @@ void http_app_start(bool lru_purge_enable){
 			http_redirect_url = malloc(sizeof(char) * redirect_sz);
 			*http_redirect_url = '\0';
 
-			if(root_len == 1){
+            if(captive_portal_len > 1) {
+                snprintf(http_redirect_url, redirect_sz, "http://%s%s", DEFAULT_AP_IP, CAPTIVE_PORTAL_LOCATION);
+            } else if(root_len == 1){
 				snprintf(http_redirect_url, redirect_sz, "http://%s", DEFAULT_AP_IP);
-			}
-			else{
+			} else{
 				snprintf(http_redirect_url, redirect_sz, "http://%s%s", DEFAULT_AP_IP, WEBAPP_LOCATION);
 			}
+
+            ESP_LOGI(TAG, "Captive portal url: %s", http_redirect_url);
 
 			/* generate the other pages URLs*/
 			http_js_url = http_app_generate_url(page_js);

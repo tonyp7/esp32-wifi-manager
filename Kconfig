@@ -30,6 +30,13 @@ config WEBAPP_LOCATION
     help
     This parameter helps you relocate the wifimanager to another URL, for instance /wifimanager/ The trailing slash is important and should be included
 
+config CAPTIVE_PORTAL_LOCATION
+    string "Use this url for the captive portal"
+    default "/"
+    help
+    This is used when a different welcome screen is required. For example when a "welcome"-http handler is hooked in to
+    esp-wifi-manager. That handler should provide a link to get into the wifi setup.
+
 config DEFAULT_AP_SSID
     string "Access Point SSID"
     default "esp32"
