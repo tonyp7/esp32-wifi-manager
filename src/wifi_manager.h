@@ -157,7 +157,7 @@ extern "C" {
  *  Value: WIFI_PS_MODEM for power save (wifi modem sleep periodically)
  *  Note: Power save is only effective when in STA only mode
  */
-#define DEFAULT_STA_POWER_SAVE 				WIFI_PS_NONE
+#define DEFAULT_STA_POWER_SAVE 				WIFI_PS_MIN_MODEM
 
 /**
  * @brief Defines the maximum length in bytes of a JSON representation of an access point.
