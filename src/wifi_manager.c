@@ -139,6 +139,8 @@ wifi_manager_start(
     g_wifi_cb_on_http_post   = cb_on_http_post;
     g_wifi_cb_on_http_delete = cb_on_http_delete;
 
+    dns_server_init();
+
     if (!wifiman_msg_init())
     {
         LOG_ERR("%s failed", "wifiman_msg_init");

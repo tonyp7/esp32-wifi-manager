@@ -54,50 +54,42 @@ Contains the freeRTOS task for the DNS server that processes the requests.
 #include "os_task.h"
 #include "log.h"
 #include "esp_type_wrapper.h"
+#include "os_signal.h"
+#include "os_mutex.h"
+
+#define DNS_SERVER_SIG_STOP (OS_SIGNAL_NUM_0)
 
 static const char TAG[] = "dns_server";
 
-static TaskHandle_t gh_dns_task;
-static socket_t     g_dns_socket_fd = SOCKET_INVALID;
+static os_mutex_static_t  g_dns_server_mutex_mem;
+static os_mutex_t         g_dns_server_mutex;
+static os_signal_static_t g_dns_server_signal_mem;
+static os_signal_t *      gp_dns_server_sig;
 
-ATTR_NORETURN
+static void
+dns_server_task(void);
+
 void
-dns_server_task(ATTR_UNUSED void *p_params);
+dns_server_init(void)
+{
+    assert(NULL == g_dns_server_mutex);
+    g_dns_server_mutex = os_mutex_create_static(&g_dns_server_mutex_mem);
+    gp_dns_server_sig  = os_signal_create_static(&g_dns_server_signal_mem);
+    os_signal_add(gp_dns_server_sig, DNS_SERVER_SIG_STOP);
+}
 
 bool
 dns_server_start(void)
 {
-    /* Create UDP socket */
-    socket_t socket_fd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (SOCKET_INVALID == socket_fd)
-    {
-        LOG_ERR("Failed to create socket 53/udp");
-        return false;
-    }
-    struct sockaddr_in ra = { 0 };
-    /* Bind to port 53 (typical DNS Server port) */
-    tcpip_adapter_ip_info_t ip = { 0 };
-    tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_STA, &ip);
-    ra.sin_family      = AF_INET;
-    ra.sin_addr.s_addr = ip.ip.addr;
-    ra.sin_port        = htons(53);
-    if (SOCKET_BIND_ERROR == bind(socket_fd, (struct sockaddr *)&ra, sizeof(struct sockaddr_in)))
-    {
-        LOG_ERR("Failed to bind to 53/udp");
-        close(socket_fd);
-        return false;
-    }
-
-    g_dns_socket_fd = socket_fd;
+    LOG_INFO("Start DNS-Server");
+    assert(NULL != g_dns_server_mutex);
 
     const uint32_t stack_depth = 3072U;
-    if (!os_task_create(
+    if (!os_task_create_finite_without_param(
             &dns_server_task,
             "dns_server",
             stack_depth,
-            NULL,
-            WIFI_MANAGER_TASK_PRIORITY - 1,
-            &gh_dns_task))
+            WIFI_MANAGER_TASK_PRIORITY - 1))
     {
         LOG_ERR("Can't create thread");
         return false;
@@ -108,13 +100,22 @@ dns_server_start(void)
 void
 dns_server_stop(void)
 {
-    if (NULL != gh_dns_task)
+    assert(NULL != g_dns_server_mutex);
+
+    os_mutex_lock(g_dns_server_mutex);
+    if (os_signal_is_any_thread_registered(gp_dns_server_sig))
     {
-        vTaskDelete(gh_dns_task);
-        close(g_dns_socket_fd);
-        g_dns_socket_fd = SOCKET_INVALID;
-        gh_dns_task     = NULL;
+        LOG_INFO("Send request to stop DNS-Server");
+        if (!os_signal_send(gp_dns_server_sig, DNS_SERVER_SIG_STOP))
+        {
+            LOG_ERR("Failed to send DNS-Server stop request");
+        }
     }
+    else
+    {
+        LOG_INFO("Send request to stop DNS-Server, but DSN-Server is not running");
+    }
+    os_mutex_unlock(g_dns_server_mutex);
 }
 
 static void
@@ -149,7 +150,8 @@ dns_server_handle_req(socket_t socket_fd, const ip4_addr_t *p_ip_resolved)
      * multiple queries within the same DNS packet and is not supported by this simple DNS hijack. */
     if (length < 0)
     {
-        LOG_ERR("recvfrom got length less than 0");
+        // timeout
+        LOG_VERBOSE("recvfrom got length less than 0");
         return;
     }
     if ((size_t)length < sizeof(dns_header_t))
@@ -207,11 +209,67 @@ dns_server_handle_req(socket_t socket_fd, const ip4_addr_t *p_ip_resolved)
     }
 }
 
-ATTR_NORETURN
-void
-dns_server_task(ATTR_UNUSED void *p_params)
+static bool
+dns_server_sig_register_cur_thread(void)
 {
-    const socket_t socket_fd = g_dns_socket_fd;
+    os_mutex_lock(g_dns_server_mutex);
+    if (!os_signal_register_cur_thread(gp_dns_server_sig))
+    {
+        os_mutex_unlock(g_dns_server_mutex);
+        return false;
+    }
+    os_mutex_unlock(g_dns_server_mutex);
+    return true;
+}
+
+static void
+dns_server_sig_unregister_cur_thread(void)
+{
+    os_mutex_lock(g_dns_server_mutex);
+    os_signal_unregister_cur_thread(gp_dns_server_sig);
+    os_mutex_unlock(g_dns_server_mutex);
+}
+
+static void
+dns_server_task(void)
+{
+    LOG_INFO("DNS-Server thread started");
+    if (!dns_server_sig_register_cur_thread())
+    {
+        LOG_WARN("Another DNS-Server is already working - finish current thread");
+        return;
+    }
+
+    /* Create UDP socket */
+    const socket_t socket_fd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (SOCKET_INVALID == socket_fd)
+    {
+        LOG_ERR("Failed to create socket 53/udp");
+        dns_server_sig_unregister_cur_thread();
+        return;
+    }
+
+    struct timeval tv = { .tv_sec = 1, .tv_usec = 0 };
+    if (setsockopt(socket_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0)
+    {
+        LOG_ERR("setsockopt(SO_RCVTIMEO) failed");
+        dns_server_sig_unregister_cur_thread();
+        return;
+    }
+    struct sockaddr_in ra = { 0 };
+    /* Bind to port 53 (typical DNS Server port) */
+    tcpip_adapter_ip_info_t ip = { 0 };
+    tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_STA, &ip);
+    ra.sin_family      = AF_INET;
+    ra.sin_addr.s_addr = ip.ip.addr;
+    ra.sin_port        = htons(53);
+    if (SOCKET_BIND_ERROR == bind(socket_fd, (struct sockaddr *)&ra, sizeof(struct sockaddr_in)))
+    {
+        LOG_ERR("Failed to bind to 53/udp");
+        close(socket_fd);
+        dns_server_sig_unregister_cur_thread();
+        return;
+    }
 
     /* Set redirection DNS hijack to the access point IP */
     ip4_addr_t ip_resolved = { 0 };
@@ -222,13 +280,18 @@ dns_server_task(ATTR_UNUSED void *p_params)
     /* Start loop to process DNS requests */
     for (;;)
     {
+        os_signal_events_t sig_events = { 0 };
+        if (os_signal_wait_with_timeout(gp_dns_server_sig, OS_DELTA_TICKS_IMMEDIATE, &sig_events))
+        {
+            LOG_INFO("Got signal STOP");
+            break;
+        }
         dns_server_handle_req(socket_fd, &ip_resolved);
 
         taskYIELD(); /* allows the freeRTOS scheduler to take over if needed. DNS daemon should not be taxing on the
                         system */
     }
-    close(g_dns_socket_fd);
-    g_dns_socket_fd = SOCKET_INVALID;
-
-    vTaskDelete(NULL);
+    LOG_INFO("Stop DNS Server");
+    close(socket_fd);
+    dns_server_sig_unregister_cur_thread();
 }

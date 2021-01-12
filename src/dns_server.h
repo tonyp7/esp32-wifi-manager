@@ -120,6 +120,9 @@ typedef struct __attribute__((__packed__)) dns_answer_t
     uint32_t dns_response_data; /* For the sake of simplicity only ipv4 is supported */
 } dns_answer_t;
 
+void
+dns_server_init(void);
+
 bool
 dns_server_start(void);
 
