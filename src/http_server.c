@@ -69,24 +69,48 @@ function to process requests, decode URLs, serve files, etc. etc.
 #include "wifi_sta_config.h"
 #include "http_req.h"
 #include "esp_type_wrapper.h"
+#include "os_signal.h"
+#include "os_mutex.h"
 
 #define LOG_LOCAL_LEVEL LOG_LEVEL_DEBUG
 #include "log.h"
 
+#define HTTP_SERVER_SIG_STOP (OS_SIGNAL_NUM_0)
+
 #define FULLBUF_SIZE (4U * 1024U)
+
+#define HTTP_SERVER_ACCEPT_TIMEOUT_MS (1 * 1000)
 
 /**
  * @brief RTOS task for the HTTP server. Do not start manually.
  * @see void http_server_start()
  */
-static _Noreturn void
-http_server_task(void *p_param);
+static void
+http_server_task(void);
+
+/**
+ * @brief Helper function that processes one HTTP request at a time.
+ * @param p_conn - ptr to a connection object
+ */
+static void
+http_server_netconn_serve(struct netconn *p_conn);
 
 /* @brief tag used for ESP serial console messages */
 static const char TAG[] = "http_server";
 
-/* @brief task handle for the http server */
-static os_task_handle_t gh_http_task;
+static os_mutex_static_t  g_http_server_mutex_mem;
+static os_mutex_t         g_http_server_mutex;
+static os_signal_static_t g_http_server_signal_mem;
+static os_signal_t *      gp_http_server_sig;
+
+void
+http_server_init(void)
+{
+    assert(NULL == g_http_server_mutex);
+    g_http_server_mutex = os_mutex_create_static(&g_http_server_mutex_mem);
+    gp_http_server_sig  = os_signal_create_static(&g_http_server_signal_mem);
+    os_signal_add(gp_http_server_sig, HTTP_SERVER_SIG_STOP);
+}
 
 ATTR_PRINTF(3, 4)
 static void
@@ -231,7 +255,7 @@ write_content_from_fatfs(struct netconn *p_conn, const http_server_resp_t *p_res
         {
             netconn_flags |= (uint8_t)NETCONN_MORE;
         }
-        LOG_DBG("Send %u bytes", num_bytes);
+        LOG_VERBOSE("Send %u bytes", num_bytes);
         const err_t err = netconn_write(p_conn, tmp_buf, num_bytes, netconn_flags);
         if (ERR_OK != err)
         {
@@ -349,47 +373,85 @@ http_server_netconn_resp_503(struct netconn *p_conn)
 void
 http_server_start(void)
 {
-    if (NULL == gh_http_task)
+    LOG_INFO("Start HTTP-Server");
+    assert(NULL != g_http_server_mutex);
+
+    const uint32_t stack_depth = 20U * 1024U;
+    if (!os_task_create_finite_without_param(
+            &http_server_task,
+            "http_server",
+            stack_depth,
+            WIFI_MANAGER_TASK_PRIORITY - 1))
     {
-        LOG_INFO("Run http_server");
-        const uint32_t stack_depth = 20U * 1024U;
-        if (!os_task_create(
-                &http_server_task,
-                "http_server",
-                stack_depth,
-                NULL,
-                WIFI_MANAGER_TASK_PRIORITY - 1,
-                &gh_http_task))
-        {
-            LOG_ERR("xTaskCreate failed: http_server");
-        }
-    }
-    else
-    {
-        LOG_INFO("Run http_server - the server is already running");
+        LOG_ERR("xTaskCreate failed: http_server");
     }
 }
 
 void
 http_server_stop(void)
 {
-    if (NULL != gh_http_task)
+    assert(NULL != g_http_server_mutex);
+    os_mutex_lock(g_http_server_mutex);
+    if (os_signal_is_any_thread_registered(gp_http_server_sig))
     {
-        vTaskDelete(gh_http_task);
-        gh_http_task = NULL;
+        LOG_INFO("Send request to stop HTTP-Server");
+        if (!os_signal_send(gp_http_server_sig, HTTP_SERVER_SIG_STOP))
+        {
+            LOG_ERR("Failed to send HTTP-Server stop request");
+        }
     }
+    else
+    {
+        LOG_INFO("Send request to stop HTTP-Server, but HTTP-Server is not running");
+    }
+    os_mutex_unlock(g_http_server_mutex);
 }
 
-static _Noreturn void
-http_server_task(ATTR_UNUSED void *p_param)
+static bool
+http_server_sig_register_cur_thread(void)
 {
+    os_mutex_lock(g_http_server_mutex);
+    if (!os_signal_register_cur_thread(gp_http_server_sig))
+    {
+        os_mutex_unlock(g_http_server_mutex);
+        return false;
+    }
+    os_mutex_unlock(g_http_server_mutex);
+    return true;
+}
+
+static void
+http_server_sig_unregister_cur_thread(void)
+{
+    os_mutex_lock(g_http_server_mutex);
+    os_signal_unregister_cur_thread(gp_http_server_sig);
+    os_mutex_unlock(g_http_server_mutex);
+}
+
+static void
+http_server_task(void)
+{
+    LOG_INFO("HTTP-Server thread started");
+    if (!http_server_sig_register_cur_thread())
+    {
+        LOG_WARN("Another HTTP-Server is already working - finish current thread");
+        return;
+    }
+
     struct netconn *p_conn    = netconn_new(NETCONN_TCP);
     const u16_t     http_port = 80U;
     netconn_bind(p_conn, IP_ADDR_ANY, http_port);
     netconn_listen(p_conn);
+    netconn_set_recvtimeout(p_conn, HTTP_SERVER_ACCEPT_TIMEOUT_MS);
     LOG_INFO("HTTP Server listening on 80/tcp");
     for (;;)
     {
+        os_signal_events_t sig_events = { 0 };
+        if (os_signal_wait_with_timeout(gp_http_server_sig, OS_DELTA_TICKS_IMMEDIATE, &sig_events))
+        {
+            LOG_INFO("Got signal STOP");
+            break;
+        }
         struct netconn *p_new_conn = NULL;
         const err_t     err        = netconn_accept(p_conn, &p_new_conn);
         if (ERR_OK == err)
@@ -400,22 +462,22 @@ http_server_task(ATTR_UNUSED void *p_param)
         }
         else if (ERR_TIMEOUT == err)
         {
-            LOG_ERR("http_server: netconn_accept ERR_TIMEOUT");
+            LOG_VERBOSE("netconn_accept ERR_TIMEOUT");
         }
         else if (ERR_ABRT == err)
         {
-            LOG_ERR("http_server: netconn_accept ERR_ABRT");
+            LOG_ERR("netconn_accept ERR_ABRT");
         }
         else
         {
-            LOG_ERR("http_server: netconn_accept: %d", err);
+            LOG_ERR("netconn_accept: %d", err);
         }
         taskYIELD(); /* allows the freeRTOS scheduler to take over if needed. */
     }
+    LOG_INFO("Stop HTTP-Server");
     netconn_close(p_conn);
     netconn_delete(p_conn);
-
-    vTaskDelete(NULL);
+    http_server_sig_unregister_cur_thread();
 }
 
 static const char *
@@ -633,7 +695,7 @@ http_server_recv_and_handle(struct netconn *p_conn, char *p_req_buf, uint32_t *p
     return true;
 }
 
-void
+static void
 http_server_netconn_serve(struct netconn *p_conn)
 {
     char     req_buf[FULLBUF_SIZE + 1];

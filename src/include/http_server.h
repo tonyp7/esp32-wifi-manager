@@ -39,19 +39,24 @@ function to process requests, decode URLs, serve files, etc. etc.
 extern "C" {
 #endif
 
-#include "lwip/api.h"
-
-/* @brief helper function that processes one HTTP request at a time */
+/**
+ * @brief Init the http server.
+ * @brief This function should be executed before start/stop.
+ */
 void
-http_server_netconn_serve(struct netconn *p_conn);
+http_server_init(void);
 
-/* @brief stop the http server task */
-void
-http_server_stop(void);
-
-/* @brief create the task for the http server */
+/**
+ * @brief Create the task for the http server.
+ */
 void
 http_server_start(void);
+
+/**
+ * @brief Stop the http server task.
+ */
+void
+http_server_stop(void);
 
 #ifdef __cplusplus
 }
