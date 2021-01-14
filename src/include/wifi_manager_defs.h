@@ -198,12 +198,15 @@ typedef enum message_code_e
     ORDER_CONNECT_STA          = 7,
     ORDER_DISCONNECT_STA       = 8,
     ORDER_START_AP             = 9,
-    ORDER_START_HTTP           = 10,
+    ORDER_STOP_AP              = 10,
     ORDER_START_DNS_HIJACK     = 11,
     EVENT_STA_DISCONNECTED     = 12,
     EVENT_SCAN_DONE            = 13,
     EVENT_STA_GOT_IP           = 14,
-    MESSAGE_CODE_COUNT         = 15 /* important for the callback array */
+    EVENT_AP_STA_CONNECTED     = 15,
+    EVENT_AP_STA_DISCONNECTED  = 16,
+    EVENT_AP_STA_IP_ASSIGNED   = 17,
+    MESSAGE_CODE_COUNT         = 18 /* important for the callback array */
 } message_code_e;
 
 /**

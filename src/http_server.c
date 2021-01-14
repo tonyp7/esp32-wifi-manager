@@ -71,6 +71,7 @@ function to process requests, decode URLs, serve files, etc. etc.
 #include "esp_type_wrapper.h"
 #include "os_signal.h"
 #include "os_mutex.h"
+#include "wifiman_msg.h"
 
 #define LOG_LOCAL_LEVEL LOG_LEVEL_DEBUG
 #include "log.h"
@@ -80,6 +81,8 @@ function to process requests, decode URLs, serve files, etc. etc.
 #define FULLBUF_SIZE (4U * 1024U)
 
 #define HTTP_SERVER_ACCEPT_TIMEOUT_MS (1 * 1000)
+
+#define HTTP_SERVER_STATUS_JSON_REQUEST_TIMEOUT_MS (5 * 1000)
 
 /**
  * @brief RTOS task for the HTTP server. Do not start manually.
@@ -102,6 +105,8 @@ static os_mutex_static_t  g_http_server_mutex_mem;
 static os_mutex_t         g_http_server_mutex;
 static os_signal_static_t g_http_server_signal_mem;
 static os_signal_t *      gp_http_server_sig;
+
+static os_delta_ticks_t g_http_last_req_status;
 
 void
 http_server_init(void)
@@ -472,6 +477,23 @@ http_server_task(void)
         {
             LOG_ERR("netconn_accept: %d", err);
         }
+        if (wifi_manager_is_connected() && wifi_manager_is_ap_sta_ip_assigned())
+        {
+            if ((0 != g_http_last_req_status)
+                && ((xTaskGetTickCount() - g_http_last_req_status)
+                    > OS_DELTA_MS_TO_TICKS(HTTP_SERVER_STATUS_JSON_REQUEST_TIMEOUT_MS)))
+            {
+                LOG_INFO(
+                    "There are no HTTP requests for status.json for %u ms",
+                    HTTP_SERVER_STATUS_JSON_REQUEST_TIMEOUT_MS);
+                LOG_INFO("Stop WiFi AP");
+                wifiman_msg_send_cmd_stop_ap();
+            }
+        }
+        else
+        {
+            g_http_last_req_status = 0;
+        }
         taskYIELD(); /* allows the freeRTOS scheduler to take over if needed. */
     }
     LOG_INFO("Stop HTTP-Server");
@@ -530,6 +552,7 @@ http_server_handle_req_get(const char *p_file_name)
         }
         else if (0 == strcmp(p_file_name, "status.json"))
         {
+            g_http_last_req_status         = xTaskGetTickCount();
             const TickType_t ticks_to_wait = 10U;
             if (!wifi_manager_lock_json_buffer(ticks_to_wait))
             {

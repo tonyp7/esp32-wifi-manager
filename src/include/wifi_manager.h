@@ -94,6 +94,12 @@ wifi_manager_disconnect_async(void);
 void
 wifi_manager_set_callback(const message_code_e message_code, wifi_manager_cb_ptr func_ptr);
 
+bool
+wifi_manager_is_connected(void);
+
+bool
+wifi_manager_is_ap_sta_ip_assigned(void);
+
 #ifdef __cplusplus
 }
 #endif

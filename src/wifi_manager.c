@@ -89,7 +89,8 @@ static EventGroupHandle_t g_wifi_manager_event_group;
 /* @brief indicate that the ESP32 is currently connected. */
 #define WIFI_MANAGER_WIFI_CONNECTED_BIT (BIT0)
 
-#define WIFI_MANAGER_AP_STA_CONNECTED_BIT (BIT1)
+#define WIFI_MANAGER_AP_STA_CONNECTED_BIT   (BIT1)
+#define WIFI_MANAGER_AP_STA_IP_ASSIGNED_BIT (BIT9)
 
 /* @brief Set automatically once the SoftAP is started */
 #define WIFI_MANAGER_AP_STARTED_BIT (BIT2)
@@ -115,6 +116,25 @@ static EventGroupHandle_t g_wifi_manager_event_group;
 ATTR_NORETURN
 static void
 wifi_manager(const void *p_params);
+
+static void
+wifi_manager_event_handler(
+    ATTR_UNUSED void *     p_ctx,
+    const esp_event_base_t event_base,
+    const int32_t          event_id,
+    void *                 event_data);
+
+static void
+wifi_manager_set_ant_config(const WiFiAntConfig_t *p_wifi_ant_config);
+
+static void
+wifi_manager_esp_wifi_configure(const struct wifi_settings_t *p_wifi_settings);
+
+static void
+wifi_manager_tcpip_adapter_set_default_ip(void);
+
+static void
+wifi_manager_tcpip_adapter_configure(const struct wifi_settings_t *p_wifi_settings);
 
 void
 wifi_manager_scan_async(void)
@@ -162,6 +182,37 @@ wifi_manager_start(
     }
     sta_ip_safe_init();
     g_wifi_manager_event_group = xEventGroupCreate();
+
+    /* initialize the tcp stack */
+    tcpip_adapter_init();
+
+    ESP_ERROR_CHECK(esp_event_loop_create_default());
+    ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_manager_event_handler, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &wifi_manager_event_handler, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_AP_STAIPASSIGNED, &wifi_manager_event_handler, NULL));
+
+    /* default wifi config */
+    wifi_init_config_t wifi_init_config = WIFI_INIT_CONFIG_DEFAULT();
+    ESP_ERROR_CHECK(esp_wifi_init(&wifi_init_config));
+    ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
+
+    wifi_manager_set_ant_config(p_wifi_ant_config);
+    /* SoftAP - Wifi Access Point configuration setup */
+    wifi_manager_tcpip_adapter_set_default_ip();
+    const wifi_settings_t *p_wifi_settings = wifi_sta_config_get_wifi_settings();
+    wifi_manager_esp_wifi_configure(p_wifi_settings);
+
+    /* STA - Wifi Station configuration setup */
+    wifi_manager_tcpip_adapter_configure(p_wifi_settings);
+
+    /* by default the mode is STA because wifi_manager will not start the access point unless it has to! */
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+    ESP_ERROR_CHECK(esp_wifi_start());
+
+    /* enqueue first event: load previous config */
+    wifiman_msg_send_cmd_load_restore_sta();
+
+    http_server_start();
 
     /* start wifi manager task */
     const char *   task_name   = "wifi_manager";
@@ -287,16 +338,22 @@ wifi_manager_event_handler(
                 wifi_manager_scan_async();
                 break;
             case WIFI_EVENT_AP_STOP:
+                LOG_INFO("WIFI_EVENT_AP_STOP");
                 break;
             case WIFI_EVENT_AP_PROBEREQRECVED:
                 break;
             case WIFI_EVENT_AP_STACONNECTED: /* a user disconnected from the SoftAP */
                 LOG_INFO("WIFI_EVENT_AP_STACONNECTED");
+                xEventGroupClearBits(g_wifi_manager_event_group, WIFI_MANAGER_AP_STA_IP_ASSIGNED_BIT);
                 xEventGroupSetBits(g_wifi_manager_event_group, WIFI_MANAGER_AP_STA_CONNECTED_BIT);
+                wifiman_msg_send_ev_ap_sta_connected();
                 break;
             case WIFI_EVENT_AP_STADISCONNECTED:
                 LOG_INFO("WIFI_EVENT_AP_STADISCONNECTED");
-                xEventGroupClearBits(g_wifi_manager_event_group, WIFI_MANAGER_AP_STA_CONNECTED_BIT);
+                xEventGroupClearBits(
+                    g_wifi_manager_event_group,
+                    WIFI_MANAGER_AP_STA_CONNECTED_BIT | WIFI_MANAGER_AP_STA_IP_ASSIGNED_BIT);
+                wifiman_msg_send_ev_ap_sta_disconnected();
                 break;
             case WIFI_EVENT_STA_START:
                 LOG_INFO("WIFI_EVENT_STA_START");
@@ -308,23 +365,28 @@ wifi_manager_event_handler(
                 LOG_INFO("WIFI_EVENT_STA_CONNECTED");
                 break;
             case WIFI_EVENT_STA_DISCONNECTED:
-            {
                 LOG_INFO("WIFI_EVENT_STA_DISCONNECTED");
-                const wifi_event_sta_disconnected_t *p_disconnected = (const wifi_event_sta_disconnected_t *)event_data;
-                wifiman_msg_send_ev_disconnected(p_disconnected->reason);
+                wifiman_msg_send_ev_disconnected(((const wifi_event_sta_disconnected_t *)event_data)->reason);
                 break;
-            }
             default:
                 break;
         }
     }
     else if (IP_EVENT == event_base)
     {
-        if (IP_EVENT_STA_GOT_IP == event_id)
+        switch (event_id)
         {
-            LOG_INFO("IP_EVENT_STA_GOT_IP");
-            const ip_event_got_ip_t *p_ip_event = (const ip_event_got_ip_t *)event_data;
-            wifiman_msg_send_ev_got_ip(p_ip_event->ip_info.ip.addr);
+            case IP_EVENT_STA_GOT_IP:
+                LOG_INFO("IP_EVENT_STA_GOT_IP");
+                wifiman_msg_send_ev_got_ip(((const ip_event_got_ip_t *)event_data)->ip_info.ip.addr);
+                break;
+            case IP_EVENT_AP_STAIPASSIGNED:
+                LOG_INFO("IP_EVENT_AP_STAIPASSIGNED");
+                xEventGroupSetBits(g_wifi_manager_event_group, WIFI_MANAGER_AP_STA_IP_ASSIGNED_BIT);
+                wifiman_msg_send_ev_ap_sta_ip_assigned();
+                break;
+            default:
+                break;
         }
     }
     else
@@ -380,6 +442,7 @@ wifi_manager_stop(void)
     LOG_INFO("%s", __func__);
     esp_event_handler_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_manager_event_handler);
     esp_event_handler_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, &wifi_manager_event_handler);
+    esp_event_handler_unregister(IP_EVENT, IP_EVENT_AP_STAIPASSIGNED, &wifi_manager_event_handler);
 
     esp_wifi_disconnect();
     esp_wifi_stop();
@@ -421,9 +484,6 @@ wifi_handle_ev_scan_done(void)
     {
         LOG_ERR("could not get access to json mutex in wifi_scan");
     }
-
-    http_server_start();
-    dns_server_start();
 }
 
 static void
@@ -580,7 +640,7 @@ wifi_handle_cmd_connect_sta(const wifiman_msg_param_t *p_param)
  * @param p_param - pointer to wifiman_msg_param_t
  */
 static bool
-wifi_handle_ev_disconnected(const wifiman_msg_param_t *p_param)
+wifi_handle_ev_sta_disconnected(const wifiman_msg_param_t *p_param)
 {
     const wifiman_disconnection_reason_t reason = wifiman_conv_param_to_reason(p_param);
     LOG_INFO("MESSAGE: EVENT_STA_DISCONNECTED with Reason code: %d", reason);
@@ -643,18 +703,31 @@ wifi_handle_ev_disconnected(const wifiman_msg_param_t *p_param)
     {
         return false;
     }
+    dns_server_start();
     return true;
 }
 
 static void
-wifi_handle_cmd_start_ip(void)
+wifi_handle_cmd_start_ap(void)
 {
     LOG_INFO("MESSAGE: ORDER_START_AP");
     esp_wifi_set_mode(WIFI_MODE_APSTA);
 }
 
 static void
-wifi_handle_ev_got_ip(const wifiman_msg_param_t *p_param)
+wifi_handle_cmd_stop_ap(void)
+{
+    LOG_INFO("MESSAGE: ORDER_STOP_AP");
+    LOG_INFO("Configure WiFi mode: Station");
+    const esp_err_t err = esp_wifi_set_mode(WIFI_MODE_STA);
+    if (ESP_OK != err)
+    {
+        LOG_ERR_ESP(err, "esp_wifi_set_mode failed");
+    }
+}
+
+static void
+wifi_handle_ev_sta_got_ip(const wifiman_msg_param_t *p_param)
 {
     LOG_INFO("MESSAGE: EVENT_STA_GOT_IP");
 
@@ -687,6 +760,30 @@ wifi_handle_ev_got_ip(const wifiman_msg_param_t *p_param)
 
     /* bring down DNS hijack */
     dns_server_stop();
+}
+
+static void
+wifi_handle_ev_ap_sta_connected(void)
+{
+    LOG_INFO("MESSAGE: EVENT_AP_STA_CONNECTED");
+    if (!wifi_manager_is_connected())
+    {
+        dns_server_start();
+    }
+}
+
+static void
+wifi_handle_ev_ap_sta_disconnected(void)
+{
+    LOG_INFO("MESSAGE: EVENT_AP_STA_DISCONNECTED");
+    xEventGroupClearBits(g_wifi_manager_event_group, WIFI_MANAGER_AP_STA_IP_ASSIGNED_BIT);
+    dns_server_stop();
+}
+
+static void
+wifi_handle_ev_ap_sta_ip_assigned(void)
+{
+    LOG_INFO("MESSAGE: EVENT_AP_STA_IP_ASSIGNED");
 }
 
 static void
@@ -739,16 +836,28 @@ wifi_manager_main_loop(void)
                 wifi_handle_cmd_connect_sta(&msg.msg_param);
                 break;
             case EVENT_STA_DISCONNECTED:
-                if (!wifi_handle_ev_disconnected(&msg.msg_param))
+                if (!wifi_handle_ev_sta_disconnected(&msg.msg_param))
                 {
                     flag_do_not_call_cb = true;
                 }
                 break;
             case ORDER_START_AP:
-                wifi_handle_cmd_start_ip();
+                wifi_handle_cmd_start_ap();
+                break;
+            case ORDER_STOP_AP:
+                wifi_handle_cmd_stop_ap();
                 break;
             case EVENT_STA_GOT_IP:
-                wifi_handle_ev_got_ip(&msg.msg_param);
+                wifi_handle_ev_sta_got_ip(&msg.msg_param);
+                break;
+            case EVENT_AP_STA_CONNECTED:
+                wifi_handle_ev_ap_sta_connected();
+                break;
+            case EVENT_AP_STA_IP_ASSIGNED:
+                wifi_handle_ev_ap_sta_ip_assigned();
+                break;
+            case EVENT_AP_STA_DISCONNECTED:
+                wifi_handle_ev_ap_sta_disconnected();
                 break;
             case ORDER_DISCONNECT_STA:
                 wifi_handle_cmd_disconnect_sta();
@@ -756,12 +865,9 @@ wifi_manager_main_loop(void)
             default:
                 break;
         }
-        if (NULL != g_wifi_cb_ptr_arr[msg.code])
+        if ((NULL != g_wifi_cb_ptr_arr[msg.code]) && (!flag_do_not_call_cb))
         {
-            if (!flag_do_not_call_cb)
-            {
-                (*g_wifi_cb_ptr_arr[msg.code])(NULL);
-            }
+            (*g_wifi_cb_ptr_arr[msg.code])(NULL);
         }
     }
 }
@@ -883,40 +989,19 @@ ATTR_NORETURN
 static void
 wifi_manager(const void *p_params)
 {
-    const WiFiAntConfig_t *p_wifi_ant_config = p_params;
-
-    /* initialize the tcp stack */
-    tcpip_adapter_init();
-
-    /* event handler and event group for the wifi driver */
-    g_wifi_manager_event_group = xEventGroupCreate();
-
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
-    ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_manager_event_handler, NULL));
-    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &wifi_manager_event_handler, NULL));
-
-    /* default wifi config */
-    wifi_init_config_t wifi_init_config = WIFI_INIT_CONFIG_DEFAULT();
-    ESP_ERROR_CHECK(esp_wifi_init(&wifi_init_config));
-    ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
-
-    wifi_manager_set_ant_config(p_wifi_ant_config);
-    /* SoftAP - Wifi Access Point configuration setup */
-    wifi_manager_tcpip_adapter_set_default_ip();
-    const wifi_settings_t *p_wifi_settings = wifi_sta_config_get_wifi_settings();
-    wifi_manager_esp_wifi_configure(p_wifi_settings);
-
-    /* STA - Wifi Station configuration setup */
-    wifi_manager_tcpip_adapter_configure(p_wifi_settings);
-
-    /* by default the mode is STA because wifi_manager will not start the access point unless it has to! */
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-    ESP_ERROR_CHECK(esp_wifi_start());
-
-    /* enqueue first event: load previous config */
-    wifiman_msg_send_cmd_load_restore_sta();
-
     wifi_manager_main_loop();
 
     vTaskDelete(NULL);
+}
+
+bool
+wifi_manager_is_connected(void)
+{
+    return (0 != (xEventGroupGetBits(g_wifi_manager_event_group) & WIFI_MANAGER_WIFI_CONNECTED_BIT));
+}
+
+bool
+wifi_manager_is_ap_sta_ip_assigned(void)
+{
+    return (0 != (xEventGroupGetBits(g_wifi_manager_event_group) & WIFI_MANAGER_AP_STA_IP_ASSIGNED_BIT));
 }

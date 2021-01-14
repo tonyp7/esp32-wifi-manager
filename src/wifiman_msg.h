@@ -47,6 +47,9 @@ bool
 wifiman_msg_send_cmd_start_ap(void);
 
 bool
+wifiman_msg_send_cmd_stop_ap(void);
+
+bool
 wifiman_msg_send_cmd_disconnect_sta(void);
 
 bool
@@ -60,6 +63,15 @@ wifiman_msg_send_ev_disconnected(const wifiman_disconnection_reason_t reason);
 
 bool
 wifiman_msg_send_ev_got_ip(const sta_ip_address_t ip_addr);
+
+bool
+wifiman_msg_send_ev_ap_sta_connected(void);
+
+bool
+wifiman_msg_send_ev_ap_sta_disconnected(void);
+
+bool
+wifiman_msg_send_ev_ap_sta_ip_assigned(void);
 
 #ifdef __cplusplus
 }

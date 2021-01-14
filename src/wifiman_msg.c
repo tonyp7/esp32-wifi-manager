@@ -104,6 +104,15 @@ wifiman_msg_send_cmd_start_ap(void)
 }
 
 bool
+wifiman_msg_send_cmd_stop_ap(void)
+{
+    const wifiman_msg_param_t msg_param = {
+        .ptr = NULL,
+    };
+    return wifiman_msg_send(ORDER_STOP_AP, msg_param);
+}
+
+bool
 wifiman_msg_send_cmd_connect_sta(const connection_request_made_by_code_e conn_req_code)
 {
     const wifiman_msg_param_t msg_param = {
@@ -146,6 +155,33 @@ wifiman_msg_send_ev_got_ip(const sta_ip_address_t ip_addr)
         .val = ip_addr,
     };
     return wifiman_msg_send(EVENT_STA_GOT_IP, msg_param);
+}
+
+bool
+wifiman_msg_send_ev_ap_sta_connected(void)
+{
+    const wifiman_msg_param_t msg_param = {
+        .val = 0,
+    };
+    return wifiman_msg_send(EVENT_AP_STA_CONNECTED, msg_param);
+}
+
+bool
+wifiman_msg_send_ev_ap_sta_disconnected(void)
+{
+    const wifiman_msg_param_t msg_param = {
+        .val = 0,
+    };
+    return wifiman_msg_send(EVENT_AP_STA_DISCONNECTED, msg_param);
+}
+
+bool
+wifiman_msg_send_ev_ap_sta_ip_assigned(void)
+{
+    const wifiman_msg_param_t msg_param = {
+        .val = 0,
+    };
+    return wifiman_msg_send(EVENT_AP_STA_IP_ASSIGNED, msg_param);
 }
 
 bool
