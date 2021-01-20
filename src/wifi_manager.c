@@ -56,7 +56,6 @@ Contains the freeRTOS task and all necessary support
 #include "dns_server.h"
 #include "json_network_info.h"
 #include "json_access_points.h"
-#include "../../main/includes/ethernet.h"
 #include "sta_ip_safe.h"
 #include "ap_ssid.h"
 #include "wifiman_msg.h"
