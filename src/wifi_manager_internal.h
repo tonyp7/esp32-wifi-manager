@@ -10,34 +10,38 @@
 
 #include "wifi_manager_defs.h"
 #include "http_req.h"
+#include "os_wrapper_types.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /**
- * @brief Tries to get access to json buffer mutex.
+ * @brief Tries to lock access to wifi_manager internal structures using mutex
+ * (it also locks the access points and connection status json buffers).
  *
  * The HTTP server can try to access the json to serve clients while the wifi manager thread can try
- * to update it. These two tasks are synchronized through a mutex.
+ * to update it.
+ * Also, wifi_manager can be asynchronously stopped and HTTP server or other threads
+ * can try to call wifi_manager while it is de-initializing.
  *
- * The mutex is used by both the access point list json and the connection status json.\n
- * These two resources should technically have their own mutex but we lose some flexibility to save
- * on memory.
- *
- * This is a simple wrapper around freeRTOS function xSemaphoreTake.
- *
- * @param ticks_to_wait The time in ticks to wait for the semaphore to become available.
+ * @param ticks_to_wait The time in ticks to wait for the mutex to become available.
  * @return true in success, false otherwise.
  */
 bool
-wifi_manager_lock_json_buffer(const TickType_t ticks_to_wait);
+wifi_manager_lock_with_timeout(const os_delta_ticks_t ticks_to_wait);
 
 /**
- * @brief Releases the json buffer mutex.
+ * @brief Lock the wifi_manager mutex.
  */
 void
-wifi_manager_unlock_json_buffer(void);
+wifi_manager_lock(void);
+
+/**
+ * @brief Releases the wifi_manager mutex.
+ */
+void
+wifi_manager_unlock(void);
 
 http_server_resp_t
 wifi_manager_cb_on_http_get(const char *p_path);

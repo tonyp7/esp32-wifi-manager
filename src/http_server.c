@@ -477,7 +477,7 @@ http_server_task(void)
         {
             LOG_ERR("netconn_accept: %d", err);
         }
-        if (wifi_manager_is_connected() && wifi_manager_is_ap_sta_ip_assigned())
+        if (wifi_manager_is_working() && wifi_manager_is_connected() && wifi_manager_is_ap_sta_ip_assigned())
         {
             if ((0 != g_http_last_req_status)
                 && ((xTaskGetTickCount() - g_http_last_req_status)
@@ -533,7 +533,7 @@ http_server_handle_req_get(const char *p_file_name)
         {
             /* if we can get the mutex, write the last version of the AP list */
             const TickType_t ticks_to_wait = 10U;
-            if (!wifi_manager_lock_json_buffer(ticks_to_wait))
+            if (!wifi_manager_lock_with_timeout(ticks_to_wait))
             {
                 LOG_DBG("http_server_netconn_serve: GET /ap.json failed to obtain mutex");
                 LOG_INFO("ap.json: 503");
@@ -547,14 +547,14 @@ http_server_handle_req_get(const char *p_file_name)
             }
             LOG_INFO("ap.json: %s", buff);
             const http_server_resp_t resp = http_server_resp_200_json(buff);
-            wifi_manager_unlock_json_buffer();
+            wifi_manager_unlock();
             return resp;
         }
         else if (0 == strcmp(p_file_name, "status.json"))
         {
             g_http_last_req_status         = xTaskGetTickCount();
             const TickType_t ticks_to_wait = 10U;
-            if (!wifi_manager_lock_json_buffer(ticks_to_wait))
+            if (!wifi_manager_lock_with_timeout(ticks_to_wait))
             {
                 LOG_DBG("http_server_netconn_serve: GET /status failed to obtain mutex");
                 LOG_INFO("status.json: 503");
@@ -568,7 +568,7 @@ http_server_handle_req_get(const char *p_file_name)
             }
             LOG_INFO("status.json: %s", buff);
             const http_server_resp_t resp = http_server_resp_200_json(buff);
-            wifi_manager_unlock_json_buffer();
+            wifi_manager_unlock();
             return resp;
         }
     }

@@ -40,11 +40,10 @@ Contains the freeRTOS task and all necessary support
 
 static char g_json_access_points_buf[JSON_ACCESS_POINT_BUF_SIZE];
 
-esp_err_t
+void
 json_access_points_init(void)
 {
     json_access_points_clear();
-    return ESP_OK;
 }
 
 void

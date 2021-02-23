@@ -41,7 +41,7 @@ Contains the freeRTOS task and all necessary support
 extern "C" {
 #endif
 
-esp_err_t
+void
 json_access_points_init(void);
 
 void

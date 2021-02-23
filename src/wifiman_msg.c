@@ -10,6 +10,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "log.h"
+#include "wifi_manager_internal.h"
 
 static QueueHandle_t gh_wifiman_msg_queue;
 
@@ -77,21 +78,22 @@ wifiman_msg_send(const message_code_e code, const wifiman_msg_param_t msg_param)
         .code      = code,
         .msg_param = msg_param,
     };
+    wifi_manager_lock();
+    // need to lock access to wifi_manager since gh_wifiman_msg_queue can be de-initialized asynchronously
+    if (NULL == gh_wifiman_msg_queue)
+    {
+        LOG_WARN("wifiman_msg is not initialized");
+        wifi_manager_unlock();
+        return false;
+    }
     if (pdTRUE != xQueueSend(gh_wifiman_msg_queue, &msg, portMAX_DELAY))
     {
         LOG_ERR("%s failed", "xQueueSend");
+        wifi_manager_unlock();
         return false;
     }
+    wifi_manager_unlock();
     return true;
-}
-
-bool
-wifiman_msg_send_cmd_load_restore_sta(void)
-{
-    const wifiman_msg_param_t msg_param = {
-        .ptr = NULL,
-    };
-    return wifiman_msg_send(ORDER_LOAD_AND_RESTORE_STA, msg_param);
 }
 
 bool
@@ -128,6 +130,16 @@ wifiman_msg_send_cmd_disconnect_sta(void)
         .ptr = NULL,
     };
     return wifiman_msg_send(ORDER_DISCONNECT_STA, msg_param);
+}
+
+bool
+wifiman_msg_send_cmd_stop_and_destroy(void)
+{
+    const wifiman_msg_param_t msg_param = {
+        .ptr = NULL,
+    };
+    LOG_INFO("Send msg: ORDER_STOP_AND_DESTROY");
+    return wifiman_msg_send(ORDER_STOP_AND_DESTROY, msg_param);
 }
 
 bool

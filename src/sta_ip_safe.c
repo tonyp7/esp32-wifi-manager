@@ -13,7 +13,8 @@
 
 static const char TAG[] = "wifi_manager";
 
-static os_mutex_t g_sta_ip_safe_mutex;
+static os_mutex_t        g_sta_ip_safe_mutex;
+static os_mutex_static_t g_sta_ip_safe_mutex_mem;
 
 STA_IP_SAFE_STATIC
 os_mutex_t
@@ -56,12 +57,7 @@ sta_ip_safe_init(void)
         LOG_ERR("Mutex was already initialized");
         return false;
     }
-    g_sta_ip_safe_mutex = os_mutex_create();
-    if (NULL == g_sta_ip_safe_mutex)
-    {
-        LOG_ERR("Failed to create mutex");
-        return false;
-    }
+    g_sta_ip_safe_mutex = os_mutex_create_static(&g_sta_ip_safe_mutex_mem);
     sta_ip_unsafe_init();
     return sta_ip_safe_reset(portMAX_DELAY);
 }

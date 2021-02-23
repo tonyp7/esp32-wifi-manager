@@ -40,7 +40,6 @@ protected:
     void
     SetUp() override
     {
-        this->flag_mutex_create_fail = false;
         sem_init(&semaFreeRTOS, 0, 0);
         const int err = pthread_create(&pid, nullptr, &freertosStartup, this);
         assert(0 == err);
@@ -66,7 +65,6 @@ protected:
 public:
     sem_t                 semaFreeRTOS;
     TQueue<MainTaskCmd_e> cmdQueue;
-    bool                  flag_mutex_create_fail;
 
     TestStaIpSafe();
 
@@ -77,7 +75,6 @@ TestStaIpSafe::TestStaIpSafe()
     : Test()
     , pid()
     , semaFreeRTOS()
-    , flag_mutex_create_fail(false)
 {
 }
 
@@ -99,13 +96,9 @@ lwip_port_rand(void)
 }
 
 os_mutex_t
-os_mutex_create(void)
+os_mutex_create_static(os_mutex_static_t *const p_mutex_static)
 {
-    if (g_pTestClass->flag_mutex_create_fail)
-    {
-        return nullptr;
-    }
-    SemaphoreHandle_t h_mutex = xSemaphoreCreateMutex();
+    SemaphoreHandle_t h_mutex = xSemaphoreCreateMutexStatic(p_mutex_static);
     return h_mutex;
 }
 
@@ -208,18 +201,6 @@ TEST_F(TestStaIpSafe, test_all) // NOLINT
         TEST_CHECK_LOG_RECORD(ESP_LOG_ERROR, "Mutex is not initialized");
         TEST_CHECK_LOG_RECORD(ESP_LOG_ERROR, "Mutex is not initialized");
         ASSERT_TRUE(esp_log_wrapper_is_empty());
-    }
-
-    // Test init failed because of mutex create failed
-    {
-        ASSERT_TRUE(nullptr == sta_ip_safe_mutex_get());
-        this->flag_mutex_create_fail = true;
-        ASSERT_FALSE(sta_ip_safe_init());
-        this->flag_mutex_create_fail = false;
-
-        TEST_CHECK_LOG_RECORD(ESP_LOG_ERROR, "Failed to create mutex");
-        ASSERT_TRUE(esp_log_wrapper_is_empty());
-        ASSERT_TRUE(nullptr == sta_ip_safe_mutex_get());
     }
 
     // Test sta_ip_safe_init / sta_ip_safe_deinit twice
