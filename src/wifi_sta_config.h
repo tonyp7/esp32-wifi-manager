@@ -68,6 +68,13 @@ const wifi_settings_t *
 wifi_sta_config_get_wifi_settings(void);
 
 /**
+ * @brief Check if SSID is configured.
+ * @return true if SSID is configured.
+ */
+bool
+wifi_sta_config_is_ssid_configured(void);
+
+/**
  * @brief Copy SSID from the current STA wifi config in RAM.
  */
 wifi_ssid_t

@@ -178,7 +178,7 @@ wifi_sta_config_save(void)
     LOG_DBG("wifi_settings: sta_ip_addr: %s", ip4addr_ntoa(&g_wifi_settings.sta_static_ip_config.ip));
     LOG_DBG("wifi_settings: sta_gw_addr: %s", ip4addr_ntoa(&g_wifi_settings.sta_static_ip_config.gw));
     LOG_DBG("wifi_settings: sta_netmask: %s", ip4addr_ntoa(&g_wifi_settings.sta_static_ip_config.netmask));
-    return ESP_OK;
+    return true;
 }
 
 bool
@@ -259,7 +259,7 @@ wifi_sta_config_fetch(void)
     LOG_INFO("wifi_sta_config_fetch: sta_gw_addr: %s", ip4addr_ntoa(&g_wifi_settings.sta_static_ip_config.gw));
     LOG_INFO("wifi_sta_config_fetch: sta_netmask: %s", ip4addr_ntoa(&g_wifi_settings.sta_static_ip_config.netmask));
 
-    return ('\0' != g_wifi_config_sta.sta.ssid[0]) ? true : false;
+    return wifi_sta_config_is_ssid_configured();
 }
 
 wifi_config_t
@@ -272,6 +272,12 @@ const wifi_settings_t *
 wifi_sta_config_get_wifi_settings(void)
 {
     return &g_wifi_settings;
+}
+
+bool
+wifi_sta_config_is_ssid_configured(void)
+{
+    return ('\0' != g_wifi_config_sta.sta.ssid[0]) ? true : false;
 }
 
 wifi_ssid_t

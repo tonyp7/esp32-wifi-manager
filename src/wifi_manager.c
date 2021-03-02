@@ -144,25 +144,15 @@ wifi_manager_disconnect_async(void)
 }
 
 static bool
-wifi_manager_init(
+wifi_manager_init_start_wifi(
     const WiFiAntConfig_t *        p_wifi_ant_config,
     wifi_manager_http_callback_t   cb_on_http_get,
     wifi_manager_http_cb_on_post_t cb_on_http_post,
     wifi_manager_http_callback_t   cb_on_http_delete)
 {
-    if (wifi_manager_is_working())
-    {
-        LOG_ERR("wifi_manager is already running");
-        return false;
-    }
-    xEventGroupSetBits(g_wifi_manager_event_group, WIFI_MANAGER_IS_WORKING);
-
     g_wifi_cb_on_http_get    = cb_on_http_get;
     g_wifi_cb_on_http_post   = cb_on_http_post;
     g_wifi_cb_on_http_delete = cb_on_http_delete;
-
-    http_server_init();
-    dns_server_init();
 
     if (!wifiman_msg_init())
     {
@@ -181,17 +171,7 @@ wifi_manager_init(
     }
     sta_ip_safe_init();
 
-    /* initialize the tcp stack */
-    tcpip_adapter_init();
-
-    esp_err_t err = esp_event_loop_create_default();
-    if (ESP_OK != err)
-    {
-        LOG_ERR("%s failed", "esp_event_loop_create_default");
-        return false;
-    }
-
-    err = esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_manager_event_handler, NULL);
+    esp_err_t err = esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_manager_event_handler, NULL);
     if (ESP_OK != err)
     {
         LOG_ERR("%s failed", "esp_event_handler_register");
@@ -265,8 +245,6 @@ wifi_manager_init(
         wifiman_msg_send_cmd_start_ap();
     }
 
-    http_server_start();
-
     /* start wifi manager task */
     const char *   task_name   = "wifi_manager";
     const uint32_t stack_depth = 4096U;
@@ -275,11 +253,53 @@ wifi_manager_init(
         LOG_ERR("Can't create thread: %s", task_name);
         return false;
     }
+
+    return true;
+}
+
+static bool
+wifi_manager_init(
+    const bool                     flag_start_wifi,
+    const WiFiAntConfig_t *        p_wifi_ant_config,
+    wifi_manager_http_callback_t   cb_on_http_get,
+    wifi_manager_http_cb_on_post_t cb_on_http_post,
+    wifi_manager_http_callback_t   cb_on_http_delete)
+{
+    LOG_INFO("WiFi manager init");
+    if (wifi_manager_is_working())
+    {
+        LOG_ERR("wifi_manager is already running");
+        return false;
+    }
+    xEventGroupSetBits(g_wifi_manager_event_group, WIFI_MANAGER_IS_WORKING);
+
+    /* initialize the tcp stack */
+    tcpip_adapter_init();
+
+    dns_server_init();
+
+    http_server_init();
+    http_server_start();
+
+    esp_err_t err = esp_event_loop_create_default();
+    if (ESP_OK != err)
+    {
+        LOG_ERR("%s failed", "esp_event_loop_create_default");
+        return false;
+    }
+
+    if (flag_start_wifi)
+    {
+        LOG_INFO("WiFi manager init: start WiFi");
+        wifi_manager_init_start_wifi(p_wifi_ant_config, cb_on_http_get, cb_on_http_post, cb_on_http_delete);
+    }
+
     return true;
 }
 
 bool
 wifi_manager_start(
+    const bool                     flag_start_wifi,
     const WiFiAntConfig_t *        p_wifi_ant_config,
     wifi_manager_http_callback_t   cb_on_http_get,
     wifi_manager_http_cb_on_post_t cb_on_http_post,
@@ -301,7 +321,12 @@ wifi_manager_start(
         g_wifi_manager_event_group = xEventGroupCreateStatic(&g_wifi_manager_event_group_mem);
     }
 
-    const bool res = wifi_manager_init(p_wifi_ant_config, cb_on_http_get, cb_on_http_post, cb_on_http_delete);
+    const bool res = wifi_manager_init(
+        flag_start_wifi,
+        p_wifi_ant_config,
+        cb_on_http_get,
+        cb_on_http_post,
+        cb_on_http_delete);
     if (!res)
     {
         xEventGroupClearBits(g_wifi_manager_event_group, WIFI_MANAGER_IS_WORKING);
@@ -1065,4 +1090,10 @@ bool
 wifi_manager_is_ap_sta_ip_assigned(void)
 {
     return (0 != (xEventGroupGetBits(g_wifi_manager_event_group) & WIFI_MANAGER_AP_STA_IP_ASSIGNED_BIT));
+}
+
+bool
+wifi_manager_is_sta_configured(void)
+{
+    return wifi_sta_config_is_ssid_configured();
 }
