@@ -212,11 +212,11 @@ wifi_manager_init_start_wifi(
     wifi_manager_set_ant_config(p_wifi_ant_config);
     /* SoftAP - Wifi Access Point configuration setup */
     wifi_manager_tcpip_adapter_set_default_ip();
-    const wifi_settings_t *p_wifi_settings = wifi_sta_config_get_wifi_settings();
-    wifi_manager_esp_wifi_configure(p_wifi_settings);
+    const wifi_settings_t wifi_settings = wifi_sta_config_get_wifi_settings();
+    wifi_manager_esp_wifi_configure(&wifi_settings);
 
     /* STA - Wifi Station configuration setup */
-    wifi_manager_tcpip_adapter_configure(p_wifi_settings);
+    wifi_manager_tcpip_adapter_configure(&wifi_settings);
 
     /* by default the mode is STA because wifi_manager will not start the access point unless it has to! */
     err = esp_wifi_set_mode(WIFI_MODE_STA);

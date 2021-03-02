@@ -64,7 +64,7 @@ wifi_sta_config_fetch(void);
 wifi_config_t
 wifi_sta_config_get_copy(void);
 
-const wifi_settings_t *
+wifi_settings_t
 wifi_sta_config_get_wifi_settings(void);
 
 /**
