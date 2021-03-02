@@ -529,6 +529,23 @@ get_http_body(const char *msg, uint32_t len, uint32_t *p_body_len)
     return p_body;
 }
 
+static void
+http_server_gen_resp_status_json(json_network_info_t *const p_info, void *const p_param)
+{
+    http_server_resp_t *p_http_resp = p_param;
+    if (NULL == p_info)
+    {
+        LOG_DBG("http_server_netconn_serve: GET /status failed to obtain mutex");
+        LOG_INFO("status.json: 503");
+        *p_http_resp = http_server_resp_503();
+    }
+    else
+    {
+        LOG_INFO("ap.json: %s", p_info->json_buf);
+        *p_http_resp = http_server_resp_200_json(p_info->json_buf);
+    }
+}
+
 static http_server_resp_t
 http_server_handle_req_get(const char *p_file_name)
 {
@@ -560,24 +577,12 @@ http_server_handle_req_get(const char *p_file_name)
         }
         else if (0 == strcmp(p_file_name, "status.json"))
         {
-            g_http_last_req_status         = xTaskGetTickCount();
-            const TickType_t ticks_to_wait = 10U;
-            if (!wifi_manager_lock_with_timeout(ticks_to_wait))
-            {
-                LOG_DBG("http_server_netconn_serve: GET /status failed to obtain mutex");
-                LOG_INFO("status.json: 503");
-                return http_server_resp_503();
-            }
-            const char *buff = json_network_info_get();
-            if (NULL == buff)
-            {
-                LOG_INFO("status.json: 503");
-                return http_server_resp_503();
-            }
-            LOG_INFO("status.json: %s", buff);
-            const http_server_resp_t resp = http_server_resp_200_json(buff);
-            wifi_manager_unlock();
-            return resp;
+            g_http_last_req_status = xTaskGetTickCount();
+
+            http_server_resp_t     http_resp     = { 0 };
+            const os_delta_ticks_t ticks_to_wait = 10U;
+            json_network_info_do_action_with_timeout(&http_server_gen_resp_status_json, &http_resp, ticks_to_wait);
+            return http_resp;
         }
     }
     return wifi_manager_cb_on_http_get(p_file_name);

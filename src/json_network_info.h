@@ -28,6 +28,7 @@ Contains the freeRTOS task and all necessary support
 
 @see https://idyl.io
 @see https://github.com/tonyp7/esp32-wifi-manager
+@see https://github.com/ruuvi/esp32-wifi-manager
 */
 
 #ifndef ESP32_WIFI_MANAGER_JSON_NETWORK_INFO_H
@@ -36,19 +37,52 @@ Contains the freeRTOS task and all necessary support
 #include <stdint.h>
 #include <stdbool.h>
 #include "wifi_manager_defs.h"
+#include "os_wrapper_types.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+typedef struct json_network_info_t
+{
+    char json_buf[JSON_IP_INFO_SIZE];
+} json_network_info_t;
+
+/**
+ * @brief Init json_network_info
+ */
 void
 json_network_info_init(void);
 
+/**
+ * @brief Deinit json_network_info
+ */
 void
 json_network_info_deinit(void);
 
-const char *
-json_network_info_get(void);
+/**
+ * @brief Try to lock access to json_network_info and perform specified action.
+ * @note If access could not be gained within the specified timeout,
+ *          then the callback-function will be called with NULL as the first argument.
+ * @param cb_func - a callback-function to call after granting access to json_network_info
+ * @param p_param - pointer to be passed to the callback-function
+ * @param ticks_to_wait - timeout waiting for data access to be granted (use OS_DELTA_TICKS_INFINITE for infinite).
+ */
+void
+json_network_info_do_action_with_timeout(
+    void (*cb_func)(json_network_info_t *const p_info, void *const p_param),
+    void *const            p_param,
+    const os_delta_ticks_t ticks_to_wait);
+
+/**
+ * @brief Lock access to json_network_info and perform specified action.
+ * @param cb_func - a callback-function to call after granting access to json_network_info
+ * @param p_param - pointer to be passed to the callback-function
+ */
+void
+json_network_info_do_action(
+    void (*cb_func)(json_network_info_t *const p_info, void *const p_param),
+    void *const p_param);
 
 /**
  * @brief Generates the connection status json: ssid and IP addresses.

@@ -10,6 +10,8 @@ add_executable(${ProjectId}
         ../../src/json_network_info.c
         ../../src/json_network_info.h
         ../../src/include/wifi_manager_defs.h
+        ../ruuvi.esp_wrappers.c/src/str_buf.c
+        ../ruuvi.esp_wrappers.c/include/str_buf.h
 )
 
 set_target_properties(${ProjectId} PROPERTIES
@@ -47,7 +49,6 @@ target_link_libraries(${ProjectId}
         gtest
         gtest_main
         gcov
-        ruuvi_esp_wrappers
         ruuvi_esp_wrappers-common_test_funcs
         --coverage
 )

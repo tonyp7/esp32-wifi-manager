@@ -35,8 +35,54 @@ Contains the freeRTOS task and all necessary support
 #include "json.h"
 #include "wifi_manager_defs.h"
 #include "esp_type_wrapper.h"
+#include "os_mutex.h"
 
-static char g_json_network_info_buf[JSON_IP_INFO_SIZE];
+static json_network_info_t g_json_network_info;
+static os_mutex_t          g_json_network_mutex;
+static os_mutex_static_t   g_json_network_mutex_mem;
+
+static json_network_info_t *
+json_network_info_lock_with_timeout(const os_delta_ticks_t ticks_to_wait)
+{
+    if (NULL == g_json_network_mutex)
+    {
+        g_json_network_mutex = os_mutex_create_static(&g_json_network_mutex_mem);
+    }
+    if (!os_mutex_lock_with_timeout(g_json_network_mutex, ticks_to_wait))
+    {
+        return NULL;
+    }
+    return &g_json_network_info;
+}
+
+static void
+json_network_info_unlock(json_network_info_t **pp_info)
+{
+    if (NULL != *pp_info)
+    {
+        *pp_info = NULL;
+        os_mutex_unlock(g_json_network_mutex);
+    }
+}
+
+void
+json_network_info_do_action_with_timeout(
+    void (*cb_func)(json_network_info_t *const p_info, void *const p_param),
+    void *const            p_param,
+    const os_delta_ticks_t ticks_to_wait)
+{
+    json_network_info_t *p_info = json_network_info_lock_with_timeout(ticks_to_wait);
+    cb_func(p_info, p_param);
+    json_network_info_unlock(&p_info);
+}
+
+void
+json_network_info_do_action(
+    void (*cb_func)(json_network_info_t *const p_info, void *const p_param),
+    void *const p_param)
+{
+    json_network_info_do_action_with_timeout(cb_func, p_param, OS_DELTA_TICKS_INFINITE);
+}
 
 void
 json_network_info_init(void)
@@ -48,22 +94,53 @@ void
 json_network_info_deinit(void)
 {
     /* This is a public API of json_network_info.c
-     * It's empty because internal buffer g_json_network_info_buf is statically allocated
+     * It's empty because internal buffer g_json_network_info is statically allocated
      * and it does not require deinit actions.
      * */
 }
 
-const char *
-json_network_info_get(void)
+static void
+json_network_info_do_clear(json_network_info_t *const p_info, void *const p_param)
 {
-    return g_json_network_info_buf;
+    str_buf_t str_buf = STR_BUF_INIT_WITH_ARR(p_info->json_buf);
+    str_buf_printf(&str_buf, "{}\n");
+}
+
+void
+json_network_info_clear(void)
+{
+    json_network_info_do_action(&json_network_info_do_clear, NULL);
+}
+
+typedef struct json_network_info_generate_t
+{
+    const wifi_ssid_t *const        p_ssid;
+    const network_info_str_t *const p_network_info;
+    const update_reason_code_e      update_reason_code;
+} json_network_info_generate_t;
+
+static void
+json_network_info_do_generate(json_network_info_t *const p_info, void *const p_param)
+{
+    json_network_info_generate_t *p_gen_info = p_param;
+    str_buf_t                     str_buf    = STR_BUF_INIT_WITH_ARR(p_info->json_buf);
+    str_buf_printf(&str_buf, "{\"ssid\":");
+    json_print_escaped_string(&str_buf, p_gen_info->p_ssid->ssid_buf);
+
+    str_buf_printf(
+        &str_buf,
+        ",\"ip\":\"%s\",\"netmask\":\"%s\",\"gw\":\"%s\",\"urc\":%d}\n",
+        p_gen_info->p_network_info->ip,
+        p_gen_info->p_network_info->netmask,
+        p_gen_info->p_network_info->gw,
+        (printf_int_t)p_gen_info->update_reason_code);
 }
 
 void
 json_network_info_generate(
-    const wifi_ssid_t *        p_ssid,
-    const network_info_str_t * p_network_info,
-    const update_reason_code_e update_reason_code)
+    const wifi_ssid_t *const        p_ssid,
+    const network_info_str_t *const p_network_info,
+    const update_reason_code_e      update_reason_code)
 {
     if (NULL == p_ssid)
     {
@@ -75,22 +152,11 @@ json_network_info_generate(
         json_network_info_clear();
         return;
     }
-    str_buf_t str_buf = STR_BUF_INIT_WITH_ARR(g_json_network_info_buf);
-    str_buf_printf(&str_buf, "{\"ssid\":");
-    json_print_escaped_string(&str_buf, p_ssid->ssid_buf);
 
-    str_buf_printf(
-        &str_buf,
-        ",\"ip\":\"%s\",\"netmask\":\"%s\",\"gw\":\"%s\",\"urc\":%d}\n",
-        p_network_info->ip,
-        p_network_info->netmask,
-        p_network_info->gw,
-        (printf_int_t)update_reason_code);
-}
-
-void
-json_network_info_clear(void)
-{
-    str_buf_t str_buf = STR_BUF_INIT_WITH_ARR(g_json_network_info_buf);
-    str_buf_printf(&str_buf, "{}\n");
+    json_network_info_generate_t gen_info = {
+        .p_ssid             = p_ssid,
+        .p_network_info     = p_network_info,
+        .update_reason_code = update_reason_code,
+    };
+    json_network_info_do_action(&json_network_info_do_generate, &gen_info);
 }

@@ -7,8 +7,6 @@ add_executable(${ProjectId}
         test_json.cpp
         ../../src/json.c
         ../../src/json.h
-        ../../src/json_network_info.c
-        ../../src/json_network_info.h
         ../../src/include/wifi_manager_defs.h
 )
 

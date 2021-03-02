@@ -161,9 +161,6 @@ wifi_manager_init_start_wifi(
     }
 
     json_access_points_init();
-    json_network_info_init();
-
-    wifi_sta_config_init();
 
     for (message_code_e i = 0; i < MESSAGE_CODE_COUNT; ++i)
     {
@@ -272,6 +269,9 @@ wifi_manager_init(
         return false;
     }
     xEventGroupSetBits(g_wifi_manager_event_group, WIFI_MANAGER_IS_WORKING);
+
+    wifi_sta_config_init();
+    json_network_info_init();
 
     /* initialize the tcp stack */
     tcpip_adapter_init();
