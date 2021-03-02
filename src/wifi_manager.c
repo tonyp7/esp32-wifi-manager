@@ -372,19 +372,12 @@ wifi_manager_clear_sta_config(void)
     return wifi_sta_config_clear();
 }
 
-/**
- * @brief Generates the connection status json: ssid and IP addresses.
- * @note This is not thread-safe and should be called only if wifi_manager_lock_json_buffer call is successful.
- */
-static void
-wifi_manager_generate_ip_info_json(
-    const update_reason_code_e     update_reason_code,
-    const tcpip_adapter_ip_info_t *p_ip_info)
+void
+wifi_manager_generate_network_info_json(
+    const update_reason_code_e           update_reason_code,
+    const wifi_ssid_t *const             p_ssid,
+    const tcpip_adapter_ip_info_t *const p_ip_info)
 {
-    wifi_manager_lock();
-
-    const wifi_ssid_t ssid = wifi_sta_config_get_ssid();
-
     network_info_str_t ip_info_str = {
         .ip      = { "0" },
         .gw      = { "0" },
@@ -396,9 +389,7 @@ wifi_manager_generate_ip_info_json(
         snprintf(ip_info_str.netmask, sizeof(ip_info_str.netmask), "%s", ip4addr_ntoa(&p_ip_info->netmask));
         snprintf(ip_info_str.gw, sizeof(ip_info_str.gw), "%s", ip4addr_ntoa(&p_ip_info->gw));
     }
-    json_network_info_generate(&ssid, &ip_info_str, update_reason_code);
-
-    wifi_manager_unlock();
+    json_network_info_generate(p_ssid, &ip_info_str, update_reason_code);
 }
 
 bool
@@ -718,7 +709,7 @@ wifi_handle_ev_sta_disconnected(const wifiman_msg_param_t *p_param)
          * request bit and move on */
         xEventGroupClearBits(g_wifi_manager_event_group, WIFI_MANAGER_REQUEST_STA_CONNECT_BIT);
 
-        wifi_manager_generate_ip_info_json(UPDATE_FAILED_ATTEMPT, NULL);
+        wifi_manager_generate_network_info_json(UPDATE_FAILED_ATTEMPT, NULL, NULL);
     }
     else if (0 != (event_bits & (uint32_t)WIFI_MANAGER_REQUEST_DISCONNECT_BIT))
     {
@@ -727,7 +718,7 @@ wifi_handle_ev_sta_disconnected(const wifiman_msg_param_t *p_param)
          * and restart the AP */
         xEventGroupClearBits(g_wifi_manager_event_group, WIFI_MANAGER_REQUEST_DISCONNECT_BIT);
 
-        wifi_manager_generate_ip_info_json(UPDATE_USER_DISCONNECT, NULL);
+        wifi_manager_generate_network_info_json(UPDATE_USER_DISCONNECT, NULL, NULL);
 
         /* Erase configuration and save it ot NVS memory */
         wifi_sta_config_clear();
@@ -739,7 +730,7 @@ wifi_handle_ev_sta_disconnected(const wifiman_msg_param_t *p_param)
     {
         LOG_INFO("lost connection");
         /* lost connection ? */
-        wifi_manager_generate_ip_info_json(UPDATE_LOST_CONNECTION, NULL);
+        wifi_manager_generate_network_info_json(UPDATE_LOST_CONNECTION, NULL, NULL);
 
         wifiman_msg_send_cmd_connect_sta(CONNECTION_REQUEST_AUTO_RECONNECT);
     }
@@ -796,7 +787,8 @@ wifi_handle_ev_sta_got_ip(const wifiman_msg_param_t *p_param)
     if (ESP_OK == err)
     {
         /* refresh JSON with the new IP */
-        wifi_manager_generate_ip_info_json(UPDATE_CONNECTION_OK, &ip_info);
+        const wifi_ssid_t ssid = wifi_sta_config_get_ssid();
+        wifi_manager_generate_network_info_json(UPDATE_CONNECTION_OK, &ssid, &ip_info);
     }
     else
     {

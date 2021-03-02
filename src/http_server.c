@@ -541,7 +541,7 @@ http_server_gen_resp_status_json(json_network_info_t *const p_info, void *const 
     }
     else
     {
-        LOG_INFO("ap.json: %s", p_info->json_buf);
+        LOG_INFO("status.json: %s", p_info->json_buf);
         *p_http_resp = http_server_resp_200_json(p_info->json_buf);
     }
 }

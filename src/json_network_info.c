@@ -125,7 +125,14 @@ json_network_info_do_generate(json_network_info_t *const p_info, void *const p_p
     json_network_info_generate_t *p_gen_info = p_param;
     str_buf_t                     str_buf    = STR_BUF_INIT_WITH_ARR(p_info->json_buf);
     str_buf_printf(&str_buf, "{\"ssid\":");
-    json_print_escaped_string(&str_buf, p_gen_info->p_ssid->ssid_buf);
+    if (NULL != p_gen_info->p_ssid)
+    {
+        json_print_escaped_string(&str_buf, p_gen_info->p_ssid->ssid_buf);
+    }
+    else
+    {
+        str_buf_printf(&str_buf, "null");
+    }
 
     str_buf_printf(
         &str_buf,
@@ -142,17 +149,6 @@ json_network_info_generate(
     const network_info_str_t *const p_network_info,
     const update_reason_code_e      update_reason_code)
 {
-    if (NULL == p_ssid)
-    {
-        json_network_info_clear();
-        return;
-    }
-    if ('\0' == p_ssid->ssid_buf[0])
-    {
-        json_network_info_clear();
-        return;
-    }
-
     json_network_info_generate_t gen_info = {
         .p_ssid             = p_ssid,
         .p_network_info     = p_network_info,

@@ -107,6 +107,18 @@ wifi_manager_is_ap_sta_ip_assigned(void);
 bool
 wifi_manager_is_sta_configured(void);
 
+/**
+ * @brief Generates the connection status json: ssid and IP addresses.
+ * @param update_reason_code - connection status, see update_reason_code_e
+ * @param p_ssid - pointer to wifi_ssid_t (WiFi SSID)
+ * @param p_ip_info - pointer to tcpip_adapter_ip_info_t
+ */
+void
+wifi_manager_generate_network_info_json(
+    const update_reason_code_e           update_reason_code,
+    const wifi_ssid_t *const             p_ssid,
+    const tcpip_adapter_ip_info_t *const p_ip_info);
+
 #ifdef __cplusplus
 }
 #endif
