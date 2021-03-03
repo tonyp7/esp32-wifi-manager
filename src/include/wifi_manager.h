@@ -102,6 +102,15 @@ bool
 wifi_manager_is_connected_to_wifi(void);
 
 bool
+wifi_manager_is_connected_to_ethernet(void);
+
+void
+wifi_manager_set_connected_to_ethernet(void);
+
+void
+wifi_manager_clear_connected_to_ethernet(void);
+
+bool
 wifi_manager_is_ap_sta_ip_assigned(void);
 
 bool

@@ -109,6 +109,9 @@ static StaticEventGroup_t g_wifi_manager_event_group_mem;
 /* @brief When set, means user requested for a disconnect */
 #define WIFI_MANAGER_REQUEST_DISCONNECT_BIT ((uint32_t)(BIT8))
 
+/* @brief indicate that the device is currently connected to Ethernet. */
+#define WIFI_MANAGER_ETH_CONNECTED_BIT ((uint32_t)(BIT9))
+
 static void
 wifi_manager_task(void);
 
@@ -1081,6 +1084,24 @@ bool
 wifi_manager_is_connected_to_wifi(void)
 {
     return (0 != (xEventGroupGetBits(g_wifi_manager_event_group) & WIFI_MANAGER_WIFI_CONNECTED_BIT));
+}
+
+bool
+wifi_manager_is_connected_to_ethernet(void)
+{
+    return (0 != (xEventGroupGetBits(g_wifi_manager_event_group) & WIFI_MANAGER_ETH_CONNECTED_BIT));
+}
+
+void
+wifi_manager_set_connected_to_ethernet(void)
+{
+    xEventGroupSetBits(g_wifi_manager_event_group, WIFI_MANAGER_ETH_CONNECTED_BIT);
+}
+
+void
+wifi_manager_clear_connected_to_ethernet(void)
+{
+    xEventGroupClearBits(g_wifi_manager_event_group, WIFI_MANAGER_ETH_CONNECTED_BIT);
 }
 
 bool
