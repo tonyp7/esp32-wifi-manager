@@ -82,17 +82,16 @@ public:
 
     ~TestJsonNetworkInfo() override;
 
-    MemAllocTrace m_mem_alloc_trace{};
-    uint32_t      m_malloc_cnt{};
-    uint32_t      m_malloc_fail_on_cnt{};
+    MemAllocTrace m_mem_alloc_trace {};
+    uint32_t      m_malloc_cnt {};
+    uint32_t      m_malloc_fail_on_cnt {};
 };
 
 TestJsonNetworkInfo::TestJsonNetworkInfo() = default;
 
 TestJsonNetworkInfo::~TestJsonNetworkInfo() = default;
 
-extern "C"
-{
+extern "C" {
 
 void *
 os_malloc(const size_t size)
@@ -155,13 +154,15 @@ os_mutex_unlock(os_mutex_t const h_mutex)
 
 } // extern "C"
 
-static void json_network_info_do_get(json_network_info_t *const p_info, void *const p_param)
+static void
+json_network_info_do_get(json_network_info_t *const p_info, void *const p_param)
 {
-    auto p_json_info_copy = static_cast<string*>(p_param);
+    auto p_json_info_copy = static_cast<string *>(p_param);
     p_json_info_copy->append(p_info->json_buf);
 }
 
-string json_network_info_get()
+string
+json_network_info_get()
 {
     string json_info_copy {};
     json_network_info_do_action(&json_network_info_do_get, &json_info_copy);
