@@ -773,7 +773,7 @@ http_server_netconn_serve(struct netconn *p_conn)
     const char *p_host   = http_req_header_get_field(req_info.http_header, "Host:", &host_len);
     /* determine if Host is from the STA IP address */
 
-    const sta_ip_string_t ip_str  = sta_ip_safe_get(portMAX_DELAY);
+    const sta_ip_string_t ip_str  = sta_ip_safe_get();
     const bool access_from_sta_ip = ('\0' == ip_str.buf[0]) || ((host_len > 0) && (NULL != strstr(p_host, ip_str.buf)));
 
     LOG_DBG("Host: %.*s", host_len, p_host);

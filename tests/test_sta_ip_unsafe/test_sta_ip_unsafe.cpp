@@ -59,37 +59,33 @@ lwip_port_rand(void)
 TEST_F(TestStaIpUnsafe, test_127_0_0_3) // NOLINT
 {
     sta_ip_unsafe_init();
-    ASSERT_EQ(string(""), string(sta_ip_unsafe_get_str()));
+    ASSERT_EQ(string("0.0.0.0"), string(sta_ip_unsafe_get_copy().buf));
 
     const uint32_t ip_addr = sta_ip_unsafe_conv_str_to_ip("127.0.0.3");
     ASSERT_EQ(0x0300007f, ip_addr);
     sta_ip_unsafe_set(ip_addr);
-    const char *p_str = sta_ip_unsafe_get_str();
-    ASSERT_TRUE(nullptr != p_str);
-    ASSERT_EQ(string("127.0.0.3"), string(p_str));
+    ASSERT_EQ(string("127.0.0.3"), string(sta_ip_unsafe_get_copy().buf));
 
     sta_ip_unsafe_reset();
-    ASSERT_EQ(string("0.0.0.0"), string(sta_ip_unsafe_get_str()));
+    ASSERT_EQ(string("0.0.0.0"), string(sta_ip_unsafe_get_copy().buf));
 
     sta_ip_unsafe_deinit();
-    ASSERT_EQ(string(""), string(sta_ip_unsafe_get_str()));
+    ASSERT_EQ(string(""), string(sta_ip_unsafe_get_copy().buf));
 }
 
 TEST_F(TestStaIpUnsafe, test_192_168_1_10) // NOLINT
 {
     sta_ip_unsafe_init();
-    ASSERT_EQ(string(""), string(sta_ip_unsafe_get_str()));
+    ASSERT_EQ(string("0.0.0.0"), string(sta_ip_unsafe_get_copy().buf));
 
     const uint32_t ip_addr = sta_ip_unsafe_conv_str_to_ip("192.168.1.10");
     ASSERT_EQ(0x0a01a8c0, ip_addr);
     sta_ip_unsafe_set(ip_addr);
-    const char *p_str = sta_ip_unsafe_get_str();
-    ASSERT_TRUE(nullptr != p_str);
-    ASSERT_EQ(string("192.168.1.10"), string(p_str));
+    ASSERT_EQ(string("192.168.1.10"), string(sta_ip_unsafe_get_copy().buf));
 
     sta_ip_unsafe_reset();
-    ASSERT_EQ(string("0.0.0.0"), string(sta_ip_unsafe_get_str()));
+    ASSERT_EQ(string("0.0.0.0"), string(sta_ip_unsafe_get_copy().buf));
 
     sta_ip_unsafe_deinit();
-    ASSERT_EQ(string(""), string(sta_ip_unsafe_get_str()));
+    ASSERT_EQ(string(""), string(sta_ip_unsafe_get_copy().buf));
 }

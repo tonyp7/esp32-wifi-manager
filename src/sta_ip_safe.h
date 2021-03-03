@@ -33,9 +33,8 @@ extern "C" {
 
 /**
  * @brief Initialize sta_ip_safe library.
- * @return true if successful
  */
-bool
+void
 sta_ip_safe_init(void);
 
 /**
@@ -47,30 +46,25 @@ sta_ip_safe_deinit(void);
 /**
  * @brief Gets the string representation of the Station IP address, e.g.: "192.168.1.1"
  * @note This function is thread safe.
- * @param ticks_to_wait - max num ticks to wait mutex
  * @return @def sta_ip_string_t
  */
 sta_ip_string_t
-sta_ip_safe_get(TickType_t ticks_to_wait);
+sta_ip_safe_get(void);
 
 /**
  * @brief Update string representation of the Station IP address
  * @note This function is thread safe.
  * @param ip - IPv4 address (@def sta_ip_address_t)
- * @param ticks_to_wait - max num ticks to wait mutex
- * @return true if successful
  */
-bool
-sta_ip_safe_set(const sta_ip_address_t ip, const TickType_t ticks_to_wait);
+void
+sta_ip_safe_set(const sta_ip_address_t ip);
 
 /**
  * @brief Reset string representation of the Station IP address
  * @note This function is thread safe.
- * @param ticks_to_wait - max num ticks to wait mutex
- * @return true if successful
  */
-bool
-sta_ip_safe_reset(const TickType_t ticks_to_wait);
+void
+sta_ip_safe_reset(void);
 
 /**
  * @brief Convert string representation of IP-address to @def sta_ip_address_t
@@ -85,8 +79,8 @@ sta_ip_safe_conv_str_to_ip(const char *p_ip_addr_str);
 SemaphoreHandle_t
 sta_ip_safe_mutex_get(void);
 
-bool
-sta_ip_safe_lock(const TickType_t ticks_to_wait);
+void
+sta_ip_safe_lock(void);
 
 void
 sta_ip_safe_unlock(void);

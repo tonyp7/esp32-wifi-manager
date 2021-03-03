@@ -20,20 +20,19 @@ STA_IP_SAFE_STATIC
 os_mutex_t
 sta_ip_safe_mutex_get(void)
 {
+    if (NULL == g_sta_ip_safe_mutex)
+    {
+        g_sta_ip_safe_mutex = os_mutex_create_static(&g_sta_ip_safe_mutex_mem);
+    }
     return g_sta_ip_safe_mutex;
 }
 
 STA_IP_SAFE_STATIC
-bool
-sta_ip_safe_lock(const TickType_t ticks_to_wait)
+void
+sta_ip_safe_lock(void)
 {
     os_mutex_t h_mutex = sta_ip_safe_mutex_get();
-    if (NULL == h_mutex)
-    {
-        LOG_ERR("Mutex is not initialized");
-        return false;
-    }
-    return os_mutex_lock_with_timeout(h_mutex, ticks_to_wait);
+    os_mutex_lock(h_mutex);
 }
 
 STA_IP_SAFE_STATIC
@@ -41,69 +40,50 @@ void
 sta_ip_safe_unlock(void)
 {
     os_mutex_t h_mutex = sta_ip_safe_mutex_get();
-    if (NULL == h_mutex)
-    {
-        LOG_ERR("Mutex is not initialized");
-        return;
-    }
     os_mutex_unlock(h_mutex);
 }
 
-bool
+void
 sta_ip_safe_init(void)
 {
-    if (NULL != sta_ip_safe_mutex_get())
-    {
-        LOG_ERR("Mutex was already initialized");
-        return false;
-    }
-    g_sta_ip_safe_mutex = os_mutex_create_static(&g_sta_ip_safe_mutex_mem);
+    sta_ip_safe_lock();
     sta_ip_unsafe_init();
-    return sta_ip_safe_reset(portMAX_DELAY);
+    sta_ip_safe_unlock();
+    sta_ip_safe_reset();
 }
 
 void
 sta_ip_safe_deinit(void)
 {
-    const bool flag_locked = sta_ip_safe_lock(portMAX_DELAY);
+    sta_ip_safe_lock();
     sta_ip_unsafe_deinit();
-    if (flag_locked)
-    {
-        sta_ip_safe_unlock();
-    }
-    os_mutex_delete(&g_sta_ip_safe_mutex);
-}
-
-bool
-sta_ip_safe_set(const sta_ip_address_t ip, const TickType_t ticks_to_wait)
-{
-    if (!sta_ip_safe_lock(ticks_to_wait))
-    {
-        LOG_WARN("%s: Timeout waiting mutex", __func__);
-        return false;
-    }
-    sta_ip_unsafe_set(ip);
-    const char *ip_str = sta_ip_unsafe_get_str();
-    LOG_INFO("Set STA IP String to: %s", ip_str);
     sta_ip_safe_unlock();
-    return true;
 }
 
-bool
-sta_ip_safe_reset(const TickType_t ticks_to_wait)
+void
+sta_ip_safe_set(const sta_ip_address_t ip)
 {
-    return sta_ip_safe_set((sta_ip_address_t)0, ticks_to_wait);
+    sta_ip_safe_lock();
+    sta_ip_unsafe_set(ip);
+    sta_ip_safe_unlock();
+    const sta_ip_string_t ip_str = sta_ip_safe_get();
+    LOG_INFO("Set STA IP String to: %s", ip_str.buf);
+}
+
+void
+sta_ip_safe_reset(void)
+{
+    sta_ip_safe_lock();
+    sta_ip_unsafe_reset();
+    sta_ip_safe_unlock();
+    const sta_ip_string_t ip_str = sta_ip_safe_get();
+    LOG_INFO("Set STA IP String to: %s", ip_str.buf);
 }
 
 sta_ip_string_t
-sta_ip_safe_get(TickType_t ticks_to_wait)
+sta_ip_safe_get(void)
 {
-    if (!sta_ip_safe_lock(ticks_to_wait))
-    {
-        LOG_WARN("%s: Timeout waiting mutex", __func__);
-        const sta_ip_string_t ip_str = { 0 };
-        return ip_str;
-    }
+    sta_ip_safe_lock();
     const sta_ip_string_t ip_str = sta_ip_unsafe_get_copy();
     sta_ip_safe_unlock();
     return ip_str;

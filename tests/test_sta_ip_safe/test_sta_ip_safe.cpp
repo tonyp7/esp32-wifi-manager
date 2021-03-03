@@ -95,39 +95,6 @@ lwip_port_rand(void)
     return (unsigned int)random();
 }
 
-os_mutex_t
-os_mutex_create_static(os_mutex_static_t *const p_mutex_static)
-{
-    SemaphoreHandle_t h_mutex = xSemaphoreCreateMutexStatic(p_mutex_static);
-    return h_mutex;
-}
-
-void
-os_mutex_delete(os_mutex_t *p_mutex)
-{
-    if (nullptr != *p_mutex)
-    {
-        vSemaphoreDelete(*p_mutex);
-        *p_mutex = nullptr;
-    }
-}
-
-bool
-os_mutex_lock_with_timeout(os_mutex_t h_mutex, TickType_t ticks_to_wait)
-{
-    if (pdTRUE != xSemaphoreTake(h_mutex, ticks_to_wait))
-    {
-        return false;
-    }
-    return true;
-}
-
-void
-os_mutex_unlock(os_mutex_t h_mutex)
-{
-    xSemaphoreGive(h_mutex);
-}
-
 } // extern "C"
 
 /*** Cmd-handler task *************************************************************************************************/
@@ -179,67 +146,65 @@ TEST_F(TestStaIpSafe, test_all) // NOLINT
 {
     // Test init/deinit
     {
-        ASSERT_TRUE(nullptr == sta_ip_safe_mutex_get());
-        ASSERT_TRUE(sta_ip_safe_init());
+        ASSERT_TRUE(nullptr != sta_ip_safe_mutex_get());
+        sta_ip_safe_init();
 
         TEST_CHECK_LOG_RECORD(ESP_LOG_INFO, "Set STA IP String to: 0.0.0.0");
         ASSERT_TRUE(esp_log_wrapper_is_empty());
 
         ASSERT_TRUE(nullptr != sta_ip_safe_mutex_get());
-        const sta_ip_string_t ip_str = sta_ip_safe_get((TickType_t)0);
+        const sta_ip_string_t ip_str = sta_ip_safe_get();
         ASSERT_EQ(string("0.0.0.0"), string(ip_str.buf));
         sta_ip_safe_deinit();
-        ASSERT_TRUE(nullptr == sta_ip_safe_mutex_get());
+        ASSERT_TRUE(nullptr != sta_ip_safe_mutex_get());
         ASSERT_TRUE(esp_log_wrapper_is_empty());
     }
 
     // Test lock/unlock without init
     {
-        ASSERT_TRUE(nullptr == sta_ip_safe_mutex_get());
-        ASSERT_FALSE(sta_ip_safe_lock((TickType_t)0));
+        ASSERT_TRUE(nullptr != sta_ip_safe_mutex_get());
+        sta_ip_safe_lock();
         sta_ip_safe_unlock();
-        TEST_CHECK_LOG_RECORD(ESP_LOG_ERROR, "Mutex is not initialized");
-        TEST_CHECK_LOG_RECORD(ESP_LOG_ERROR, "Mutex is not initialized");
+        ASSERT_TRUE(nullptr != sta_ip_safe_mutex_get());
         ASSERT_TRUE(esp_log_wrapper_is_empty());
     }
 
     // Test sta_ip_safe_init / sta_ip_safe_deinit twice
     {
-        ASSERT_TRUE(nullptr == sta_ip_safe_mutex_get());
-        ASSERT_TRUE(sta_ip_safe_init());
+        ASSERT_TRUE(nullptr != sta_ip_safe_mutex_get());
+        sta_ip_safe_init();
         TEST_CHECK_LOG_RECORD(ESP_LOG_INFO, "Set STA IP String to: 0.0.0.0");
         ASSERT_TRUE(esp_log_wrapper_is_empty());
 
         ASSERT_TRUE(nullptr != sta_ip_safe_mutex_get());
 
-        ASSERT_FALSE(sta_ip_safe_init());
-        TEST_CHECK_LOG_RECORD(ESP_LOG_ERROR, "Mutex was already initialized");
+        sta_ip_safe_init();
+        TEST_CHECK_LOG_RECORD(ESP_LOG_INFO, "Set STA IP String to: 0.0.0.0");
         ASSERT_TRUE(esp_log_wrapper_is_empty());
 
-        const sta_ip_string_t ip_str = sta_ip_safe_get((TickType_t)0);
+        const sta_ip_string_t ip_str = sta_ip_safe_get();
         ASSERT_EQ(string("0.0.0.0"), string(ip_str.buf));
         sta_ip_safe_deinit();
-        ASSERT_TRUE(nullptr == sta_ip_safe_mutex_get());
+        ASSERT_TRUE(nullptr != sta_ip_safe_mutex_get());
         sta_ip_safe_deinit();
-        TEST_CHECK_LOG_RECORD(ESP_LOG_ERROR, "Mutex is not initialized");
         ASSERT_TRUE(esp_log_wrapper_is_empty());
     }
 
     // Test sta_ip_safe_set / sta_ip_safe_get
     {
-        ASSERT_TRUE(sta_ip_safe_init());
+        sta_ip_safe_init();
         TEST_CHECK_LOG_RECORD(ESP_LOG_INFO, "Set STA IP String to: 0.0.0.0");
         ASSERT_TRUE(esp_log_wrapper_is_empty());
 
         const sta_ip_address_t ip_address = sta_ip_safe_conv_str_to_ip("192.168.1.10");
-        ASSERT_TRUE(sta_ip_safe_set(ip_address, (TickType_t)0));
+        sta_ip_safe_set(ip_address);
         TEST_CHECK_LOG_RECORD(ESP_LOG_INFO, "Set STA IP String to: 192.168.1.10");
         ASSERT_TRUE(esp_log_wrapper_is_empty());
 
-        const sta_ip_string_t ip_str = sta_ip_safe_get((TickType_t)0);
+        const sta_ip_string_t ip_str = sta_ip_safe_get();
         ASSERT_EQ(string("192.168.1.10"), string(ip_str.buf));
         sta_ip_safe_deinit();
-        ASSERT_TRUE(nullptr == sta_ip_safe_mutex_get());
+        ASSERT_TRUE(nullptr != sta_ip_safe_mutex_get());
         ASSERT_TRUE(esp_log_wrapper_is_empty());
     }
 
@@ -248,105 +213,38 @@ TEST_F(TestStaIpSafe, test_all) // NOLINT
         ASSERT_TRUE(esp_log_wrapper_is_empty());
 
         const sta_ip_address_t ip_address = sta_ip_safe_conv_str_to_ip("192.168.1.10");
-        ASSERT_FALSE(sta_ip_safe_set(ip_address, (TickType_t)0));
-        TEST_CHECK_LOG_RECORD(ESP_LOG_ERROR, "Mutex is not initialized");
-        TEST_CHECK_LOG_RECORD(ESP_LOG_WARN, "sta_ip_safe_set: Timeout waiting mutex");
+        sta_ip_safe_set(ip_address);
+        TEST_CHECK_LOG_RECORD(ESP_LOG_INFO, "Set STA IP String to: 192.168.1.10");
         ASSERT_TRUE(esp_log_wrapper_is_empty());
 
-        const sta_ip_string_t ip_str = sta_ip_safe_get((TickType_t)0);
-        ASSERT_EQ(string(""), string(ip_str.buf));
-        ASSERT_TRUE(nullptr == sta_ip_safe_mutex_get());
-        TEST_CHECK_LOG_RECORD(ESP_LOG_ERROR, "Mutex is not initialized");
-        TEST_CHECK_LOG_RECORD(ESP_LOG_WARN, "sta_ip_safe_get: Timeout waiting mutex");
+        const sta_ip_string_t ip_str = sta_ip_safe_get();
+        ASSERT_EQ(string("192.168.1.10"), string(ip_str.buf));
+        ASSERT_TRUE(nullptr != sta_ip_safe_mutex_get());
         ASSERT_TRUE(esp_log_wrapper_is_empty());
     }
 
     // Test sta_ip_safe_reset
     {
-        ASSERT_TRUE(sta_ip_safe_init());
+        sta_ip_safe_init();
         TEST_CHECK_LOG_RECORD(ESP_LOG_INFO, "Set STA IP String to: 0.0.0.0");
         ASSERT_TRUE(esp_log_wrapper_is_empty());
 
         const sta_ip_address_t ip_address = sta_ip_safe_conv_str_to_ip("192.168.1.10");
-        ASSERT_TRUE(sta_ip_safe_set(ip_address, (TickType_t)0));
+        sta_ip_safe_set(ip_address);
         TEST_CHECK_LOG_RECORD(ESP_LOG_INFO, "Set STA IP String to: 192.168.1.10");
         ASSERT_TRUE(esp_log_wrapper_is_empty());
 
-        const sta_ip_string_t ip_str = sta_ip_safe_get((TickType_t)0);
+        const sta_ip_string_t ip_str = sta_ip_safe_get();
         ASSERT_EQ(string("192.168.1.10"), string(ip_str.buf));
 
-        ASSERT_TRUE(sta_ip_safe_reset(0));
+        sta_ip_safe_reset();
         TEST_CHECK_LOG_RECORD(ESP_LOG_INFO, "Set STA IP String to: 0.0.0.0");
         ASSERT_TRUE(esp_log_wrapper_is_empty());
 
-        const sta_ip_string_t ip_str2 = sta_ip_safe_get((TickType_t)0);
+        const sta_ip_string_t ip_str2 = sta_ip_safe_get();
         ASSERT_EQ(string("0.0.0.0"), string(ip_str2.buf));
         sta_ip_safe_deinit();
-        ASSERT_TRUE(nullptr == sta_ip_safe_mutex_get());
+        ASSERT_TRUE(nullptr != sta_ip_safe_mutex_get());
         ASSERT_TRUE(esp_log_wrapper_is_empty());
-    }
-
-    // Test mutex timeout
-    {
-        {
-            ASSERT_TRUE(sta_ip_safe_init());
-            TEST_CHECK_LOG_RECORD(ESP_LOG_INFO, "Set STA IP String to: 0.0.0.0");
-            ASSERT_TRUE(esp_log_wrapper_is_empty());
-
-            const sta_ip_address_t ip_address = sta_ip_safe_conv_str_to_ip("192.168.1.10");
-            ASSERT_TRUE(sta_ip_safe_set(ip_address, (TickType_t)0));
-            TEST_CHECK_LOG_RECORD(ESP_LOG_INFO, "Set STA IP String to: 192.168.1.10");
-            ASSERT_TRUE(esp_log_wrapper_is_empty());
-
-            const sta_ip_string_t ip_str = sta_ip_safe_get((TickType_t)0);
-            ASSERT_EQ(string("192.168.1.10"), string(ip_str.buf));
-            ASSERT_TRUE(esp_log_wrapper_is_empty());
-        }
-
-        // lock mutex before sta_ip_safe_set
-        {
-            ASSERT_TRUE(sta_ip_safe_lock((TickType_t)0));
-            const sta_ip_address_t ip_address = sta_ip_safe_conv_str_to_ip("192.168.2.11");
-            ASSERT_FALSE(sta_ip_safe_set(ip_address, (TickType_t)0));
-            TEST_CHECK_LOG_RECORD(ESP_LOG_WARN, "sta_ip_safe_set: Timeout waiting mutex");
-            ASSERT_TRUE(esp_log_wrapper_is_empty());
-
-            sta_ip_safe_unlock();
-            const sta_ip_string_t ip_str = sta_ip_safe_get((TickType_t)0);
-            ASSERT_EQ(string("192.168.1.10"), string(ip_str.buf));
-            ASSERT_TRUE(esp_log_wrapper_is_empty());
-        }
-
-        {
-            const sta_ip_address_t ip_address = sta_ip_safe_conv_str_to_ip("192.168.2.11");
-            ASSERT_TRUE(sta_ip_safe_set(ip_address, (TickType_t)0));
-            TEST_CHECK_LOG_RECORD(ESP_LOG_INFO, "Set STA IP String to: 192.168.2.11");
-            ASSERT_TRUE(esp_log_wrapper_is_empty());
-
-            const sta_ip_string_t ip_str = sta_ip_safe_get((TickType_t)0);
-            ASSERT_EQ(string("192.168.2.11"), string(ip_str.buf));
-            ASSERT_TRUE(esp_log_wrapper_is_empty());
-        }
-
-        // lock mutex before sta_ip_safe_get
-        {
-            ASSERT_TRUE(sta_ip_safe_lock((TickType_t)0));
-            const sta_ip_string_t ip_str = sta_ip_safe_get((TickType_t)0);
-            TEST_CHECK_LOG_RECORD(ESP_LOG_WARN, "sta_ip_safe_get: Timeout waiting mutex");
-            ASSERT_TRUE(esp_log_wrapper_is_empty());
-
-            ASSERT_EQ(string(""), string(ip_str.buf));
-            sta_ip_safe_unlock();
-            ASSERT_TRUE(esp_log_wrapper_is_empty());
-        }
-
-        {
-            const sta_ip_string_t ip_str = sta_ip_safe_get((TickType_t)0);
-            ASSERT_EQ(string("192.168.2.11"), string(ip_str.buf));
-            ASSERT_TRUE(esp_log_wrapper_is_empty());
-        }
-
-        sta_ip_safe_deinit();
-        ASSERT_TRUE(nullptr == sta_ip_safe_mutex_get());
     }
 }

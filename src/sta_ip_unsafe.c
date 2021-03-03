@@ -15,28 +15,16 @@ _Static_assert(
     sizeof(sta_ip_string_t) >= sizeof(g_sta_ip_str_buf),
     "size of sta_ip_string_t less than IP4ADDR_STRLEN_MAX+1");
 
-static void
-sta_ip_unsafe_clear(void)
-{
-    memset(g_sta_ip_str_buf, 0, sizeof(g_sta_ip_str_buf));
-}
-
 void
 sta_ip_unsafe_init(void)
 {
-    sta_ip_unsafe_clear();
+    sta_ip_unsafe_reset();
 }
 
 void
 sta_ip_unsafe_deinit(void)
 {
-    sta_ip_unsafe_clear();
-}
-
-const char *
-sta_ip_unsafe_get_str(void)
-{
-    return g_sta_ip_str_buf;
+    memset(g_sta_ip_str_buf, 0, sizeof(g_sta_ip_str_buf));
 }
 
 sta_ip_string_t

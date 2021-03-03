@@ -169,7 +169,6 @@ wifi_manager_init_start_wifi(
     {
         g_wifi_cb_ptr_arr[i] = NULL;
     }
-    sta_ip_safe_init();
 
     esp_err_t err = esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_manager_event_handler, NULL);
     if (ESP_OK != err)
@@ -275,6 +274,7 @@ wifi_manager_init(
 
     wifi_sta_config_init();
     json_network_info_init();
+    sta_ip_safe_init();
 
     /* initialize the tcp stack */
     tcpip_adapter_init();
@@ -712,7 +712,7 @@ wifi_handle_ev_sta_disconnected(const wifiman_msg_param_t *p_param)
     const EventBits_t event_bits           = xEventGroupClearBits(g_wifi_manager_event_group, WIFI_MANAGER_SCAN_BIT);
 
     /* reset saved sta IP */
-    sta_ip_safe_reset(portMAX_DELAY);
+    sta_ip_safe_reset();
 
     update_reason_code_e update_reason_code = UPDATE_LOST_CONNECTION;
     if (0 != (event_bits & (uint32_t)WIFI_MANAGER_REQUEST_STA_CONNECT_BIT))
@@ -785,7 +785,7 @@ wifi_handle_ev_sta_got_ip(const wifiman_msg_param_t *p_param)
 
     /* save IP as a string for the HTTP server host */
     const sta_ip_address_t ip_addr = wifiman_conv_param_to_ip_addr(p_param);
-    sta_ip_safe_set(ip_addr, portMAX_DELAY);
+    sta_ip_safe_set(ip_addr);
 
     /* save wifi config in NVS if it wasn't a restored of a connection */
     if (0 == (event_bits & (uint32_t)WIFI_MANAGER_REQUEST_RESTORE_STA_BIT))

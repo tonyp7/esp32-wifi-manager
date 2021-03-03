@@ -27,9 +27,6 @@ sta_ip_unsafe_set(const sta_ip_address_t ip);
 void
 sta_ip_unsafe_reset(void);
 
-const char *
-sta_ip_unsafe_get_str(void);
-
 sta_ip_string_t
 sta_ip_unsafe_get_copy(void);
 
