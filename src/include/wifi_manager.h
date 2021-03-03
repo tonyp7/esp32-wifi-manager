@@ -104,12 +104,6 @@ wifi_manager_is_connected_to_wifi(void);
 bool
 wifi_manager_is_connected_to_ethernet(void);
 
-void
-wifi_manager_set_connected_to_ethernet(void);
-
-void
-wifi_manager_clear_connected_to_ethernet(void);
-
 bool
 wifi_manager_is_ap_sta_ip_assigned(void);
 
@@ -123,7 +117,7 @@ wifi_manager_is_sta_configured(void);
  * @param p_ip_info - pointer to tcpip_adapter_ip_info_t
  */
 void
-wifi_manager_generate_network_info_json(
+wifi_manager_update_network_connection_info(
     const update_reason_code_e           update_reason_code,
     const wifi_ssid_t *const             p_ssid,
     const tcpip_adapter_ip_info_t *const p_ip_info);

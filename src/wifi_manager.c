@@ -376,7 +376,7 @@ wifi_manager_clear_sta_config(void)
 }
 
 void
-wifi_manager_generate_network_info_json(
+wifi_manager_update_network_connection_info(
     const update_reason_code_e           update_reason_code,
     const wifi_ssid_t *const             p_ssid,
     const tcpip_adapter_ip_info_t *const p_ip_info)
@@ -386,11 +386,28 @@ wifi_manager_generate_network_info_json(
         .gw      = { "0" },
         .netmask = { "0" },
     };
-    if ((UPDATE_CONNECTION_OK == update_reason_code) && (NULL != p_ip_info))
+    if (UPDATE_CONNECTION_OK == update_reason_code)
     {
-        snprintf(ip_info_str.ip, sizeof(ip_info_str.ip), "%s", ip4addr_ntoa(&p_ip_info->ip));
-        snprintf(ip_info_str.netmask, sizeof(ip_info_str.netmask), "%s", ip4addr_ntoa(&p_ip_info->netmask));
-        snprintf(ip_info_str.gw, sizeof(ip_info_str.gw), "%s", ip4addr_ntoa(&p_ip_info->gw));
+        if (NULL == p_ssid)
+        {
+            xEventGroupSetBits(g_wifi_manager_event_group, WIFI_MANAGER_ETH_CONNECTED_BIT);
+        }
+        else
+        {
+            xEventGroupSetBits(g_wifi_manager_event_group, WIFI_MANAGER_WIFI_CONNECTED_BIT);
+        }
+        if (NULL != p_ip_info)
+        {
+            snprintf(ip_info_str.ip, sizeof(ip_info_str.ip), "%s", ip4addr_ntoa(&p_ip_info->ip));
+            snprintf(ip_info_str.netmask, sizeof(ip_info_str.netmask), "%s", ip4addr_ntoa(&p_ip_info->netmask));
+            snprintf(ip_info_str.gw, sizeof(ip_info_str.gw), "%s", ip4addr_ntoa(&p_ip_info->gw));
+        }
+    }
+    else
+    {
+        xEventGroupClearBits(
+            g_wifi_manager_event_group,
+            WIFI_MANAGER_WIFI_CONNECTED_BIT | WIFI_MANAGER_ETH_CONNECTED_BIT);
     }
     json_network_info_generate(p_ssid, &ip_info_str, update_reason_code);
 }
@@ -691,13 +708,13 @@ wifi_handle_ev_sta_disconnected(const wifiman_msg_param_t *p_param)
 
     /* if a DISCONNECT message is posted while a scan is in progress this scan will NEVER end, causing scan
      * to never work again. For this reason SCAN_BIT is cleared too */
-    const EventBits_t event_bits = xEventGroupClearBits(
-        g_wifi_manager_event_group,
-        WIFI_MANAGER_WIFI_CONNECTED_BIT | WIFI_MANAGER_SCAN_BIT);
+    const bool        is_connected_to_wifi = wifi_manager_is_connected_to_wifi();
+    const EventBits_t event_bits           = xEventGroupClearBits(g_wifi_manager_event_group, WIFI_MANAGER_SCAN_BIT);
 
     /* reset saved sta IP */
     sta_ip_safe_reset(portMAX_DELAY);
 
+    update_reason_code_e update_reason_code = UPDATE_LOST_CONNECTION;
     if (0 != (event_bits & (uint32_t)WIFI_MANAGER_REQUEST_STA_CONNECT_BIT))
     {
         LOG_INFO("event_bits & WIFI_MANAGER_REQUEST_STA_CONNECT_BIT");
@@ -706,7 +723,7 @@ wifi_handle_ev_sta_disconnected(const wifiman_msg_param_t *p_param)
          * request bit and move on */
         xEventGroupClearBits(g_wifi_manager_event_group, WIFI_MANAGER_REQUEST_STA_CONNECT_BIT);
 
-        wifi_manager_generate_network_info_json(UPDATE_FAILED_ATTEMPT, NULL, NULL);
+        update_reason_code = UPDATE_FAILED_ATTEMPT;
     }
     else if (0 != (event_bits & (uint32_t)WIFI_MANAGER_REQUEST_DISCONNECT_BIT))
     {
@@ -715,7 +732,7 @@ wifi_handle_ev_sta_disconnected(const wifiman_msg_param_t *p_param)
          * and restart the AP */
         xEventGroupClearBits(g_wifi_manager_event_group, WIFI_MANAGER_REQUEST_DISCONNECT_BIT);
 
-        wifi_manager_generate_network_info_json(UPDATE_USER_DISCONNECT, NULL, NULL);
+        update_reason_code = UPDATE_USER_DISCONNECT;
 
         /* Erase configuration and save it ot NVS memory */
         wifi_sta_config_clear();
@@ -726,12 +743,11 @@ wifi_handle_ev_sta_disconnected(const wifiman_msg_param_t *p_param)
     else
     {
         LOG_INFO("lost connection");
-        /* lost connection ? */
-        wifi_manager_generate_network_info_json(UPDATE_LOST_CONNECTION, NULL, NULL);
-
+        update_reason_code = UPDATE_LOST_CONNECTION;
         wifiman_msg_send_cmd_connect_sta(CONNECTION_REQUEST_AUTO_RECONNECT);
     }
-    if (0 == (event_bits & (uint32_t)WIFI_MANAGER_WIFI_CONNECTED_BIT))
+    wifi_manager_update_network_connection_info(update_reason_code, NULL, NULL);
+    if (!is_connected_to_wifi)
     {
         return false;
     }
@@ -766,7 +782,6 @@ wifi_handle_ev_sta_got_ip(const wifiman_msg_param_t *p_param)
     const EventBits_t event_bits = xEventGroupClearBits(
         g_wifi_manager_event_group,
         WIFI_MANAGER_REQUEST_STA_CONNECT_BIT | WIFI_MANAGER_REQUEST_RESTORE_STA_BIT);
-    xEventGroupSetBits(g_wifi_manager_event_group, WIFI_MANAGER_WIFI_CONNECTED_BIT);
 
     /* save IP as a string for the HTTP server host */
     const sta_ip_address_t ip_addr = wifiman_conv_param_to_ip_addr(p_param);
@@ -785,7 +800,7 @@ wifi_handle_ev_sta_got_ip(const wifiman_msg_param_t *p_param)
     {
         /* refresh JSON with the new IP */
         const wifi_ssid_t ssid = wifi_sta_config_get_ssid();
-        wifi_manager_generate_network_info_json(UPDATE_CONNECTION_OK, &ssid, &ip_info);
+        wifi_manager_update_network_connection_info(UPDATE_CONNECTION_OK, &ssid, &ip_info);
     }
     else
     {
@@ -1089,18 +1104,6 @@ bool
 wifi_manager_is_connected_to_ethernet(void)
 {
     return (0 != (xEventGroupGetBits(g_wifi_manager_event_group) & WIFI_MANAGER_ETH_CONNECTED_BIT));
-}
-
-void
-wifi_manager_set_connected_to_ethernet(void)
-{
-    xEventGroupSetBits(g_wifi_manager_event_group, WIFI_MANAGER_ETH_CONNECTED_BIT);
-}
-
-void
-wifi_manager_clear_connected_to_ethernet(void)
-{
-    xEventGroupClearBits(g_wifi_manager_event_group, WIFI_MANAGER_ETH_CONNECTED_BIT);
 }
 
 bool
