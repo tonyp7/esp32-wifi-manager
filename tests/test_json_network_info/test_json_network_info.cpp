@@ -193,7 +193,7 @@ TEST_F(TestJsonNetworkInfo, test_generate_ssid_null) // NOLINT
     };
     json_network_info_generate(nullptr, &network_info, UPDATE_CONNECTION_OK);
     string json_str = json_network_info_get();
-    ASSERT_EQ(string("{}\n"), json_str);
+    ASSERT_EQ(string("{\"ssid\":null,\"ip\":\"192.168.0.50\",\"netmask\":\"255.255.255.0\",\"gw\":\"192.168.0.1\",\"urc\":0}\n"), json_str);
 }
 
 TEST_F(TestJsonNetworkInfo, test_generate_ssid_empty) // NOLINT
@@ -206,7 +206,7 @@ TEST_F(TestJsonNetworkInfo, test_generate_ssid_empty) // NOLINT
     const wifi_ssid_t ssid = { "" };
     json_network_info_generate(&ssid, &network_info, UPDATE_CONNECTION_OK);
     string json_str = json_network_info_get();
-    ASSERT_EQ(string("{}\n"), json_str);
+    ASSERT_EQ(string("{\"ssid\":\"\",\"ip\":\"192.168.0.50\",\"netmask\":\"255.255.255.0\",\"gw\":\"192.168.0.1\",\"urc\":0}\n"), json_str);
 }
 
 TEST_F(TestJsonNetworkInfo, test_generate_connection_ok) // NOLINT
