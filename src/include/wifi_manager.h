@@ -99,7 +99,7 @@ bool
 wifi_manager_is_working(void);
 
 bool
-wifi_manager_is_connected(void);
+wifi_manager_is_connected_to_wifi(void);
 
 bool
 wifi_manager_is_ap_sta_ip_assigned(void);

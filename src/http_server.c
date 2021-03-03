@@ -485,7 +485,7 @@ http_server_task(void)
         {
             LOG_ERR("netconn_accept: %d", err);
         }
-        if (wifi_manager_is_working() && wifi_manager_is_connected() && wifi_manager_is_ap_sta_ip_assigned())
+        if (wifi_manager_is_working() && wifi_manager_is_connected_to_wifi() && wifi_manager_is_ap_sta_ip_assigned())
         {
             if ((0 != g_http_last_req_status)
                 && ((xTaskGetTickCount() - g_http_last_req_status)

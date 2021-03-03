@@ -803,7 +803,7 @@ static void
 wifi_handle_ev_ap_sta_connected(void)
 {
     LOG_INFO("MESSAGE: EVENT_AP_STA_CONNECTED");
-    if (!wifi_manager_is_connected())
+    if (!wifi_manager_is_connected_to_wifi())
     {
         dns_server_start();
     }
@@ -1078,7 +1078,7 @@ wifi_manager_is_working(void)
 }
 
 bool
-wifi_manager_is_connected(void)
+wifi_manager_is_connected_to_wifi(void)
 {
     return (0 != (xEventGroupGetBits(g_wifi_manager_event_group) & WIFI_MANAGER_WIFI_CONNECTED_BIT));
 }
