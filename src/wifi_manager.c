@@ -450,15 +450,10 @@ wifi_manager_event_handler(
                 break;
             case WIFI_EVENT_AP_STACONNECTED: /* a user disconnected from the SoftAP */
                 LOG_INFO("WIFI_EVENT_AP_STACONNECTED");
-                xEventGroupClearBits(g_wifi_manager_event_group, WIFI_MANAGER_AP_STA_IP_ASSIGNED_BIT);
-                xEventGroupSetBits(g_wifi_manager_event_group, WIFI_MANAGER_AP_STA_CONNECTED_BIT);
                 wifiman_msg_send_ev_ap_sta_connected();
                 break;
             case WIFI_EVENT_AP_STADISCONNECTED:
                 LOG_INFO("WIFI_EVENT_AP_STADISCONNECTED");
-                xEventGroupClearBits(
-                    g_wifi_manager_event_group,
-                    WIFI_MANAGER_AP_STA_CONNECTED_BIT | WIFI_MANAGER_AP_STA_IP_ASSIGNED_BIT);
                 wifiman_msg_send_ev_ap_sta_disconnected();
                 break;
             case WIFI_EVENT_STA_START:
@@ -488,7 +483,6 @@ wifi_manager_event_handler(
                 break;
             case IP_EVENT_AP_STAIPASSIGNED:
                 LOG_INFO("IP_EVENT_AP_STAIPASSIGNED");
-                xEventGroupSetBits(g_wifi_manager_event_group, WIFI_MANAGER_AP_STA_IP_ASSIGNED_BIT);
                 wifiman_msg_send_ev_ap_sta_ip_assigned();
                 break;
             default:
@@ -806,6 +800,8 @@ static void
 wifi_handle_ev_ap_sta_connected(void)
 {
     LOG_INFO("MESSAGE: EVENT_AP_STA_CONNECTED");
+    xEventGroupClearBits(g_wifi_manager_event_group, WIFI_MANAGER_AP_STA_IP_ASSIGNED_BIT);
+    xEventGroupSetBits(g_wifi_manager_event_group, WIFI_MANAGER_AP_STA_CONNECTED_BIT);
     if (!wifi_manager_is_connected_to_wifi())
     {
         dns_server_start();
@@ -816,7 +812,9 @@ static void
 wifi_handle_ev_ap_sta_disconnected(void)
 {
     LOG_INFO("MESSAGE: EVENT_AP_STA_DISCONNECTED");
-    xEventGroupClearBits(g_wifi_manager_event_group, WIFI_MANAGER_AP_STA_IP_ASSIGNED_BIT);
+    xEventGroupClearBits(
+        g_wifi_manager_event_group,
+        WIFI_MANAGER_AP_STA_CONNECTED_BIT | WIFI_MANAGER_AP_STA_IP_ASSIGNED_BIT);
     dns_server_stop();
 }
 
@@ -824,6 +822,7 @@ static void
 wifi_handle_ev_ap_sta_ip_assigned(void)
 {
     LOG_INFO("MESSAGE: EVENT_AP_STA_IP_ASSIGNED");
+    xEventGroupSetBits(g_wifi_manager_event_group, WIFI_MANAGER_AP_STA_IP_ASSIGNED_BIT);
 }
 
 static void
