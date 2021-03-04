@@ -315,6 +315,8 @@ typedef struct http_server_resp_t
 typedef http_server_resp_t (*wifi_manager_http_callback_t)(const char *path);
 typedef http_server_resp_t (*wifi_manager_http_cb_on_post_t)(const char *path, const char *body);
 
+typedef void (*wifi_manager_callback_on_cmd_disconnect_t)(void);
+
 #ifdef __cplusplus
 }
 #endif

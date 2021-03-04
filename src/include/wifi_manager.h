@@ -53,11 +53,12 @@ typedef struct
  */
 bool
 wifi_manager_start(
-    const bool                     flag_start_wifi,
-    const WiFiAntConfig_t *        p_wifi_ant_config,
-    wifi_manager_http_callback_t   cb_on_http_get,
-    wifi_manager_http_cb_on_post_t cb_on_http_post,
-    wifi_manager_http_callback_t   cb_on_http_delete);
+    const bool                                flag_start_wifi,
+    const WiFiAntConfig_t *                   p_wifi_ant_config,
+    wifi_manager_http_callback_t              cb_on_http_get,
+    wifi_manager_http_cb_on_post_t            cb_on_http_post,
+    wifi_manager_http_callback_t              cb_on_http_delete,
+    wifi_manager_callback_on_cmd_disconnect_t cb_on_disconnect_cmd);
 
 /**
  * @brief Stop wifi manager and deallocate resources.
@@ -97,6 +98,9 @@ wifi_manager_set_callback(const message_code_e message_code, wifi_manager_cb_ptr
 
 bool
 wifi_manager_is_working(void);
+
+bool
+wifi_manager_is_ap_active(void);
 
 bool
 wifi_manager_is_connected_to_wifi(void);

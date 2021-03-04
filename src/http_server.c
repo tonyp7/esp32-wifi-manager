@@ -82,7 +82,8 @@ function to process requests, decode URLs, serve files, etc. etc.
 
 #define HTTP_SERVER_ACCEPT_TIMEOUT_MS (1 * 1000)
 
-#define HTTP_SERVER_STATUS_JSON_REQUEST_TIMEOUT_MS (5 * 1000)
+#define HTTP_SERVER_STATUS_JSON_REQUEST_TIMEOUT_MS (20 * 1000)
+#define HTTP_SERVER_STA_AP_TIMEOUT_MS              (60 * 1000)
 
 /**
  * @brief RTOS task for the HTTP server. Do not start manually.
@@ -105,8 +106,8 @@ static os_mutex_static_t  g_http_server_mutex_mem;
 static os_mutex_t         g_http_server_mutex;
 static os_signal_static_t g_http_server_signal_mem;
 static os_signal_t *      gp_http_server_sig;
-
-static os_delta_ticks_t g_http_last_req_status;
+static os_delta_ticks_t   g_timestamp_last_http_status_request;
+static bool               g_is_ap_sta_ip_assigned;
 
 void
 http_server_init(void)
@@ -441,6 +442,104 @@ http_server_sig_unregister_cur_thread(void)
     os_mutex_unlock(g_http_server_mutex);
 }
 
+static bool
+http_server_is_status_json_timeout_expired(const uint32_t timeout_ms)
+{
+    if ((xTaskGetTickCount() - g_timestamp_last_http_status_request) > OS_DELTA_MS_TO_TICKS(timeout_ms))
+    {
+        return true;
+    }
+    return false;
+}
+
+void
+http_server_on_ap_sta_connected(void)
+{
+    g_is_ap_sta_ip_assigned              = false;
+    g_timestamp_last_http_status_request = xTaskGetTickCount();
+}
+
+void
+http_server_on_ap_sta_disconnected(void)
+{
+    g_is_ap_sta_ip_assigned              = false;
+    g_timestamp_last_http_status_request = xTaskGetTickCount();
+}
+
+void
+http_server_on_ap_sta_ip_assigned(void)
+{
+    g_is_ap_sta_ip_assigned              = true;
+    g_timestamp_last_http_status_request = xTaskGetTickCount();
+}
+
+static bool
+http_server_check_if_configuring_complete(const os_delta_ticks_t time_for_processing_request)
+{
+    static bool g_is_network_connected = false;
+
+    if (wifi_manager_is_ap_active() && wifi_manager_is_connected_to_wifi())
+    {
+        if (!g_is_network_connected)
+        {
+            g_is_network_connected               = true;
+            g_timestamp_last_http_status_request = xTaskGetTickCount();
+        }
+        if (!g_is_ap_sta_ip_assigned && wifi_manager_is_ap_sta_ip_assigned())
+        {
+            g_is_ap_sta_ip_assigned              = true;
+            g_timestamp_last_http_status_request = xTaskGetTickCount();
+        }
+        else if (g_is_ap_sta_ip_assigned && !wifi_manager_is_ap_sta_ip_assigned())
+        {
+            g_is_ap_sta_ip_assigned              = false;
+            g_timestamp_last_http_status_request = xTaskGetTickCount();
+        }
+        if (g_is_ap_sta_ip_assigned)
+        {
+            const uint32_t timeout_ms = HTTP_SERVER_STATUS_JSON_REQUEST_TIMEOUT_MS;
+            if (http_server_is_status_json_timeout_expired(timeout_ms + time_for_processing_request))
+            {
+                LOG_INFO("There are no HTTP requests for status.json while AP_STA is connected for %u ms", timeout_ms);
+                return true;
+            }
+        }
+        else
+        {
+            const uint32_t timeout_ms = HTTP_SERVER_STA_AP_TIMEOUT_MS;
+            if (http_server_is_status_json_timeout_expired(timeout_ms + time_for_processing_request))
+            {
+                LOG_INFO(
+                    "There are no HTTP requests for status.json while AP_STA is not connected for %u ms",
+                    timeout_ms);
+                return true;
+            }
+        }
+    }
+    else if (wifi_manager_is_connected_to_ethernet())
+    {
+        if (!g_is_network_connected)
+        {
+            g_is_network_connected               = true;
+            g_timestamp_last_http_status_request = xTaskGetTickCount();
+        }
+        if (http_server_is_status_json_timeout_expired(
+                HTTP_SERVER_STATUS_JSON_REQUEST_TIMEOUT_MS + time_for_processing_request))
+        {
+            LOG_INFO(
+                "There are no HTTP requests for status.json for %u ms",
+                HTTP_SERVER_STATUS_JSON_REQUEST_TIMEOUT_MS);
+            return true;
+        }
+    }
+    else
+    {
+        g_is_network_connected  = false;
+        g_is_ap_sta_ip_assigned = false;
+    }
+    return false;
+}
+
 static void
 http_server_task(void)
 {
@@ -466,12 +565,17 @@ http_server_task(void)
             break;
         }
         struct netconn *p_new_conn = NULL;
-        const err_t     err        = netconn_accept(p_conn, &p_new_conn);
+
+        const err_t err = netconn_accept(p_conn, &p_new_conn);
+
+        os_delta_ticks_t time_for_processing_request = 0;
         if (ERR_OK == err)
         {
+            const os_delta_ticks_t t0 = xTaskGetTickCount();
             http_server_netconn_serve(p_new_conn);
             netconn_close(p_new_conn);
             netconn_delete(p_new_conn);
+            time_for_processing_request = xTaskGetTickCount() - t0;
         }
         else if (ERR_TIMEOUT == err)
         {
@@ -485,23 +589,18 @@ http_server_task(void)
         {
             LOG_ERR("netconn_accept: %d", err);
         }
-        if (wifi_manager_is_working() && wifi_manager_is_ap_sta_ip_assigned()
-            && (wifi_manager_is_connected_to_wifi() || wifi_manager_is_connected_to_ethernet()))
+        if (wifi_manager_is_working() && http_server_check_if_configuring_complete(time_for_processing_request))
         {
-            if ((0 != g_http_last_req_status)
-                && ((xTaskGetTickCount() - g_http_last_req_status)
-                    > OS_DELTA_MS_TO_TICKS(HTTP_SERVER_STATUS_JSON_REQUEST_TIMEOUT_MS)))
+            if (wifi_manager_is_connected_to_ethernet())
             {
-                LOG_INFO(
-                    "There are no HTTP requests for status.json for %u ms",
-                    HTTP_SERVER_STATUS_JSON_REQUEST_TIMEOUT_MS);
+                LOG_INFO("Stop WiFi-Manager");
+                wifiman_msg_send_cmd_stop_and_destroy();
+            }
+            else if (wifi_manager_is_connected_to_wifi())
+            {
                 LOG_INFO("Stop WiFi AP");
                 wifiman_msg_send_cmd_stop_ap();
             }
-        }
-        else
-        {
-            g_http_last_req_status = 0;
         }
         taskYIELD(); /* allows the freeRTOS scheduler to take over if needed. */
     }
@@ -548,12 +647,28 @@ http_server_gen_resp_status_json(json_network_info_t *const p_info, void *const 
 }
 
 static http_server_resp_t
-http_server_handle_req_get(const char *p_file_name)
+http_server_handle_req_get(const char *p_file_name, const bool flag_allow_req_to_wifi_manager)
 {
     LOG_INFO("GET /%s", p_file_name);
 
+    if (flag_allow_req_to_wifi_manager)
+    {
+        if (0 == strcmp(p_file_name, ""))
+        {
+            p_file_name = "index.html";
+        }
+    }
+    else
+    {
+        // Do not allow to access to the wifi_manager UI when it is disabled
+        if (0 == strcmp(p_file_name, "") || (0 == strcmp(p_file_name, "index.html")))
+        {
+            p_file_name = "ruuvi.html";
+        }
+    }
+
     const char *file_ext = strrchr(p_file_name, '.');
-    if ((NULL != file_ext) && (0 == strcmp(file_ext, ".json")))
+    if (flag_allow_req_to_wifi_manager && (NULL != file_ext) && (0 == strcmp(file_ext, ".json")))
     {
         if (0 == strcmp(p_file_name, "ap.json"))
         {
@@ -578,7 +693,7 @@ http_server_handle_req_get(const char *p_file_name)
         }
         else if (0 == strcmp(p_file_name, "status.json"))
         {
-            g_http_last_req_status = xTaskGetTickCount();
+            g_timestamp_last_http_status_request = xTaskGetTickCount();
 
             http_server_resp_t     http_resp     = { 0 };
             const os_delta_ticks_t ticks_to_wait = 10U;
@@ -590,10 +705,10 @@ http_server_handle_req_get(const char *p_file_name)
 }
 
 static http_server_resp_t
-http_server_handle_req_delete(const char *p_file_name)
+http_server_handle_req_delete(const char *p_file_name, const bool flag_allow_req_to_wifi_manager)
 {
     LOG_INFO("DELETE /%s", p_file_name);
-    if (0 == strcmp(p_file_name, "connect.json"))
+    if (flag_allow_req_to_wifi_manager && (0 == strcmp(p_file_name, "connect.json")))
     {
         LOG_DBG("http_server_netconn_serve: DELETE /connect.json");
         /* request a disconnection from wifi and forget about it */
@@ -629,11 +744,12 @@ http_server_handle_req_post_connect_json(const http_req_header_t http_header)
 static http_server_resp_t
 http_server_handle_req_post(
     const char *            p_file_name,
+    const bool              flag_allow_req_to_wifi_manager,
     const http_req_header_t http_header,
     const http_req_body_t   http_body)
 {
     LOG_INFO("POST /%s", p_file_name);
-    if (0 == strcmp(p_file_name, "connect.json"))
+    if (flag_allow_req_to_wifi_manager && (0 == strcmp(p_file_name, "connect.json")))
     {
         return http_server_handle_req_post_connect_json(http_header);
     }
@@ -641,7 +757,7 @@ http_server_handle_req_post(
 }
 
 static http_server_resp_t
-http_server_handle_req(const http_req_info_t *p_req_info)
+http_server_handle_req(const http_req_info_t *p_req_info, const bool flag_allow_req_to_wifi_manager)
 {
     const char *path = p_req_info->http_uri.ptr;
     if ('/' == path[0])
@@ -651,15 +767,19 @@ http_server_handle_req(const http_req_info_t *p_req_info)
 
     if (0 == strcmp("GET", p_req_info->http_cmd.ptr))
     {
-        return http_server_handle_req_get(path);
+        return http_server_handle_req_get(path, flag_allow_req_to_wifi_manager);
     }
     else if (0 == strcmp("DELETE", p_req_info->http_cmd.ptr))
     {
-        return http_server_handle_req_delete(path);
+        return http_server_handle_req_delete(path, flag_allow_req_to_wifi_manager);
     }
     else if (0 == strcmp("POST", p_req_info->http_cmd.ptr))
     {
-        return http_server_handle_req_post(path, p_req_info->http_header, p_req_info->http_body);
+        return http_server_handle_req_post(
+            path,
+            flag_allow_req_to_wifi_manager,
+            p_req_info->http_header,
+            p_req_info->http_body);
     }
     else
     {
@@ -767,23 +887,29 @@ http_server_netconn_serve(struct netconn *p_conn)
         http_server_netconn_resp_400(p_conn);
         return;
     }
+    const bool is_wifi_manager_working = wifi_manager_is_working();
+
     /* captive portal functionality: redirect to access point IP for HOST that are not the access point IP OR the
      * STA IP */
     uint32_t    host_len = 0;
     const char *p_host   = http_req_header_get_field(req_info.http_header, "Host:", &host_len);
+
     /* determine if Host is from the STA IP address */
+    const sta_ip_string_t ip_str = sta_ip_safe_get();
 
-    const sta_ip_string_t ip_str  = sta_ip_safe_get();
-    const bool access_from_sta_ip = ('\0' == ip_str.buf[0]) || ((host_len > 0) && (NULL != strstr(p_host, ip_str.buf)));
+    const bool is_access_to_sta_ip = ('\0' != ip_str.buf[0]) && (host_len > 0) && (NULL != strstr(p_host, ip_str.buf));
+    const bool is_request_to_ap_ip = ((host_len > 0) && (NULL != strstr(p_host, DEFAULT_AP_IP)));
 
-    LOG_DBG("Host: %.*s", host_len, p_host);
-    LOG_DBG("StaticIP: %s", ip_str.buf);
-    if ((host_len > 0) && (NULL == strstr(p_host, DEFAULT_AP_IP)) && (!access_from_sta_ip))
+    LOG_DBG("Host: %.*s, StaticIP: %s", host_len, p_host, ip_str.buf);
+
+    if (is_wifi_manager_working && (!is_request_to_ap_ip) && (!is_access_to_sta_ip))
     {
         http_server_netconn_resp_302(p_conn);
         return;
     }
-    http_server_resp_t resp = http_server_handle_req(&req_info);
+    const bool flag_allow_req_to_wifi_manager = is_wifi_manager_working && is_request_to_ap_ip;
+
+    http_server_resp_t resp = http_server_handle_req(&req_info, flag_allow_req_to_wifi_manager);
     switch (resp.http_resp_code)
     {
         case HTTP_RESP_CODE_200:

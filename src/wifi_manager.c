@@ -78,9 +78,10 @@ static wifi_ap_record_t g_wifi_accessp_records[MAX_AP_NUM];
 
 static wifi_manager_cb_ptr g_wifi_cb_ptr_arr[MESSAGE_CODE_COUNT];
 
-static wifi_manager_http_callback_t   g_wifi_cb_on_http_get;
-static wifi_manager_http_cb_on_post_t g_wifi_cb_on_http_post;
-static wifi_manager_http_callback_t   g_wifi_cb_on_http_delete;
+static wifi_manager_http_callback_t              g_wifi_cb_on_http_get;
+static wifi_manager_http_cb_on_post_t            g_wifi_cb_on_http_post;
+static wifi_manager_http_callback_t              g_wifi_cb_on_http_delete;
+static wifi_manager_callback_on_cmd_disconnect_t g_wifi_cb_on_disconnect_cmd;
 
 static EventGroupHandle_t g_wifi_manager_event_group;
 static StaticEventGroup_t g_wifi_manager_event_group_mem;
@@ -111,6 +112,9 @@ static StaticEventGroup_t g_wifi_manager_event_group_mem;
 
 /* @brief indicate that the device is currently connected to Ethernet. */
 #define WIFI_MANAGER_ETH_CONNECTED_BIT ((uint32_t)(BIT9))
+
+/* @brief indicate that WiFi access point is active. */
+#define WIFI_MANAGER_AP_ACTIVE ((uint32_t)(BIT10))
 
 static void
 wifi_manager_task(void);
@@ -147,16 +151,8 @@ wifi_manager_disconnect_async(void)
 }
 
 static bool
-wifi_manager_init_start_wifi(
-    const WiFiAntConfig_t *        p_wifi_ant_config,
-    wifi_manager_http_callback_t   cb_on_http_get,
-    wifi_manager_http_cb_on_post_t cb_on_http_post,
-    wifi_manager_http_callback_t   cb_on_http_delete)
+wifi_manager_init_start_wifi(const WiFiAntConfig_t *p_wifi_ant_config)
 {
-    g_wifi_cb_on_http_get    = cb_on_http_get;
-    g_wifi_cb_on_http_post   = cb_on_http_post;
-    g_wifi_cb_on_http_delete = cb_on_http_delete;
-
     if (!wifiman_msg_init())
     {
         LOG_ERR("%s failed", "wifiman_msg_init");
@@ -224,6 +220,7 @@ wifi_manager_init_start_wifi(
         LOG_ERR("%s failed", "esp_wifi_set_mode");
         return false;
     }
+    xEventGroupClearBits(g_wifi_manager_event_group, WIFI_MANAGER_AP_ACTIVE);
 
     err = esp_wifi_start();
     if (ESP_OK != err)
@@ -258,11 +255,12 @@ wifi_manager_init_start_wifi(
 
 static bool
 wifi_manager_init(
-    const bool                     flag_start_wifi,
-    const WiFiAntConfig_t *        p_wifi_ant_config,
-    wifi_manager_http_callback_t   cb_on_http_get,
-    wifi_manager_http_cb_on_post_t cb_on_http_post,
-    wifi_manager_http_callback_t   cb_on_http_delete)
+    const bool                                flag_start_wifi,
+    const WiFiAntConfig_t *                   p_wifi_ant_config,
+    wifi_manager_http_callback_t              cb_on_http_get,
+    wifi_manager_http_cb_on_post_t            cb_on_http_post,
+    wifi_manager_http_callback_t              cb_on_http_delete,
+    wifi_manager_callback_on_cmd_disconnect_t cb_on_disconnect_cmd)
 {
     LOG_INFO("WiFi manager init");
     if (wifi_manager_is_working())
@@ -271,6 +269,11 @@ wifi_manager_init(
         return false;
     }
     xEventGroupSetBits(g_wifi_manager_event_group, WIFI_MANAGER_IS_WORKING);
+
+    g_wifi_cb_on_http_get       = cb_on_http_get;
+    g_wifi_cb_on_http_post      = cb_on_http_post;
+    g_wifi_cb_on_http_delete    = cb_on_http_delete;
+    g_wifi_cb_on_disconnect_cmd = cb_on_disconnect_cmd;
 
     wifi_sta_config_init();
     json_network_info_init();
@@ -294,7 +297,16 @@ wifi_manager_init(
     if (flag_start_wifi)
     {
         LOG_INFO("WiFi manager init: start WiFi");
-        wifi_manager_init_start_wifi(p_wifi_ant_config, cb_on_http_get, cb_on_http_post, cb_on_http_delete);
+        wifi_manager_init_start_wifi(p_wifi_ant_config);
+    }
+    else
+    {
+        xEventGroupClearBits(
+            g_wifi_manager_event_group,
+            WIFI_MANAGER_IS_WORKING | WIFI_MANAGER_WIFI_CONNECTED_BIT | WIFI_MANAGER_AP_STA_CONNECTED_BIT
+                | WIFI_MANAGER_AP_STA_IP_ASSIGNED_BIT | WIFI_MANAGER_AP_STARTED_BIT
+                | WIFI_MANAGER_REQUEST_STA_CONNECT_BIT | WIFI_MANAGER_REQUEST_RESTORE_STA_BIT | WIFI_MANAGER_SCAN_BIT
+                | WIFI_MANAGER_REQUEST_DISCONNECT_BIT | WIFI_MANAGER_AP_ACTIVE);
     }
 
     return true;
@@ -302,11 +314,12 @@ wifi_manager_init(
 
 bool
 wifi_manager_start(
-    const bool                     flag_start_wifi,
-    const WiFiAntConfig_t *        p_wifi_ant_config,
-    wifi_manager_http_callback_t   cb_on_http_get,
-    wifi_manager_http_cb_on_post_t cb_on_http_post,
-    wifi_manager_http_callback_t   cb_on_http_delete)
+    const bool                                flag_start_wifi,
+    const WiFiAntConfig_t *                   p_wifi_ant_config,
+    wifi_manager_http_callback_t              cb_on_http_get,
+    wifi_manager_http_cb_on_post_t            cb_on_http_post,
+    wifi_manager_http_callback_t              cb_on_http_delete,
+    wifi_manager_callback_on_cmd_disconnect_t cb_on_disconnect_cmd)
 {
     if (NULL == gh_wifi_mutex)
     {
@@ -329,7 +342,8 @@ wifi_manager_start(
         p_wifi_ant_config,
         cb_on_http_get,
         cb_on_http_post,
-        cb_on_http_delete);
+        cb_on_http_delete,
+        cb_on_disconnect_cmd);
     if (!res)
     {
         xEventGroupClearBits(g_wifi_manager_event_group, WIFI_MANAGER_IS_WORKING);
@@ -398,13 +412,21 @@ wifi_manager_update_network_connection_info(
         }
         if (NULL != p_ip_info)
         {
+            /* save IP as a string for the HTTP server host */
+            sta_ip_safe_set(p_ip_info->ip.addr);
+
             snprintf(ip_info_str.ip, sizeof(ip_info_str.ip), "%s", ip4addr_ntoa(&p_ip_info->ip));
             snprintf(ip_info_str.netmask, sizeof(ip_info_str.netmask), "%s", ip4addr_ntoa(&p_ip_info->netmask));
             snprintf(ip_info_str.gw, sizeof(ip_info_str.gw), "%s", ip4addr_ntoa(&p_ip_info->gw));
         }
+        else
+        {
+            sta_ip_safe_reset();
+        }
     }
     else
     {
+        sta_ip_safe_reset();
         xEventGroupClearBits(
             g_wifi_manager_event_group,
             WIFI_MANAGER_WIFI_CONNECTED_BIT | WIFI_MANAGER_ETH_CONNECTED_BIT);
@@ -711,9 +733,6 @@ wifi_handle_ev_sta_disconnected(const wifiman_msg_param_t *p_param)
     const bool        is_connected_to_wifi = wifi_manager_is_connected_to_wifi();
     const EventBits_t event_bits           = xEventGroupClearBits(g_wifi_manager_event_group, WIFI_MANAGER_SCAN_BIT);
 
-    /* reset saved sta IP */
-    sta_ip_safe_reset();
-
     update_reason_code_e update_reason_code = UPDATE_LOST_CONNECTION;
     if (0 != (event_bits & (uint32_t)WIFI_MANAGER_REQUEST_STA_CONNECT_BIT))
     {
@@ -760,6 +779,7 @@ wifi_handle_cmd_start_ap(void)
 {
     LOG_INFO("MESSAGE: ORDER_START_AP");
     esp_wifi_set_mode(WIFI_MODE_APSTA);
+    xEventGroupSetBits(g_wifi_manager_event_group, WIFI_MANAGER_AP_ACTIVE);
 }
 
 static void
@@ -772,20 +792,18 @@ wifi_handle_cmd_stop_ap(void)
     {
         LOG_ERR_ESP(err, "esp_wifi_set_mode failed");
     }
+    xEventGroupClearBits(g_wifi_manager_event_group, WIFI_MANAGER_AP_ACTIVE);
 }
 
 static void
 wifi_handle_ev_sta_got_ip(const wifiman_msg_param_t *p_param)
 {
+    (void)p_param;
     LOG_INFO("MESSAGE: EVENT_STA_GOT_IP");
 
     const EventBits_t event_bits = xEventGroupClearBits(
         g_wifi_manager_event_group,
         WIFI_MANAGER_REQUEST_STA_CONNECT_BIT | WIFI_MANAGER_REQUEST_RESTORE_STA_BIT);
-
-    /* save IP as a string for the HTTP server host */
-    const sta_ip_address_t ip_addr = wifiman_conv_param_to_ip_addr(p_param);
-    sta_ip_safe_set(ip_addr);
 
     /* save wifi config in NVS if it wasn't a restored of a connection */
     if (0 == (event_bits & (uint32_t)WIFI_MANAGER_REQUEST_RESTORE_STA_BIT))
@@ -817,6 +835,7 @@ wifi_handle_ev_ap_sta_connected(void)
     LOG_INFO("MESSAGE: EVENT_AP_STA_CONNECTED");
     xEventGroupClearBits(g_wifi_manager_event_group, WIFI_MANAGER_AP_STA_IP_ASSIGNED_BIT);
     xEventGroupSetBits(g_wifi_manager_event_group, WIFI_MANAGER_AP_STA_CONNECTED_BIT);
+    http_server_on_ap_sta_connected();
     if (!wifi_manager_is_connected_to_wifi())
     {
         dns_server_start();
@@ -830,6 +849,7 @@ wifi_handle_ev_ap_sta_disconnected(void)
     xEventGroupClearBits(
         g_wifi_manager_event_group,
         WIFI_MANAGER_AP_STA_CONNECTED_BIT | WIFI_MANAGER_AP_STA_IP_ASSIGNED_BIT);
+    http_server_on_ap_sta_disconnected();
     dns_server_stop();
 }
 
@@ -838,6 +858,7 @@ wifi_handle_ev_ap_sta_ip_assigned(void)
 {
     LOG_INFO("MESSAGE: EVENT_AP_STA_IP_ASSIGNED");
     xEventGroupSetBits(g_wifi_manager_event_group, WIFI_MANAGER_AP_STA_IP_ASSIGNED_BIT);
+    http_server_on_ap_sta_ip_assigned();
 }
 
 static void
@@ -852,6 +873,10 @@ wifi_handle_cmd_disconnect_sta(void)
     if (ESP_OK != err)
     {
         LOG_ERR_ESP(err, "%s failed", "esp_wifi_disconnect");
+    }
+    if (NULL != g_wifi_cb_on_disconnect_cmd)
+    {
+        g_wifi_cb_on_disconnect_cmd();
     }
 }
 
@@ -952,7 +977,8 @@ wifi_manager_task(void)
         g_wifi_manager_event_group,
         WIFI_MANAGER_IS_WORKING | WIFI_MANAGER_WIFI_CONNECTED_BIT | WIFI_MANAGER_AP_STA_CONNECTED_BIT
             | WIFI_MANAGER_AP_STA_IP_ASSIGNED_BIT | WIFI_MANAGER_AP_STARTED_BIT | WIFI_MANAGER_REQUEST_STA_CONNECT_BIT
-            | WIFI_MANAGER_REQUEST_RESTORE_STA_BIT | WIFI_MANAGER_SCAN_BIT | WIFI_MANAGER_REQUEST_DISCONNECT_BIT);
+            | WIFI_MANAGER_REQUEST_RESTORE_STA_BIT | WIFI_MANAGER_SCAN_BIT | WIFI_MANAGER_REQUEST_DISCONNECT_BIT
+            | WIFI_MANAGER_AP_ACTIVE);
 
     esp_event_handler_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_manager_event_handler);
     esp_event_handler_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, &wifi_manager_event_handler);
@@ -1041,6 +1067,7 @@ static void
 wifi_manager_esp_wifi_configure(const struct wifi_settings_t *p_wifi_settings)
 {
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
+    xEventGroupSetBits(g_wifi_manager_event_group, WIFI_MANAGER_AP_ACTIVE);
     wifi_config_t ap_config = wifi_manager_generate_ap_config(p_wifi_settings);
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &ap_config));
     ESP_ERROR_CHECK(esp_wifi_set_bandwidth(WIFI_IF_AP, p_wifi_settings->ap_bandwidth));
@@ -1092,6 +1119,12 @@ bool
 wifi_manager_is_working(void)
 {
     return (0 != (xEventGroupGetBits(g_wifi_manager_event_group) & WIFI_MANAGER_IS_WORKING));
+}
+
+bool
+wifi_manager_is_ap_active(void)
+{
+    return (0 != (xEventGroupGetBits(g_wifi_manager_event_group) & WIFI_MANAGER_AP_ACTIVE));
 }
 
 bool

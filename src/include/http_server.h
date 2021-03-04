@@ -58,6 +58,15 @@ http_server_start(void);
 void
 http_server_stop(void);
 
+void
+http_server_on_ap_sta_connected(void);
+
+void
+http_server_on_ap_sta_disconnected(void);
+
+void
+http_server_on_ap_sta_ip_assigned(void);
+
 #ifdef __cplusplus
 }
 #endif
