@@ -53,18 +53,22 @@ typedef struct
  */
 bool
 wifi_manager_start(
-    const bool                                flag_start_wifi,
-    const WiFiAntConfig_t *                   p_wifi_ant_config,
-    wifi_manager_http_callback_t              cb_on_http_get,
-    wifi_manager_http_cb_on_post_t            cb_on_http_post,
-    wifi_manager_http_callback_t              cb_on_http_delete,
-    wifi_manager_callback_on_cmd_disconnect_t cb_on_disconnect_cmd);
+    const bool                                     flag_start_wifi,
+    const WiFiAntConfig_t *                        p_wifi_ant_config,
+    wifi_manager_http_callback_t                   cb_on_http_get,
+    wifi_manager_http_cb_on_post_t                 cb_on_http_post,
+    wifi_manager_http_callback_t                   cb_on_http_delete,
+    wifi_manager_callback_on_cmd_connect_eth_t     cb_on_connect_eth_cmd,
+    wifi_manager_callback_on_cmd_disconnect_eth_t  cb_on_disconnect_eth_cmd,
+    wifi_manager_callback_on_cmd_disconnect_sta_t  cb_on_disconnect_sta_cmd,
+    wifi_manager_callback_on_ap_sta_connected_t    cb_on_ap_sta_connected,
+    wifi_manager_callback_on_ap_sta_disconnected_t cb_on_ap_sta_disconnected);
 
 /**
- * @brief Stop wifi manager and deallocate resources.
+ * @brief Stop WiFi access-point
  */
 void
-wifi_manager_stop(void);
+wifi_manager_stop_ap(void);
 
 /**
  * @brief clears the current STA wifi config in flash ram storage.
@@ -85,10 +89,16 @@ void
 wifi_manager_scan_async(void);
 
 /**
+ * @brief requests to disconnect and forget about Ethernet connection.
+ */
+void
+wifi_manager_disconnect_eth(void);
+
+/**
  * @brief requests to disconnect and forget about the access point.
  */
 void
-wifi_manager_disconnect_async(void);
+wifi_manager_disconnect_wifi(void);
 
 /**
  * @brief Register a callback to a custom function when specific event message_code happens.
@@ -107,6 +117,9 @@ wifi_manager_is_connected_to_wifi(void);
 
 bool
 wifi_manager_is_connected_to_ethernet(void);
+
+bool
+wifi_manager_is_connected_to_wifi_or_ethernet(void);
 
 bool
 wifi_manager_is_ap_sta_ip_assigned(void);

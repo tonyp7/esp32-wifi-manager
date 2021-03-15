@@ -457,6 +457,7 @@ http_server_on_ap_sta_connected(void)
 {
     g_is_ap_sta_ip_assigned              = false;
     g_timestamp_last_http_status_request = xTaskGetTickCount();
+    LOG_DBG("http_server_on_ap_sta_connected: %lu", (printf_ulong_t)g_timestamp_last_http_status_request);
 }
 
 void
@@ -464,6 +465,7 @@ http_server_on_ap_sta_disconnected(void)
 {
     g_is_ap_sta_ip_assigned              = false;
     g_timestamp_last_http_status_request = xTaskGetTickCount();
+    LOG_DBG("http_server_on_ap_sta_disconnected: %lu", (printf_ulong_t)g_timestamp_last_http_status_request);
 }
 
 void
@@ -471,6 +473,7 @@ http_server_on_ap_sta_ip_assigned(void)
 {
     g_is_ap_sta_ip_assigned              = true;
     g_timestamp_last_http_status_request = xTaskGetTickCount();
+    LOG_DBG("http_server_on_ap_sta_ip_assigned: %lu", (printf_ulong_t)g_timestamp_last_http_status_request);
 }
 
 static bool
@@ -589,17 +592,12 @@ http_server_task(void)
         {
             LOG_ERR("netconn_accept: %d", err);
         }
-        if (wifi_manager_is_working() && http_server_check_if_configuring_complete(time_for_processing_request))
+        if (wifi_manager_is_ap_active() && http_server_check_if_configuring_complete(time_for_processing_request))
         {
-            if (wifi_manager_is_connected_to_ethernet())
-            {
-                LOG_INFO("Stop WiFi-Manager");
-                wifiman_msg_send_cmd_stop_and_destroy();
-            }
-            else if (wifi_manager_is_connected_to_wifi())
+            if (wifi_manager_is_connected_to_wifi_or_ethernet())
             {
                 LOG_INFO("Stop WiFi AP");
-                wifiman_msg_send_cmd_stop_ap();
+                wifi_manager_stop_ap();
             }
         }
         taskYIELD(); /* allows the freeRTOS scheduler to take over if needed. */
@@ -711,8 +709,15 @@ http_server_handle_req_delete(const char *p_file_name, const bool flag_allow_req
     if (flag_allow_req_to_wifi_manager && (0 == strcmp(p_file_name, "connect.json")))
     {
         LOG_DBG("http_server_netconn_serve: DELETE /connect.json");
-        /* request a disconnection from wifi and forget about it */
-        wifi_manager_disconnect_async();
+        if (wifi_manager_is_connected_to_ethernet())
+        {
+            wifi_manager_disconnect_eth();
+        }
+        else
+        {
+            /* request a disconnection from wifi and forget about it */
+            wifi_manager_disconnect_wifi();
+        }
         return http_server_resp_200_json("{}");
     }
     return wifi_manager_cb_on_http_delete(p_file_name);
@@ -726,6 +731,11 @@ http_server_handle_req_post_connect_json(const http_req_header_t http_header)
     uint32_t    len_password = 0;
     const char *p_ssid       = http_req_header_get_field(http_header, "X-Custom-ssid:", &len_ssid);
     const char *p_password   = http_req_header_get_field(http_header, "X-Custom-pwd:", &len_password);
+    if ((NULL == p_ssid) && (NULL == p_password))
+    {
+        wifiman_msg_send_cmd_connect_eth();
+        return http_server_resp_200_json("{}");
+    }
     if ((NULL != p_ssid) && (len_ssid <= MAX_SSID_SIZE) && (NULL != p_password) && (len_password <= MAX_PASSWORD_SIZE))
     {
         wifi_sta_config_set_ssid_and_password(p_ssid, len_ssid, p_password, len_password);
@@ -734,11 +744,8 @@ http_server_handle_req_post_connect_json(const http_req_header_t http_header)
         wifi_manager_connect_async();
         return http_server_resp_200_json("{}");
     }
-    else
-    {
-        /* bad request the authentification header is not complete/not the correct format */
-        return http_server_resp_400();
-    }
+    /* bad request the authentication header is not complete/not the correct format */
+    return http_server_resp_400();
 }
 
 static http_server_resp_t

@@ -191,17 +191,19 @@ typedef enum message_code_e
     NONE                      = 0,
     ORDER_STOP_AND_DESTROY    = 1,
     ORDER_START_WIFI_SCAN     = 2,
-    ORDER_CONNECT_STA         = 4,
-    ORDER_DISCONNECT_STA      = 5,
-    ORDER_START_AP            = 6,
-    ORDER_STOP_AP             = 7,
-    EVENT_STA_DISCONNECTED    = 8,
-    EVENT_SCAN_DONE           = 9,
-    EVENT_STA_GOT_IP          = 10,
-    EVENT_AP_STA_CONNECTED    = 11,
-    EVENT_AP_STA_DISCONNECTED = 12,
-    EVENT_AP_STA_IP_ASSIGNED  = 13,
-    MESSAGE_CODE_COUNT        = 14 /* important for the callback array */
+    ORDER_CONNECT_ETH         = 4,
+    ORDER_CONNECT_STA         = 5,
+    ORDER_DISCONNECT_ETH      = 6,
+    ORDER_DISCONNECT_STA      = 7,
+    ORDER_START_AP            = 8,
+    ORDER_STOP_AP             = 9,
+    EVENT_STA_DISCONNECTED    = 10,
+    EVENT_SCAN_DONE           = 11,
+    EVENT_STA_GOT_IP          = 12,
+    EVENT_AP_STA_CONNECTED    = 13,
+    EVENT_AP_STA_DISCONNECTED = 14,
+    EVENT_AP_STA_IP_ASSIGNED  = 15,
+    MESSAGE_CODE_COUNT        = 16 /* important for the callback array */
 } message_code_e;
 
 /**
@@ -315,7 +317,11 @@ typedef struct http_server_resp_t
 typedef http_server_resp_t (*wifi_manager_http_callback_t)(const char *path);
 typedef http_server_resp_t (*wifi_manager_http_cb_on_post_t)(const char *path, const char *body);
 
-typedef void (*wifi_manager_callback_on_cmd_disconnect_t)(void);
+typedef void (*wifi_manager_callback_on_cmd_connect_eth_t)(void);
+typedef void (*wifi_manager_callback_on_cmd_disconnect_eth_t)(void);
+typedef void (*wifi_manager_callback_on_cmd_disconnect_sta_t)(void);
+typedef void (*wifi_manager_callback_on_ap_sta_connected_t)(void);
+typedef void (*wifi_manager_callback_on_ap_sta_disconnected_t)(void);
 
 #ifdef __cplusplus
 }
