@@ -674,18 +674,17 @@ http_server_handle_req_get(const char *p_file_name, const bool flag_allow_req_to
             const TickType_t ticks_to_wait = 10U;
             if (!wifi_manager_lock_with_timeout(ticks_to_wait))
             {
-                LOG_DBG("http_server_netconn_serve: GET /ap.json failed to obtain mutex");
-                LOG_INFO("ap.json: 503");
+                LOG_ERR("GET /ap.json: failed to obtain mutex, return HTTP error 503");
                 return http_server_resp_503();
             }
-            const char *buff = json_access_points_get();
-            if (NULL == buff)
+            const char *p_buff = json_access_points_get();
+            if (NULL == p_buff)
             {
-                LOG_INFO("status.json: 503");
+                LOG_ERR("GET /ap.json: failed to get json, return HTTP error 503");
                 return http_server_resp_503();
             }
-            LOG_INFO("ap.json: %s", buff);
-            const http_server_resp_t resp = http_server_resp_200_json(buff);
+            LOG_INFO("ap.json: %s", p_buff);
+            const http_server_resp_t resp = http_server_resp_200_json(p_buff);
             wifi_manager_unlock();
             return resp;
         }
