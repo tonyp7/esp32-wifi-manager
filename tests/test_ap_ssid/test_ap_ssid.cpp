@@ -47,7 +47,7 @@ TEST_F(TestApSsid, test_1) // NOLINT
 {
     char ap_ssid[MAX_SSID_SIZE] = { 0 };
 
-    const ap_mac_t ap_mac = {
+    const mac_address_bin_t ap_mac = {
         {
             0x11,
             0x22,
@@ -65,7 +65,7 @@ TEST_F(TestApSsid, test_long_ssid) // NOLINT
 {
     char ap_ssid[MAX_SSID_SIZE] = { 0 };
 
-    const ap_mac_t ap_mac = {
+    const mac_address_bin_t ap_mac = {
         {
             0x11,
             0x22,

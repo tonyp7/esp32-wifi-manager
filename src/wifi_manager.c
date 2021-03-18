@@ -1086,7 +1086,7 @@ wifi_manager_generate_ssid_from_orig_and_mac(
     const size_t ssid_max_len,
     const char * p_orig_ap_ssid)
 {
-    ap_mac_t ap_mac = { 0 };
+    mac_address_bin_t ap_mac = { 0 };
     ESP_ERROR_CHECK(esp_wifi_get_mac(ESP_IF_WIFI_AP, &ap_mac.mac[0]));
     ap_ssid_generate(p_ssid_str_buf, ssid_max_len, p_orig_ap_ssid, &ap_mac);
 }

@@ -5,7 +5,6 @@ set(ProjectId ruuvi_esp32-wifi-manager-test-ap_ssid)
 
 add_executable(${ProjectId}
         test_ap_ssid.cpp
-        ../../src/ap_mac.h
         ../../src/ap_ssid.c
         ../../src/ap_ssid.h
 )

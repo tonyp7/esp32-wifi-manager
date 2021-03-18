@@ -7,7 +7,6 @@ if(IDF_VERSION_MAJOR GREATER_EQUAL 4)
             src/include/http_server.h
             src/access_points_list.c
             src/access_points_list.h
-            src/ap_mac.h
             src/ap_ssid.c
             src/ap_ssid.h
             src/dns_server.c
