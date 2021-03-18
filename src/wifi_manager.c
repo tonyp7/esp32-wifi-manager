@@ -239,6 +239,14 @@ wifi_manager_init_start_wifi(const WiFiAntConfig_t *p_wifi_ant_config, const wif
         return false;
     }
 
+    LOG_INFO("Set hostname for WiFi interface: %s", p_gw_wifi_ssid->ssid_buf);
+    err = tcpip_adapter_set_hostname(TCPIP_ADAPTER_IF_STA, p_gw_wifi_ssid->ssid_buf);
+    if (ESP_OK != err)
+    {
+        LOG_ERR_ESP(err, "%s failed", "tcpip_adapter_set_hostname");
+        return false;
+    }
+
     if (wifi_sta_config_fetch())
     {
         LOG_INFO("Saved wifi found on startup. Will attempt to connect.");
