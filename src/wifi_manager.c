@@ -161,7 +161,7 @@ wifi_manager_disconnect_wifi(void)
 }
 
 static bool
-wifi_manager_init_start_wifi(const WiFiAntConfig_t *p_wifi_ant_config)
+wifi_manager_init_start_wifi(const WiFiAntConfig_t *p_wifi_ant_config, const wifi_ssid_t *const p_gw_wifi_ssid)
 {
     if (!wifiman_msg_init())
     {
@@ -266,6 +266,7 @@ wifi_manager_init_start_wifi(const WiFiAntConfig_t *p_wifi_ant_config)
 static bool
 wifi_manager_init(
     const bool                                     flag_start_wifi,
+    const wifi_ssid_t *const                       p_gw_wifi_ssid,
     const WiFiAntConfig_t *                        p_wifi_ant_config,
     wifi_manager_http_callback_t                   cb_on_http_get,
     wifi_manager_http_cb_on_post_t                 cb_on_http_post,
@@ -293,7 +294,7 @@ wifi_manager_init(
     g_wifi_cb_on_ap_sta_connected    = cb_on_ap_sta_connected;
     g_wifi_cb_on_ap_sta_disconnected = cb_on_ap_sta_disconnected;
 
-    wifi_sta_config_init();
+    wifi_sta_config_init(p_gw_wifi_ssid);
     json_network_info_init();
     sta_ip_safe_init();
 
@@ -315,7 +316,7 @@ wifi_manager_init(
     if (flag_start_wifi)
     {
         LOG_INFO("WiFi manager init: start WiFi");
-        wifi_manager_init_start_wifi(p_wifi_ant_config);
+        wifi_manager_init_start_wifi(p_wifi_ant_config, p_gw_wifi_ssid);
     }
     else
     {
@@ -333,6 +334,7 @@ wifi_manager_init(
 bool
 wifi_manager_start(
     const bool                                     flag_start_wifi,
+    const wifi_ssid_t *const                       p_gw_wifi_ssid,
     const WiFiAntConfig_t *                        p_wifi_ant_config,
     wifi_manager_http_callback_t                   cb_on_http_get,
     wifi_manager_http_cb_on_post_t                 cb_on_http_post,
@@ -361,6 +363,7 @@ wifi_manager_start(
 
     const bool res = wifi_manager_init(
         flag_start_wifi,
+        p_gw_wifi_ssid,
         p_wifi_ant_config,
         cb_on_http_get,
         cb_on_http_post,
@@ -410,8 +413,9 @@ wifi_manager_cb_on_http_delete(const char *p_path)
 }
 
 bool
-wifi_manager_clear_sta_config(void)
+wifi_manager_clear_sta_config(const wifi_ssid_t *const p_gw_wifi_ssid)
 {
+    wifi_sta_config_init(p_gw_wifi_ssid);
     return wifi_sta_config_clear();
 }
 
@@ -1080,17 +1084,6 @@ wifi_manager_set_ant_config(const WiFiAntConfig_t *p_wifi_ant_config)
     }
 }
 
-static void
-wifi_manager_generate_ssid_from_orig_and_mac(
-    char *       p_ssid_str_buf,
-    const size_t ssid_max_len,
-    const char * p_orig_ap_ssid)
-{
-    mac_address_bin_t ap_mac = { 0 };
-    ESP_ERROR_CHECK(esp_wifi_get_mac(ESP_IF_WIFI_AP, &ap_mac.mac[0]));
-    ap_ssid_generate(p_ssid_str_buf, ssid_max_len, p_orig_ap_ssid, &ap_mac);
-}
-
 static wifi_config_t
 wifi_manager_generate_ap_config(const struct wifi_settings_t *p_wifi_settings)
 {
@@ -1115,16 +1108,13 @@ wifi_manager_generate_ap_config(const struct wifi_settings_t *p_wifi_settings)
         },
     };
 
-    wifi_manager_generate_ssid_from_orig_and_mac(
-        (char *)&ap_config.ap.ssid[0],
-        sizeof(ap_config.ap.ssid),
-        (const char *)&p_wifi_settings->ap_ssid[0]);
+    snprintf((char *)&ap_config.ap.ssid[0], sizeof(ap_config.ap.ssid), "%s", p_wifi_settings->ap_ssid);
     snprintf((char *)&ap_config.ap.password[0], sizeof(ap_config.ap.password), "%s", p_wifi_settings->ap_pwd);
     return ap_config;
 }
 
 static void
-wifi_manager_esp_wifi_configure(const struct wifi_settings_t *p_wifi_settings)
+wifi_manager_esp_wifi_configure(const struct wifi_settings_t *const p_wifi_settings)
 {
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
     xEventGroupSetBits(g_wifi_manager_event_group, WIFI_MANAGER_AP_ACTIVE);

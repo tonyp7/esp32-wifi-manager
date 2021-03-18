@@ -44,6 +44,7 @@ typedef struct wifiman_sta_config_t
 static wifiman_sta_config_t g_wifi_sta_config;
 static os_mutex_static_t    g_wifi_sta_config_mutex_mem;
 static os_mutex_t           g_wifi_sta_config_mutex;
+static wifi_ssid_t          g_wifi_ap_ssid;
 
 _Static_assert(
     MAX_SSID_SIZE == sizeof(g_wifi_sta_config.wifi_config_sta.sta.ssid),
@@ -92,6 +93,16 @@ wifiman_sta_config_safe_transaction(
 }
 
 static void
+wifiman_sta_config_safe_transaction_with_const_param(
+    void (*cb_func)(wifiman_sta_config_t *const p_cfg, const void *const p_param),
+    const void *const p_param)
+{
+    wifiman_sta_config_t *p_cfg = wifiman_sta_config_lock();
+    cb_func(p_cfg, p_param);
+    wifiman_sta_config_unlock(&p_cfg);
+}
+
+static void
 wifiman_sta_config_safe_transaction_without_param(void (*cb_func)(wifiman_sta_config_t *const p_cfg))
 {
     wifiman_sta_config_t *p_cfg = wifiman_sta_config_lock();
@@ -107,13 +118,23 @@ wifiman_sta_config_do_clear(wifiman_sta_config_t *const p_cfg)
     p_cfg->wifi_config_sta.sta.password[0] = '\0';
 
     p_cfg->wifi_settings = g_wifi_settings_default;
+    snprintf((char *)p_cfg->wifi_settings.ap_ssid, sizeof(p_cfg->wifi_settings.ap_ssid), "%s", g_wifi_ap_ssid.ssid_buf);
     memset(&p_cfg->wifi_settings.sta_static_ip_config, 0x00, sizeof(tcpip_adapter_ip_info_t));
 }
 
-void
-wifi_sta_config_init(void)
+static void
+wifiman_sta_config_do_init(wifiman_sta_config_t *const p_cfg, const void *const p_param)
 {
-    wifiman_sta_config_safe_transaction_without_param(&wifiman_sta_config_do_clear);
+    const wifi_ssid_t *const p_gw_wifi_ssid = p_param;
+    g_wifi_ap_ssid                          = *p_gw_wifi_ssid;
+
+    wifiman_sta_config_do_clear(p_cfg);
+}
+
+void
+wifi_sta_config_init(const wifi_ssid_t *const p_gw_wifi_ssid)
+{
+    wifiman_sta_config_safe_transaction_with_const_param(&wifiman_sta_config_do_init, p_gw_wifi_ssid);
 }
 
 bool

@@ -35,9 +35,10 @@ typedef struct wifi_settings_t
 
 /**
  * @brief Clears the current STA wifi config in RAM storage.
+ * @param p_gw_wifi_ssid - ptr to wifi_ssid_t with AP SSID.
  */
 void
-wifi_sta_config_init(void);
+wifi_sta_config_init(const wifi_ssid_t *const p_gw_wifi_ssid);
 
 /**
  * @brief Clears the current STA wifi config in NVS and RAM storage.

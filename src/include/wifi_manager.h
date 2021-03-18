@@ -54,6 +54,7 @@ typedef struct
 bool
 wifi_manager_start(
     const bool                                     flag_start_wifi,
+    const wifi_ssid_t *const                       p_gw_wifi_ssid,
     const WiFiAntConfig_t *                        p_wifi_ant_config,
     wifi_manager_http_callback_t                   cb_on_http_get,
     wifi_manager_http_cb_on_post_t                 cb_on_http_post,
@@ -74,7 +75,7 @@ wifi_manager_stop_ap(void);
  * @brief clears the current STA wifi config in flash ram storage.
  */
 bool
-wifi_manager_clear_sta_config(void);
+wifi_manager_clear_sta_config(const wifi_ssid_t *const p_gw_wifi_ssid);
 
 /**
  * @brief requests a connection to an access point that will be process in the main task thread.
