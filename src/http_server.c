@@ -686,6 +686,7 @@ http_server_handle_req_get(const char *p_file_name, const bool flag_allow_req_to
             LOG_INFO("ap.json: %s", p_buff);
             const http_server_resp_t resp = http_server_resp_200_json(p_buff);
             wifi_manager_unlock();
+            wifiman_msg_send_cmd_start_wifi_scan();
             return resp;
         }
         else if (0 == strcmp(p_file_name, "status.json"))
