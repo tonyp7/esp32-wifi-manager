@@ -609,7 +609,12 @@ wifi_handle_ev_scan_done(void)
      * actual AP number this API returns.
      * As a consequence, ap_num MUST be reset to MAX_AP_NUM at every scan */
     g_wifi_ap_num = MAX_AP_NUM;
-    ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&g_wifi_ap_num, g_wifi_accessp_records));
+    esp_err_t err = esp_wifi_scan_get_ap_records(&g_wifi_ap_num, g_wifi_accessp_records);
+    if (ESP_OK != err)
+    {
+        LOG_ERR_ESP(err, "%s failed", "esp_wifi_scan_get_ap_records");
+        return;
+    }
     /* make sure the http server isn't trying to access the list while it gets refreshed */
     if (wifi_manager_lock_with_timeout(pdMS_TO_TICKS(1000)))
     {
@@ -705,8 +710,19 @@ wifi_handle_cmd_connect_sta(const wifiman_msg_param_t *p_param)
     {
         /* update config to latest and attempt connection */
         wifi_config_t wifi_config = wifi_sta_config_get_copy();
-        ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
-        ESP_ERROR_CHECK(esp_wifi_connect());
+        esp_err_t     err         = esp_wifi_set_config(WIFI_IF_STA, &wifi_config);
+        if (ESP_OK != err)
+        {
+            LOG_ERR_ESP(err, "%s failed", "esp_wifi_set_config");
+        }
+        else
+        {
+            err = esp_wifi_connect();
+            if (ESP_OK != err)
+            {
+                LOG_ERR_ESP(err, "%s failed", "esp_wifi_connect");
+            }
+        }
     }
 }
 
@@ -1124,12 +1140,32 @@ wifi_manager_generate_ap_config(const struct wifi_settings_t *p_wifi_settings)
 static void
 wifi_manager_esp_wifi_configure(const struct wifi_settings_t *const p_wifi_settings)
 {
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
+    esp_err_t err = esp_wifi_set_mode(WIFI_MODE_APSTA);
+    if (ESP_OK != err)
+    {
+        LOG_ERR_ESP(err, "%s failed", "esp_wifi_set_mode");
+        return;
+    }
     xEventGroupSetBits(g_wifi_manager_event_group, WIFI_MANAGER_AP_ACTIVE);
     wifi_config_t ap_config = wifi_manager_generate_ap_config(p_wifi_settings);
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &ap_config));
-    ESP_ERROR_CHECK(esp_wifi_set_bandwidth(WIFI_IF_AP, p_wifi_settings->ap_bandwidth));
-    ESP_ERROR_CHECK(esp_wifi_set_ps(p_wifi_settings->sta_power_save));
+    err                     = esp_wifi_set_config(WIFI_IF_AP, &ap_config);
+    if (ESP_OK != err)
+    {
+        LOG_ERR_ESP(err, "%s failed", "esp_wifi_set_config");
+        return;
+    }
+    err = esp_wifi_set_bandwidth(WIFI_IF_AP, p_wifi_settings->ap_bandwidth);
+    if (ESP_OK != err)
+    {
+        LOG_ERR_ESP(err, "%s failed", "esp_wifi_set_bandwidth");
+        return;
+    }
+    err = esp_wifi_set_ps(p_wifi_settings->sta_power_save);
+    if (ESP_OK != err)
+    {
+        LOG_ERR_ESP(err, "%s failed", "esp_wifi_set_ps");
+        return;
+    }
 }
 
 static void
@@ -1139,9 +1175,24 @@ wifi_manager_tcpip_adapter_set_default_ip(void)
     inet_pton(AF_INET, DEFAULT_AP_IP, &info.ip); /* access point is on a static IP */
     inet_pton(AF_INET, DEFAULT_AP_GATEWAY, &info.gw);
     inet_pton(AF_INET, DEFAULT_AP_NETMASK, &info.netmask);
-    ESP_ERROR_CHECK(tcpip_adapter_dhcps_stop(TCPIP_ADAPTER_IF_AP)); /* stop AP DHCP server */
-    ESP_ERROR_CHECK(tcpip_adapter_set_ip_info(TCPIP_ADAPTER_IF_AP, &info));
-    ESP_ERROR_CHECK(tcpip_adapter_dhcps_start(TCPIP_ADAPTER_IF_AP)); /* start AP DHCP server */
+    esp_err_t err = tcpip_adapter_dhcps_stop(TCPIP_ADAPTER_IF_AP); /* stop AP DHCP server */
+    if (ESP_OK != err)
+    {
+        LOG_ERR_ESP(err, "%s failed", "tcpip_adapter_dhcps_stop");
+        return;
+    }
+    err = tcpip_adapter_set_ip_info(TCPIP_ADAPTER_IF_AP, &info);
+    if (ESP_OK != err)
+    {
+        LOG_ERR_ESP(err, "%s failed", "tcpip_adapter_set_ip_info");
+        return;
+    }
+    err = tcpip_adapter_dhcps_start(TCPIP_ADAPTER_IF_AP); /* start AP DHCP server */
+    if (ESP_OK != err)
+    {
+        LOG_ERR_ESP(err, "%s failed", "tcpip_adapter_dhcps_start");
+        return;
+    }
 }
 
 static void
@@ -1156,19 +1207,40 @@ wifi_manager_tcpip_adapter_configure(const struct wifi_settings_t *p_wifi_settin
             ip4addr_ntoa(&p_wifi_settings->sta_static_ip_config.netmask));
 
         /* stop DHCP client*/
-        ESP_ERROR_CHECK(tcpip_adapter_dhcpc_stop(TCPIP_ADAPTER_IF_STA));
+        esp_err_t err = tcpip_adapter_dhcpc_stop(TCPIP_ADAPTER_IF_STA);
+        if (ESP_OK != err)
+        {
+            LOG_ERR_ESP(err, "%s failed", "tcpip_adapter_dhcpc_stop");
+            return;
+        }
         /* assign a static IP to the STA network interface */
-        ESP_ERROR_CHECK(tcpip_adapter_set_ip_info(TCPIP_ADAPTER_IF_STA, &p_wifi_settings->sta_static_ip_config));
+        err = tcpip_adapter_set_ip_info(TCPIP_ADAPTER_IF_STA, &p_wifi_settings->sta_static_ip_config);
+        if (ESP_OK != err)
+        {
+            LOG_ERR_ESP(err, "%s failed", "tcpip_adapter_set_ip_info");
+            return;
+        }
     }
     else
     {
         /* start DHCP client if not started*/
         LOG_INFO("wifi_manager: Start DHCP client for STA interface. If not already running");
         tcpip_adapter_dhcp_status_t status = 0;
-        ESP_ERROR_CHECK(tcpip_adapter_dhcpc_get_status(TCPIP_ADAPTER_IF_STA, &status));
+
+        esp_err_t err = tcpip_adapter_dhcpc_get_status(TCPIP_ADAPTER_IF_STA, &status);
+        if (ESP_OK != err)
+        {
+            LOG_ERR_ESP(err, "%s failed", "tcpip_adapter_dhcpc_get_status");
+            return;
+        }
         if (status != TCPIP_ADAPTER_DHCP_STARTED)
         {
-            ESP_ERROR_CHECK(tcpip_adapter_dhcpc_start(TCPIP_ADAPTER_IF_STA));
+            err = tcpip_adapter_dhcpc_start(TCPIP_ADAPTER_IF_STA);
+            if (ESP_OK != err)
+            {
+                LOG_ERR_ESP(err, "%s failed", "tcpip_adapter_dhcpc_start");
+                return;
+            }
         }
     }
 }
