@@ -593,6 +593,13 @@ wifi_manager_stop_ap(void)
 }
 
 void
+wifi_manager_start_ap(void)
+{
+    LOG_INFO("%s", __func__);
+    wifiman_msg_send_cmd_start_ap();
+}
+
+void
 wifi_manager_set_callback(const message_code_e message_code, wifi_manager_cb_ptr func_ptr)
 {
     if (message_code < MESSAGE_CODE_COUNT)

@@ -72,6 +72,12 @@ void
 wifi_manager_stop_ap(void);
 
 /**
+ * @brief Start WiFi access-point
+ */
+void
+wifi_manager_start_ap(void);
+
+/**
  * @brief clears the current STA wifi config in flash ram storage.
  */
 bool
