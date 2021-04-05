@@ -96,13 +96,13 @@ void
 wifi_manager_scan_async(void);
 
 /**
- * @brief requests to disconnect and forget about Ethernet connection.
+ * @brief requests to disconnect from Ethernet.
  */
 void
 wifi_manager_disconnect_eth(void);
 
 /**
- * @brief requests to disconnect and forget about the access point.
+ * @brief requests to disconnect from the WiFi access point.
  */
 void
 wifi_manager_disconnect_wifi(void);

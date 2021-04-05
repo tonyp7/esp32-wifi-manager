@@ -817,18 +817,10 @@ wifi_handle_ev_sta_disconnected(const wifiman_msg_param_t *p_param)
     }
     else if (0 != (event_bits & (uint32_t)WIFI_MANAGER_REQUEST_DISCONNECT_BIT))
     {
-        LOG_INFO("event_bits & WIFI_MANAGER_REQUEST_DISCONNECT_BIT");
-        /* user manually requested a disconnect so the lost connection is a normal event. Clear the flag
-         * and restart the AP */
+        LOG_INFO("User manually requested a disconnect so the lost connection is a normal event");
         xEventGroupClearBits(g_wifi_manager_event_group, WIFI_MANAGER_REQUEST_DISCONNECT_BIT);
 
         update_reason_code = UPDATE_USER_DISCONNECT;
-
-        /* Erase configuration and save it ot NVS memory */
-        wifi_sta_config_clear();
-
-        /* start SoftAP */
-        wifiman_msg_send_cmd_start_ap();
     }
     else
     {
