@@ -649,26 +649,15 @@ http_server_handle_req_get(const char *p_file_name, const bool flag_allow_req_to
 {
     LOG_INFO("GET /%s", p_file_name);
 
-    if (flag_allow_req_to_wifi_manager)
+    if (0 == strcmp(p_file_name, ""))
     {
-        if (0 == strcmp(p_file_name, ""))
-        {
-            p_file_name = "index.html";
-        }
-    }
-    else
-    {
-        // Do not allow to access to the wifi_manager UI when it is disabled
-        if (0 == strcmp(p_file_name, "") || (0 == strcmp(p_file_name, "index.html")))
-        {
-            p_file_name = "ruuvi.html";
-        }
+        p_file_name = "index.html";
     }
 
     const char *file_ext = strrchr(p_file_name, '.');
-    if (flag_allow_req_to_wifi_manager && (NULL != file_ext) && (0 == strcmp(file_ext, ".json")))
+    if ((NULL != file_ext) && (0 == strcmp(file_ext, ".json")))
     {
-        if (0 == strcmp(p_file_name, "ap.json"))
+        if (flag_allow_req_to_wifi_manager && (0 == strcmp(p_file_name, "ap.json")))
         {
             /* if we can get the mutex, write the last version of the AP list */
             const TickType_t ticks_to_wait = 10U;
