@@ -247,18 +247,6 @@ wifi_manager_init_start_wifi(const WiFiAntConfig_t *p_wifi_ant_config, const wif
         return false;
     }
 
-    if (wifi_sta_config_fetch())
-    {
-        LOG_INFO("Saved wifi found on startup. Will attempt to connect.");
-        wifiman_msg_send_cmd_connect_sta(CONNECTION_REQUEST_RESTORE_CONNECTION);
-    }
-    else
-    {
-        /* no wifi saved: start soft AP! This is what should happen during a first run */
-        LOG_INFO("No saved wifi found on startup. Starting access point.");
-        wifiman_msg_send_cmd_start_ap();
-    }
-
     /* start wifi manager task */
     const char *   task_name   = "wifi_manager";
     const uint32_t stack_depth = 4096U;
@@ -321,19 +309,22 @@ wifi_manager_init(
         return false;
     }
 
+    LOG_INFO("WiFi manager init: start WiFi");
+    wifi_manager_init_start_wifi(p_wifi_ant_config, p_gw_wifi_ssid);
+
     if (flag_start_wifi)
     {
-        LOG_INFO("WiFi manager init: start WiFi");
-        wifi_manager_init_start_wifi(p_wifi_ant_config, p_gw_wifi_ssid);
-    }
-    else
-    {
-        xEventGroupClearBits(
-            g_wifi_manager_event_group,
-            WIFI_MANAGER_IS_WORKING | WIFI_MANAGER_WIFI_CONNECTED_BIT | WIFI_MANAGER_AP_STA_CONNECTED_BIT
-                | WIFI_MANAGER_AP_STA_IP_ASSIGNED_BIT | WIFI_MANAGER_AP_STARTED_BIT
-                | WIFI_MANAGER_REQUEST_STA_CONNECT_BIT | WIFI_MANAGER_REQUEST_RESTORE_STA_BIT | WIFI_MANAGER_SCAN_BIT
-                | WIFI_MANAGER_REQUEST_DISCONNECT_BIT | WIFI_MANAGER_AP_ACTIVE);
+        if (wifi_sta_config_fetch())
+        {
+            LOG_INFO("Saved wifi found on startup. Will attempt to connect.");
+            wifiman_msg_send_cmd_connect_sta(CONNECTION_REQUEST_RESTORE_CONNECTION);
+        }
+        else
+        {
+            /* no wifi saved: start soft AP! This is what should happen during a first run */
+            LOG_INFO("No saved wifi found on startup. Starting access point.");
+            wifiman_msg_send_cmd_start_ap();
+        }
     }
 
     return true;
