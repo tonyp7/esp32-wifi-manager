@@ -35,6 +35,8 @@ function to process requests, decode URLs, serve files, etc. etc.
 #ifndef HTTP_SERVER_H_INCLUDED
 #define HTTP_SERVER_H_INCLUDED
 
+#include <stdbool.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -45,6 +47,9 @@ extern "C" {
  */
 void
 http_server_init(void);
+
+bool
+http_server_set_auth(const char *const p_auth_type, const char *const p_auth_user, const char *const p_auth_pass);
 
 /**
  * @brief Create the task for the http server.
@@ -66,6 +71,9 @@ http_server_on_ap_sta_disconnected(void);
 
 void
 http_server_on_ap_sta_ip_assigned(void);
+
+void
+http_server_update_last_http_status_request(void);
 
 #ifdef __cplusplus
 }

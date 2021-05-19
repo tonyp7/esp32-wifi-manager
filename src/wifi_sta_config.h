@@ -88,6 +88,9 @@ wifi_sta_config_set_ssid_and_password(
     const char * p_password,
     const size_t password_len);
 
+wifi_ssid_t
+wifi_sta_config_get_ap_ssid(void);
+
 #ifdef __cplusplus
 }
 #endif

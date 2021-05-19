@@ -382,13 +382,13 @@ wifi_manager_start(
 }
 
 http_server_resp_t
-wifi_manager_cb_on_http_get(const char *p_path)
+wifi_manager_cb_on_http_get(const char *p_path, const http_server_resp_t *const p_resp_auth)
 {
     if (NULL == g_wifi_cb_on_http_get)
     {
         return http_server_resp_404();
     }
-    return g_wifi_cb_on_http_get(p_path);
+    return g_wifi_cb_on_http_get(p_path, p_resp_auth);
 }
 
 http_server_resp_t
@@ -402,13 +402,13 @@ wifi_manager_cb_on_http_post(const char *p_path, const http_req_body_t http_body
 }
 
 http_server_resp_t
-wifi_manager_cb_on_http_delete(const char *p_path)
+wifi_manager_cb_on_http_delete(const char *p_path, const http_server_resp_t *const p_resp_auth)
 {
     if (NULL == g_wifi_cb_on_http_delete)
     {
         return http_server_resp_404();
     }
-    return g_wifi_cb_on_http_delete(p_path);
+    return g_wifi_cb_on_http_delete(p_path, p_resp_auth);
 }
 
 bool

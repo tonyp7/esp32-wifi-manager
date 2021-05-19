@@ -7,6 +7,14 @@ add_executable(${ProjectId}
         test_http_server_resp.cpp
         ../../src/http_server_resp.c
         ../../src/include/http_server_resp.h
+        ../../src/http_server_auth.c
+        ../../src/http_server_auth.h
+        ../../src/wifiman_sha256.c
+        ../../src/wifiman_sha256.h
+        $ENV{IDF_PATH}/components/mbedtls/mbedtls/library/sha256.c
+        $ENV{IDF_PATH}/components/mbedtls/mbedtls/include/mbedtls/sha256.h
+        $ENV{IDF_PATH}/components/mbedtls/mbedtls/library/platform_util.c
+        $ENV{IDF_PATH}/components/mbedtls/mbedtls/include/mbedtls/platform_util.h
 )
 
 set_target_properties(${ProjectId} PROPERTIES
@@ -17,6 +25,7 @@ set_target_properties(${ProjectId} PROPERTIES
 target_include_directories(${ProjectId} PUBLIC
         ${gtest_SOURCE_DIR}/include
         ${gtest_SOURCE_DIR}
+        $ENV{IDF_PATH}/components/mbedtls/mbedtls/include
         ../../src/include
         ../../src
         include

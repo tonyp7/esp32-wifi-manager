@@ -66,12 +66,13 @@ function to process requests, decode URLs, serve files, etc. etc.
 #include "os_task.h"
 #include "os_malloc.h"
 #include "str_buf.h"
-#include "wifi_sta_config.h"
 #include "http_req.h"
 #include "esp_type_wrapper.h"
 #include "os_signal.h"
 #include "os_mutex.h"
 #include "wifiman_msg.h"
+#include "http_server_handle_req_get_auth.h"
+#include "http_server_handle_req.h"
 
 #define LOG_LOCAL_LEVEL LOG_LEVEL_DEBUG
 #include "log.h"
@@ -84,6 +85,13 @@ function to process requests, decode URLs, serve files, etc. etc.
 
 #define HTTP_SERVER_STATUS_JSON_REQUEST_TIMEOUT_MS (20 * 1000)
 #define HTTP_SERVER_STA_AP_TIMEOUT_MS              (60 * 1000)
+
+#define HTTP_HEADER_DATE_EXAMPLE "Date: Thu, 01 Jan 2021 00:00:00 GMT\n"
+
+typedef struct http_header_date_str_t
+{
+    char buf[sizeof(HTTP_HEADER_DATE_EXAMPLE)];
+} http_header_date_str_t;
 
 /**
  * @brief RTOS task for the HTTP server. Do not start manually.
@@ -109,6 +117,9 @@ static os_signal_t *      gp_http_server_sig;
 static os_delta_ticks_t   g_timestamp_last_http_status_request;
 static bool               g_is_ap_sta_ip_assigned;
 
+static http_header_extra_fields_t g_http_server_extra_header_fields;
+static http_server_auth_info_t    g_auth_info;
+
 void
 http_server_init(void)
 {
@@ -116,6 +127,45 @@ http_server_init(void)
     g_http_server_mutex = os_mutex_create_static(&g_http_server_mutex_mem);
     gp_http_server_sig  = os_signal_create_static(&g_http_server_signal_mem);
     os_signal_add(gp_http_server_sig, HTTP_SERVER_SIG_STOP);
+}
+
+bool
+http_server_set_auth(const char *const p_auth_type, const char *const p_auth_user, const char *const p_auth_pass)
+{
+    http_server_auth_type_e auth_type = HTTP_SERVER_AUTH_TYPE_DENY;
+    if (0 == strcmp("lan_auth_deny", p_auth_type))
+    {
+        auth_type = HTTP_SERVER_AUTH_TYPE_DENY;
+    }
+    else if (0 == strcmp("lan_auth_allow", p_auth_type))
+    {
+        auth_type = HTTP_SERVER_AUTH_TYPE_ALLOW;
+    }
+    else if (0 == strcmp("lan_auth_basic", p_auth_type))
+    {
+        auth_type = HTTP_SERVER_AUTH_TYPE_BASIC;
+    }
+    else if (0 == strcmp("lan_auth_digest", p_auth_type))
+    {
+        auth_type = HTTP_SERVER_AUTH_TYPE_DIGEST;
+    }
+    else if (0 == strcmp("lan_auth_ruuvi", p_auth_type))
+    {
+        auth_type = HTTP_SERVER_AUTH_TYPE_RUUVI;
+    }
+
+    if ((NULL != p_auth_user) && (strlen(p_auth_user) >= sizeof(g_auth_info.auth_user)))
+    {
+        return false;
+    }
+    if ((NULL != p_auth_pass) && (strlen(p_auth_pass) >= sizeof(g_auth_info.auth_pass)))
+    {
+        return false;
+    }
+    g_auth_info.auth_type = auth_type;
+    snprintf(g_auth_info.auth_user, sizeof(g_auth_info.auth_user), "%s", (NULL != p_auth_user) ? p_auth_user : "");
+    snprintf(g_auth_info.auth_pass, sizeof(g_auth_info.auth_pass), "%s", (NULL != p_auth_pass) ? p_auth_pass : "");
+    return true;
 }
 
 ATTR_PRINTF(3, 4)
@@ -184,13 +234,13 @@ http_get_content_encoding_str(const http_server_resp_t *p_resp)
             content_encoding_str = "";
             break;
         case HTTP_CONENT_ENCODING_GZIP:
-            content_encoding_str = "Content-Encoding: gzip\n";
+            content_encoding_str = "Content-Encoding: gzip\r\n";
             break;
     }
     return content_encoding_str;
 }
 
-const char *
+static const char *
 http_get_cache_control_str(const http_server_resp_t *p_resp)
 {
     const char *cache_control_str = "";
@@ -273,21 +323,39 @@ write_content_from_fatfs(struct netconn *p_conn, const http_server_resp_t *p_res
     close(p_resp->select_location.fatfs.fd);
 }
 
+static http_header_date_str_t
+http_server_gen_header_date_str(const bool flag_gen_date)
+{
+    http_header_date_str_t date_str = { 0 };
+    if (flag_gen_date)
+    {
+        const time_t cur_time = time(NULL);
+        struct tm    tm_time  = { 0 };
+        gmtime_r(&cur_time, &tm_time);
+        strftime(date_str.buf, sizeof(date_str.buf), "Date: %a, %d %b %Y %H:%M:%S GMT\r\n", &tm_time);
+    }
+    return date_str;
+}
+
 static void
 http_server_netconn_resp_200(struct netconn *p_conn, http_server_resp_t *p_resp)
 {
     const bool use_extra_content_type_param = (NULL != p_resp->p_content_type_param)
                                               && ('\0' != p_resp->p_content_type_param[0]);
+    const http_header_date_str_t date_str = http_server_gen_header_date_str(p_resp->flag_add_header_date);
 
     http_server_netconn_printf(
         p_conn,
         true,
-        "HTTP/1.1 200 OK\n"
-        "Content-type: %s; charset=utf-8%s%s\n"
-        "Content-Length: %lu\n"
+        "HTTP/1.1 200 OK\r\n"
+        "Server: Ruuvi Gateway\r\n"
+        "%s"
+        "Content-type: %s; charset=utf-8%s%s\r\n"
+        "Content-Length: %lu\r\n"
         "%s"
         "%s"
-        "\n",
+        "\r\n",
+        date_str.buf,
         http_get_content_type_str(p_resp->content_type),
         use_extra_content_type_param ? "; " : "",
         use_extra_content_type_param ? p_resp->p_content_type_param : "",
@@ -314,19 +382,6 @@ http_server_netconn_resp_200(struct netconn *p_conn, http_server_resp_t *p_resp)
     }
 }
 
-static http_server_resp_t
-http_server_resp_200_json(const char *p_json_content)
-{
-    const bool flag_no_cache = true;
-    return http_server_resp_data_in_static_mem(
-        HTTP_CONENT_TYPE_APPLICATION_JSON,
-        NULL,
-        strlen(p_json_content),
-        HTTP_CONENT_ENCODING_NONE,
-        (const uint8_t *)p_json_content,
-        flag_no_cache);
-}
-
 static void
 http_server_netconn_resp_302(struct netconn *p_conn)
 {
@@ -334,10 +389,25 @@ http_server_netconn_resp_302(struct netconn *p_conn)
     http_server_netconn_printf(
         p_conn,
         false,
-        "HTTP/1.1 302 Found\n"
-        "Location: http://%s/\n"
-        "\n",
+        "HTTP/1.1 302 Found\r\n"
+        "Server: Ruuvi Gateway\r\n"
+        "Location: http://%s/\r\n"
+        "\r\n",
         DEFAULT_AP_IP);
+}
+
+static void
+http_server_netconn_resp_302_auth_html(struct netconn *p_conn, const sta_ip_string_t *const p_ip_str)
+{
+    LOG_INFO("Respond: 302 Found");
+    http_server_netconn_printf(
+        p_conn,
+        false,
+        "HTTP/1.1 302 Found\r\n"
+        "Server: Ruuvi Gateway\r\n"
+        "Location: http://%s/auth.html\r\n"
+        "\r\n",
+        p_ip_str->buf);
 }
 
 static void
@@ -348,8 +418,109 @@ http_server_netconn_resp_400(struct netconn *p_conn)
         p_conn,
         false,
         "HTTP/1.1 400 Bad Request\r\n"
+        "Server: Ruuvi Gateway\r\n"
         "Content-Length: 0\r\n"
         "\r\n");
+}
+
+static void
+http_server_netconn_resp_401(
+    struct netconn *                        p_conn,
+    http_server_resp_t *                    p_resp,
+    const http_header_extra_fields_t *const p_extra_header_fields)
+{
+    LOG_INFO("Respond: 401 Unauthorized");
+    const bool use_extra_content_type_param = (NULL != p_resp->p_content_type_param)
+                                              && ('\0' != p_resp->p_content_type_param[0]);
+    const http_header_date_str_t date_str = http_server_gen_header_date_str(true);
+    http_server_netconn_printf(
+        p_conn,
+        true,
+        "HTTP/1.1 401 Unauthorized\r\n"
+        "Server: Ruuvi Gateway\r\n"
+        "%s"
+        "Content-type: %s; charset=utf-8%s%s\r\n"
+        "Content-Length: %lu\r\n"
+        "%s"
+        "%s"
+        "%s"
+        "\r\n",
+        date_str.buf,
+        http_get_content_type_str(p_resp->content_type),
+        use_extra_content_type_param ? "; " : "",
+        use_extra_content_type_param ? p_resp->p_content_type_param : "",
+        (printf_ulong_t)p_resp->content_len,
+        (NULL != p_extra_header_fields) ? p_extra_header_fields->buf : "",
+        http_get_content_encoding_str(p_resp),
+        http_get_cache_control_str(p_resp));
+
+    switch (p_resp->content_location)
+    {
+        case HTTP_CONTENT_LOCATION_NO_CONTENT:
+            break;
+        case HTTP_CONTENT_LOCATION_FLASH_MEM:
+            write_content_from_flash(p_conn, p_resp);
+            break;
+        case HTTP_CONTENT_LOCATION_STATIC_MEM:
+            write_content_from_static_mem(p_conn, p_resp);
+            break;
+        case HTTP_CONTENT_LOCATION_HEAP:
+            write_content_from_heap(p_conn, p_resp);
+            break;
+        case HTTP_CONTENT_LOCATION_FATFS:
+            write_content_from_fatfs(p_conn, p_resp);
+            break;
+    }
+}
+
+static void
+http_server_netconn_resp_403(
+    struct netconn *                        p_conn,
+    http_server_resp_t *                    p_resp,
+    const http_header_extra_fields_t *const p_extra_header_fields)
+{
+    LOG_INFO("Respond: 403 Forbidden");
+    const bool use_extra_content_type_param = (NULL != p_resp->p_content_type_param)
+                                              && ('\0' != p_resp->p_content_type_param[0]);
+    const http_header_date_str_t date_str = http_server_gen_header_date_str(true);
+    http_server_netconn_printf(
+        p_conn,
+        true,
+        "HTTP/1.1 403 Forbidden\r\n"
+        "Server: Ruuvi Gateway\r\n"
+        "%s"
+        "Content-type: %s; charset=utf-8%s%s\r\n"
+        "Content-Length: %lu\r\n"
+        "%s"
+        "%s"
+        "%s"
+        "\r\n",
+        date_str.buf,
+        http_get_content_type_str(p_resp->content_type),
+        use_extra_content_type_param ? "; " : "",
+        use_extra_content_type_param ? p_resp->p_content_type_param : "",
+        (printf_ulong_t)p_resp->content_len,
+        (NULL != p_extra_header_fields) ? p_extra_header_fields->buf : "",
+        http_get_content_encoding_str(p_resp),
+        http_get_cache_control_str(p_resp));
+
+    switch (p_resp->content_location)
+    {
+        case HTTP_CONTENT_LOCATION_NO_CONTENT:
+            break;
+        case HTTP_CONTENT_LOCATION_FLASH_MEM:
+            write_content_from_flash(p_conn, p_resp);
+            break;
+        case HTTP_CONTENT_LOCATION_STATIC_MEM:
+            write_content_from_static_mem(p_conn, p_resp);
+            break;
+        case HTTP_CONTENT_LOCATION_HEAP:
+            write_content_from_heap(p_conn, p_resp);
+            break;
+        case HTTP_CONTENT_LOCATION_FATFS:
+            write_content_from_fatfs(p_conn, p_resp);
+            break;
+    }
 }
 
 static void
@@ -360,6 +531,7 @@ http_server_netconn_resp_404(struct netconn *p_conn)
         p_conn,
         false,
         "HTTP/1.1 404 Not Found\r\n"
+        "Server: Ruuvi Gateway\r\n"
         "Content-Length: 0\r\n"
         "\r\n");
 }
@@ -372,6 +544,7 @@ http_server_netconn_resp_503(struct netconn *p_conn)
         p_conn,
         false,
         "HTTP/1.1 503 Service Unavailable\r\n"
+        "Server: Ruuvi Gateway\r\n"
         "Content-Length: 0\r\n"
         "\r\n");
 }
@@ -442,6 +615,12 @@ http_server_sig_unregister_cur_thread(void)
     os_mutex_unlock(g_http_server_mutex);
 }
 
+void
+http_server_update_last_http_status_request(void)
+{
+    g_timestamp_last_http_status_request = xTaskGetTickCount();
+}
+
 static bool
 http_server_is_status_json_timeout_expired(const uint32_t timeout_ms)
 {
@@ -455,24 +634,24 @@ http_server_is_status_json_timeout_expired(const uint32_t timeout_ms)
 void
 http_server_on_ap_sta_connected(void)
 {
-    g_is_ap_sta_ip_assigned              = false;
-    g_timestamp_last_http_status_request = xTaskGetTickCount();
+    g_is_ap_sta_ip_assigned = false;
+    http_server_update_last_http_status_request();
     LOG_DBG("http_server_on_ap_sta_connected: %lu", (printf_ulong_t)g_timestamp_last_http_status_request);
 }
 
 void
 http_server_on_ap_sta_disconnected(void)
 {
-    g_is_ap_sta_ip_assigned              = false;
-    g_timestamp_last_http_status_request = xTaskGetTickCount();
+    g_is_ap_sta_ip_assigned = false;
+    http_server_update_last_http_status_request();
     LOG_DBG("http_server_on_ap_sta_disconnected: %lu", (printf_ulong_t)g_timestamp_last_http_status_request);
 }
 
 void
 http_server_on_ap_sta_ip_assigned(void)
 {
-    g_is_ap_sta_ip_assigned              = true;
-    g_timestamp_last_http_status_request = xTaskGetTickCount();
+    g_is_ap_sta_ip_assigned = true;
+    http_server_update_last_http_status_request();
     LOG_DBG("http_server_on_ap_sta_ip_assigned: %lu", (printf_ulong_t)g_timestamp_last_http_status_request);
 }
 
@@ -485,18 +664,18 @@ http_server_check_if_configuring_complete(const os_delta_ticks_t time_for_proces
     {
         if (!g_is_network_connected)
         {
-            g_is_network_connected               = true;
-            g_timestamp_last_http_status_request = xTaskGetTickCount();
+            g_is_network_connected = true;
+            http_server_update_last_http_status_request();
         }
         if (!g_is_ap_sta_ip_assigned && wifi_manager_is_ap_sta_ip_assigned())
         {
-            g_is_ap_sta_ip_assigned              = true;
-            g_timestamp_last_http_status_request = xTaskGetTickCount();
+            g_is_ap_sta_ip_assigned = true;
+            http_server_update_last_http_status_request();
         }
         else if (g_is_ap_sta_ip_assigned && !wifi_manager_is_ap_sta_ip_assigned())
         {
-            g_is_ap_sta_ip_assigned              = false;
-            g_timestamp_last_http_status_request = xTaskGetTickCount();
+            g_is_ap_sta_ip_assigned = false;
+            http_server_update_last_http_status_request();
         }
         if (g_is_ap_sta_ip_assigned)
         {
@@ -523,8 +702,8 @@ http_server_check_if_configuring_complete(const os_delta_ticks_t time_for_proces
     {
         if (!g_is_network_connected)
         {
-            g_is_network_connected               = true;
-            g_timestamp_last_http_status_request = xTaskGetTickCount();
+            g_is_network_connected = true;
+            http_server_update_last_http_status_request();
         }
         if (http_server_is_status_json_timeout_expired(
                 HTTP_SERVER_STATUS_JSON_REQUEST_TIMEOUT_MS + time_for_processing_request))
@@ -627,162 +806,6 @@ get_http_body(const char *msg, uint32_t len, uint32_t *p_body_len)
     return p_body;
 }
 
-static void
-http_server_gen_resp_status_json(json_network_info_t *const p_info, void *const p_param)
-{
-    http_server_resp_t *p_http_resp = p_param;
-    if (NULL == p_info)
-    {
-        LOG_DBG("http_server_netconn_serve: GET /status failed to obtain mutex");
-        LOG_INFO("status.json: 503");
-        *p_http_resp = http_server_resp_503();
-    }
-    else
-    {
-        LOG_INFO("status.json: %s", p_info->json_buf);
-        *p_http_resp = http_server_resp_200_json(p_info->json_buf);
-    }
-}
-
-static http_server_resp_t
-http_server_handle_req_get(const char *p_file_name, const bool flag_allow_req_to_wifi_manager)
-{
-    LOG_INFO("GET /%s", p_file_name);
-
-    if (0 == strcmp(p_file_name, ""))
-    {
-        p_file_name = "index.html";
-    }
-
-    const char *file_ext = strrchr(p_file_name, '.');
-    if ((NULL != file_ext) && (0 == strcmp(file_ext, ".json")))
-    {
-        if (flag_allow_req_to_wifi_manager && (0 == strcmp(p_file_name, "ap.json")))
-        {
-            /* if we can get the mutex, write the last version of the AP list */
-            const TickType_t ticks_to_wait = 10U;
-            if (!wifi_manager_lock_with_timeout(ticks_to_wait))
-            {
-                LOG_ERR("GET /ap.json: failed to obtain mutex, return HTTP error 503");
-                return http_server_resp_503();
-            }
-            const char *p_buff = json_access_points_get();
-            if (NULL == p_buff)
-            {
-                LOG_ERR("GET /ap.json: failed to get json, return HTTP error 503");
-                return http_server_resp_503();
-            }
-            LOG_INFO("ap.json: %s", p_buff);
-            const http_server_resp_t resp = http_server_resp_200_json(p_buff);
-            wifi_manager_unlock();
-            wifiman_msg_send_cmd_start_wifi_scan();
-            return resp;
-        }
-        else if (0 == strcmp(p_file_name, "status.json"))
-        {
-            g_timestamp_last_http_status_request = xTaskGetTickCount();
-
-            http_server_resp_t     http_resp     = { 0 };
-            const os_delta_ticks_t ticks_to_wait = 10U;
-            json_network_info_do_action_with_timeout(&http_server_gen_resp_status_json, &http_resp, ticks_to_wait);
-            return http_resp;
-        }
-    }
-    return wifi_manager_cb_on_http_get(p_file_name);
-}
-
-static http_server_resp_t
-http_server_handle_req_delete(const char *p_file_name, const bool flag_allow_req_to_wifi_manager)
-{
-    LOG_INFO("DELETE /%s", p_file_name);
-    if (flag_allow_req_to_wifi_manager && (0 == strcmp(p_file_name, "connect.json")))
-    {
-        LOG_DBG("http_server_netconn_serve: DELETE /connect.json");
-        if (wifi_manager_is_connected_to_ethernet())
-        {
-            wifi_manager_disconnect_eth();
-        }
-        else
-        {
-            /* request a disconnection from wifi and forget about it */
-            wifi_manager_disconnect_wifi();
-        }
-        return http_server_resp_200_json("{}");
-    }
-    return wifi_manager_cb_on_http_delete(p_file_name);
-}
-
-static http_server_resp_t
-http_server_handle_req_post_connect_json(const http_req_header_t http_header)
-{
-    LOG_DBG("http_server_netconn_serve: POST /connect.json");
-    uint32_t    len_ssid     = 0;
-    uint32_t    len_password = 0;
-    const char *p_ssid       = http_req_header_get_field(http_header, "X-Custom-ssid:", &len_ssid);
-    const char *p_password   = http_req_header_get_field(http_header, "X-Custom-pwd:", &len_password);
-    if ((NULL == p_ssid) && (NULL == p_password))
-    {
-        wifiman_msg_send_cmd_connect_eth();
-        return http_server_resp_200_json("{}");
-    }
-    if ((NULL != p_ssid) && (len_ssid <= MAX_SSID_SIZE) && (NULL != p_password) && (len_password <= MAX_PASSWORD_SIZE))
-    {
-        wifi_sta_config_set_ssid_and_password(p_ssid, len_ssid, p_password, len_password);
-
-        LOG_DBG("http_server_netconn_serve: wifi_manager_connect_async() call");
-        wifi_manager_connect_async();
-        return http_server_resp_200_json("{}");
-    }
-    /* bad request the authentication header is not complete/not the correct format */
-    return http_server_resp_400();
-}
-
-static http_server_resp_t
-http_server_handle_req_post(
-    const char *            p_file_name,
-    const bool              flag_allow_req_to_wifi_manager,
-    const http_req_header_t http_header,
-    const http_req_body_t   http_body)
-{
-    LOG_INFO("POST /%s", p_file_name);
-    if (flag_allow_req_to_wifi_manager && (0 == strcmp(p_file_name, "connect.json")))
-    {
-        return http_server_handle_req_post_connect_json(http_header);
-    }
-    return wifi_manager_cb_on_http_post(p_file_name, http_body);
-}
-
-static http_server_resp_t
-http_server_handle_req(const http_req_info_t *p_req_info, const bool flag_allow_req_to_wifi_manager)
-{
-    const char *path = p_req_info->http_uri.ptr;
-    if ('/' == path[0])
-    {
-        path += 1;
-    }
-
-    if (0 == strcmp("GET", p_req_info->http_cmd.ptr))
-    {
-        return http_server_handle_req_get(path, flag_allow_req_to_wifi_manager);
-    }
-    else if (0 == strcmp("DELETE", p_req_info->http_cmd.ptr))
-    {
-        return http_server_handle_req_delete(path, flag_allow_req_to_wifi_manager);
-    }
-    else if (0 == strcmp("POST", p_req_info->http_cmd.ptr))
-    {
-        return http_server_handle_req_post(
-            path,
-            flag_allow_req_to_wifi_manager,
-            p_req_info->http_header,
-            p_req_info->http_body);
-    }
-    else
-    {
-        return http_server_resp_400();
-    }
-}
-
 static bool
 http_server_recv_and_handle(struct netconn *p_conn, char *p_req_buf, uint32_t *p_req_size, bool *p_req_ready)
 {
@@ -849,11 +872,16 @@ http_server_recv_and_handle(struct netconn *p_conn, char *p_req_buf, uint32_t *p
 }
 
 static void
-http_server_netconn_serve(struct netconn *p_conn)
+http_server_netconn_serve(struct netconn *const p_conn)
 {
     char     req_buf[FULLBUF_SIZE + 1];
     uint32_t req_size  = 0;
     bool     req_ready = false;
+
+    sta_ip_string_t local_ip_str  = { '\0' };
+    sta_ip_string_t remote_ip_str = { '\0' };
+    ipaddr_ntoa_r(&p_conn->pcb.tcp->local_ip, local_ip_str.buf, sizeof(local_ip_str.buf));
+    ipaddr_ntoa_r(&p_conn->pcb.tcp->remote_ip, remote_ip_str.buf, sizeof(remote_ip_str.buf));
 
     while (!req_ready)
     {
@@ -868,7 +896,7 @@ http_server_netconn_serve(struct netconn *p_conn)
         LOG_WARN("the connection was closed by the client side");
         return;
     }
-    LOG_DBG("req: %s", req_buf);
+    LOG_DBG("Request from %s to %s: %s", remote_ip_str.buf, local_ip_str.buf, req_buf);
 
     const http_req_info_t req_info = http_req_parse(req_buf);
 
@@ -903,16 +931,39 @@ http_server_netconn_serve(struct netconn *p_conn)
         http_server_netconn_resp_302(p_conn);
         return;
     }
-    const bool flag_allow_req_to_wifi_manager = is_wifi_manager_working && is_request_to_ap_ip;
 
-    http_server_resp_t resp = http_server_handle_req(&req_info, flag_allow_req_to_wifi_manager);
+    const bool flag_access_from_lan = (0 != strcmp(local_ip_str.buf, DEFAULT_AP_IP)) ? true : false;
+
+    g_http_server_extra_header_fields.buf[0] = '\0';
+
+    http_server_resp_t resp = http_server_handle_req(
+        &req_info,
+        &remote_ip_str,
+        &g_auth_info,
+        &g_http_server_extra_header_fields,
+        flag_access_from_lan);
+    if (HTTP_CONENT_TYPE_APPLICATION_JSON == resp.content_type
+        && ((HTTP_CONTENT_LOCATION_STATIC_MEM == resp.content_location)
+            || (HTTP_CONTENT_LOCATION_HEAP == resp.content_location)))
+    {
+        LOG_INFO("Json resp: code=%u, content:\n%s", resp.http_resp_code, resp.select_location.memory.p_buf);
+    }
     switch (resp.http_resp_code)
     {
         case HTTP_RESP_CODE_200:
             http_server_netconn_resp_200(p_conn, &resp);
             return;
+        case HTTP_RESP_CODE_302:
+            http_server_netconn_resp_302_auth_html(p_conn, &local_ip_str);
+            return;
         case HTTP_RESP_CODE_400:
             http_server_netconn_resp_400(p_conn);
+            return;
+        case HTTP_RESP_CODE_401:
+            http_server_netconn_resp_401(p_conn, &resp, &g_http_server_extra_header_fields);
+            return;
+        case HTTP_RESP_CODE_403:
+            http_server_netconn_resp_403(p_conn, &resp, &g_http_server_extra_header_fields);
             return;
         case HTTP_RESP_CODE_404:
             http_server_netconn_resp_404(p_conn);

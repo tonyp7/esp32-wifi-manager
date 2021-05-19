@@ -468,3 +468,19 @@ wifi_sta_config_set_ssid_and_password(
     };
     wifiman_sta_config_safe_transaction(&wifi_sta_config_do_set_ssid_and_password, &info);
 }
+
+static void
+wifi_sta_config_do_get_ap_ssid(wifiman_sta_config_t *const p_cfg, void *const p_param)
+{
+    wifi_ssid_t *const p_ap_ssid = p_param;
+
+    snprintf(&p_ap_ssid->ssid_buf[0], sizeof(p_ap_ssid->ssid_buf), "%s", (const char *)&g_wifi_ap_ssid.ssid_buf[0]);
+}
+
+wifi_ssid_t
+wifi_sta_config_get_ap_ssid(void)
+{
+    wifi_ssid_t ap_ssid = { 0 };
+    wifiman_sta_config_safe_transaction(&wifi_sta_config_do_get_ap_ssid, &ap_ssid);
+    return ap_ssid;
+}

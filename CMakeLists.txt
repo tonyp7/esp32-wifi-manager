@@ -5,6 +5,7 @@ if(IDF_VERSION_MAJOR GREATER_EQUAL 4)
             src/include/wifi_manager_defs.h
             src/include/http_server_resp.h
             src/include/http_server.h
+            src/include/sta_ip.h
             src/access_points_list.c
             src/access_points_list.h
             src/ap_ssid.c
@@ -19,8 +20,22 @@ if(IDF_VERSION_MAJOR GREATER_EQUAL 4)
             src/http_req.c
             src/http_req.h
             src/http_server.c
+            src/http_server_auth.c
+            src/http_server_auth.h
+            src/http_server_auth_common.h
+            src/http_server_auth_digest.c
+            src/http_server_auth_digest.h
+            src/http_server_auth_ruuvi.c
+            src/http_server_auth_ruuvi.h
+            src/http_server_handle_req.c
+            src/http_server_handle_req.h
+            src/http_server_handle_req_delete_auth.c
+            src/http_server_handle_req_delete_auth.h
+            src/http_server_handle_req_get_auth.c
+            src/http_server_handle_req_get_auth.h
+            src/http_server_handle_req_post_auth.c
+            src/http_server_handle_req_post_auth.h
             src/http_server_resp.c
-            src/sta_ip.h
             src/sta_ip_safe.c
             src/sta_ip_safe.h
             src/sta_ip_unsafe.c
@@ -30,6 +45,10 @@ if(IDF_VERSION_MAJOR GREATER_EQUAL 4)
             src/wifi_sta_config.h
             src/wifiman_msg.c
             src/wifiman_msg.h
+            src/wifiman_md5.c
+            src/wifiman_md5.h
+            src/wifiman_sha256.c
+            src/wifiman_sha256.h
         REQUIRES
             log
             nvs_flash

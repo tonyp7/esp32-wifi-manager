@@ -260,7 +260,10 @@ typedef struct network_info_str_t
 typedef enum http_resp_code_e
 {
     HTTP_RESP_CODE_200 = 200,
+    HTTP_RESP_CODE_302 = 302,
     HTTP_RESP_CODE_400 = 400,
+    HTTP_RESP_CODE_401 = 401,
+    HTTP_RESP_CODE_403 = 403,
     HTTP_RESP_CODE_404 = 404,
     HTTP_RESP_CODE_503 = 503,
 } http_resp_code_e;
@@ -297,6 +300,7 @@ typedef struct http_server_resp_t
     http_resp_code_e        http_resp_code;
     http_content_location_e content_location;
     bool                    flag_no_cache;
+    bool                    flag_add_header_date;
     http_content_type_e     content_type;
     const char *            p_content_type_param;
     size_t                  content_len;
@@ -314,7 +318,8 @@ typedef struct http_server_resp_t
     } select_location;
 } http_server_resp_t;
 
-typedef http_server_resp_t (*wifi_manager_http_callback_t)(const char *path);
+typedef http_server_resp_t (
+    *wifi_manager_http_callback_t)(const char *path, const http_server_resp_t *const p_resp_auth);
 typedef http_server_resp_t (*wifi_manager_http_cb_on_post_t)(const char *path, const char *body);
 
 typedef void (*wifi_manager_callback_on_cmd_connect_eth_t)(void);
