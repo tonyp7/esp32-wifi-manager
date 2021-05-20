@@ -11,19 +11,11 @@
 #include "http_server_auth_common.h"
 #include "http_server_auth_digest.h"
 #include "http_server_auth_ruuvi.h"
+#include "http_server_auth_type.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-typedef enum http_server_auth_type_e
-{
-    HTTP_SERVER_AUTH_TYPE_ALLOW  = 0,
-    HTTP_SERVER_AUTH_TYPE_BASIC  = 1,
-    HTTP_SERVER_AUTH_TYPE_DIGEST = 2,
-    HTTP_SERVER_AUTH_TYPE_RUUVI  = 3,
-    HTTP_SERVER_AUTH_TYPE_DENY   = 4,
-} http_server_auth_type_e;
 
 typedef struct http_server_auth_info_t
 {
@@ -49,6 +41,9 @@ http_server_auth_ruuvi_get_info(void);
 
 const char *
 http_server_strnstr(const char *const p_haystack, const char *const p_needle, const size_t len);
+
+http_server_auth_info_t *
+http_server_get_auth(void);
 
 #ifdef __cplusplus
 }

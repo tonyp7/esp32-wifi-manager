@@ -36,6 +36,7 @@ function to process requests, decode URLs, serve files, etc. etc.
 #define HTTP_SERVER_H_INCLUDED
 
 #include <stdbool.h>
+#include "http_server_auth_type.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -47,9 +48,6 @@ extern "C" {
  */
 void
 http_server_init(void);
-
-bool
-http_server_set_auth(const char *const p_auth_type, const char *const p_auth_user, const char *const p_auth_pass);
 
 /**
  * @brief Create the task for the http server.

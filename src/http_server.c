@@ -118,7 +118,6 @@ static os_delta_ticks_t   g_timestamp_last_http_status_request;
 static bool               g_is_ap_sta_ip_assigned;
 
 static http_header_extra_fields_t g_http_server_extra_header_fields;
-static http_server_auth_info_t    g_auth_info;
 
 void
 http_server_init(void)
@@ -127,45 +126,6 @@ http_server_init(void)
     g_http_server_mutex = os_mutex_create_static(&g_http_server_mutex_mem);
     gp_http_server_sig  = os_signal_create_static(&g_http_server_signal_mem);
     os_signal_add(gp_http_server_sig, HTTP_SERVER_SIG_STOP);
-}
-
-bool
-http_server_set_auth(const char *const p_auth_type, const char *const p_auth_user, const char *const p_auth_pass)
-{
-    http_server_auth_type_e auth_type = HTTP_SERVER_AUTH_TYPE_DENY;
-    if (0 == strcmp("lan_auth_deny", p_auth_type))
-    {
-        auth_type = HTTP_SERVER_AUTH_TYPE_DENY;
-    }
-    else if (0 == strcmp("lan_auth_allow", p_auth_type))
-    {
-        auth_type = HTTP_SERVER_AUTH_TYPE_ALLOW;
-    }
-    else if (0 == strcmp("lan_auth_basic", p_auth_type))
-    {
-        auth_type = HTTP_SERVER_AUTH_TYPE_BASIC;
-    }
-    else if (0 == strcmp("lan_auth_digest", p_auth_type))
-    {
-        auth_type = HTTP_SERVER_AUTH_TYPE_DIGEST;
-    }
-    else if (0 == strcmp("lan_auth_ruuvi", p_auth_type))
-    {
-        auth_type = HTTP_SERVER_AUTH_TYPE_RUUVI;
-    }
-
-    if ((NULL != p_auth_user) && (strlen(p_auth_user) >= sizeof(g_auth_info.auth_user)))
-    {
-        return false;
-    }
-    if ((NULL != p_auth_pass) && (strlen(p_auth_pass) >= sizeof(g_auth_info.auth_pass)))
-    {
-        return false;
-    }
-    g_auth_info.auth_type = auth_type;
-    snprintf(g_auth_info.auth_user, sizeof(g_auth_info.auth_user), "%s", (NULL != p_auth_user) ? p_auth_user : "");
-    snprintf(g_auth_info.auth_pass, sizeof(g_auth_info.auth_pass), "%s", (NULL != p_auth_pass) ? p_auth_pass : "");
-    return true;
 }
 
 ATTR_PRINTF(3, 4)
@@ -939,7 +899,7 @@ http_server_netconn_serve(struct netconn *const p_conn)
     http_server_resp_t resp = http_server_handle_req(
         &req_info,
         &remote_ip_str,
-        &g_auth_info,
+        http_server_get_auth(),
         &g_http_server_extra_header_fields,
         flag_access_from_lan);
     if (HTTP_CONENT_TYPE_APPLICATION_JSON == resp.content_type

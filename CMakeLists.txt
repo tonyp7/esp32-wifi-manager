@@ -3,8 +3,9 @@ if(IDF_VERSION_MAJOR GREATER_EQUAL 4)
         SRCS
             src/include/wifi_manager.h
             src/include/wifi_manager_defs.h
-            src/include/http_server_resp.h
             src/include/http_server.h
+            src/include/http_server_auth_type.h
+            src/include/http_server_resp.h
             src/include/sta_ip.h
             src/access_points_list.c
             src/access_points_list.h
