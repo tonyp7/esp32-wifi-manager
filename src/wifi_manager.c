@@ -53,6 +53,7 @@ Contains the freeRTOS task and all necessary support
 #include "lwip/err.h"
 #include "lwip/netdb.h"
 #include "lwip/ip4_addr.h"
+#include "sdkconfig.h"
 
 
 #include "json.h"
@@ -60,7 +61,11 @@ Contains the freeRTOS task and all necessary support
 #include "nvs_sync.h"
 #include "wifi_manager.h"
 
-
+#ifdef CONFIG_WIFI_MANAGER_DNS_SERVER_ENABLE
+	uint8_t dns_server_enable = 1;
+#else
+	uint8_t dns_server_enable = 0;
+#endif
 
 /* objects used to manipulate the main queue of events */
 QueueHandle_t wifi_manager_queue;
@@ -1218,7 +1223,9 @@ void wifi_manager( void * pvParameters ){
 				http_app_start(true);
 
 				/* start DNS */
-				dns_server_start();
+				if(dns_server_enable) {
+					dns_server_start();
+				}
 
 				/* callback */
 				if(cb_ptr_arr[msg.code]) (*cb_ptr_arr[msg.code])(NULL);
@@ -1240,7 +1247,9 @@ void wifi_manager( void * pvParameters ){
 					esp_wifi_set_mode(WIFI_MODE_STA);
 
 					/* stop DNS */
-					dns_server_stop();
+					if(dns_server_enable) {
+						dns_server_stop();
+					}
 
 					/* restart HTTP daemon */
 					http_app_stop();
@@ -1283,7 +1292,9 @@ void wifi_manager( void * pvParameters ){
 				else { abort(); }
 
 				/* bring down DNS hijack */
-				dns_server_stop();
+				if(dns_server_enable) {
+					dns_server_stop();
+				}
 
 				/* start the timer that will eventually shutdown the access point
 				 * We check first that it's actually running because in case of a boot and restore connection
