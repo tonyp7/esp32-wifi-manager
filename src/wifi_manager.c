@@ -53,6 +53,7 @@ Contains the freeRTOS task and all necessary support
 #include "lwip/err.h"
 #include "lwip/netdb.h"
 #include "lwip/ip4_addr.h"
+#include "sdkconfig.h"
 
 
 #include "json.h"
@@ -60,7 +61,11 @@ Contains the freeRTOS task and all necessary support
 #include "nvs_sync.h"
 #include "wifi_manager.h"
 
-
+#ifdef CONFIG_WIFI_MANAGER_DNS_SERVER_ENABLE
+	uint8_t dns_server_enable = 1;
+#else
+	uint8_t dns_server_enable = 0;
+#endif
 
 /* objects used to manipulate the main queue of events */
 QueueHandle_t wifi_manager_queue;
@@ -77,6 +82,7 @@ SemaphoreHandle_t wifi_manager_json_mutex = NULL;
 SemaphoreHandle_t wifi_manager_sta_ip_mutex = NULL;
 char *wifi_manager_sta_ip = NULL;
 uint16_t ap_num = MAX_AP_NUM;
+uint16_t ap_users = 0;
 wifi_ap_record_t *accessp_records;
 char *accessp_json = NULL;
 char *ip_info_json = NULL;
@@ -685,6 +691,14 @@ static void wifi_manager_event_handler(void* arg, esp_event_base_t event_base, i
 		 * to do something, for example, to get the info of the connected STA, etc. */
 		case WIFI_EVENT_AP_STACONNECTED:
 			ESP_LOGI(TAG, "WIFI_EVENT_AP_STACONNECTED");
+			xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_AP_STA_CONNECTED_BIT);
+
+			if(xTimerIsTimerActive(wifi_manager_retry_timer) == pdTRUE)
+				xTimerStop(wifi_manager_retry_timer, (TickType_t)0);
+
+			xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_RESTORE_STA_BIT);
+			ap_users += 1;
+			ESP_LOGI(TAG, "WIFI_EVENT_AP_STACONNECTED, connected users: %d", ap_users);
 			break;
 
 		/* This event can happen in the following scenarios:
@@ -695,6 +709,17 @@ static void wifi_manager_event_handler(void* arg, esp_event_base_t event_base, i
 		 * something, e.g., close the socket which is related to this station, etc. */
 		case WIFI_EVENT_AP_STADISCONNECTED:
 			ESP_LOGI(TAG, "WIFI_EVENT_AP_STADISCONNECTED");
+			if (ap_users > 0){
+				ap_users -= 1;
+			}
+			if (ap_users == 0) {
+				xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_AP_STA_CONNECTED_BIT);
+				EventBits_t uxBits = xEventGroupGetBits(wifi_manager_event_group);
+				if(! (uxBits & WIFI_MANAGER_WIFI_CONNECTED_BIT) ) {
+					wifi_manager_send_message(WM_ORDER_LOAD_AND_RESTORE_STA, NULL);
+				}
+			}
+			ESP_LOGI(TAG, "WIFI_EVENT_AP_STADISCONNECTED: Remaining connected users: %d", ap_users);
 			break;
 
 		/* This event is disabled by default. The application can enable it via API esp_wifi_set_event_mask().
@@ -1171,7 +1196,7 @@ void wifi_manager( void * pvParameters ){
 					/* start SoftAP */
 					wifi_manager_send_message(WM_ORDER_START_AP, NULL);
 				}
-				else{
+				else if (! (uxBits & WIFI_MANAGER_AP_STA_CONNECTED_BIT)){
 					/* lost connection ? */
 					if(wifi_manager_lock_json_buffer( portMAX_DELAY )){
 						wifi_manager_generate_ip_info_json( UPDATE_LOST_CONNECTION );
@@ -1200,6 +1225,8 @@ void wifi_manager( void * pvParameters ){
 							wifi_manager_send_message(WM_ORDER_START_AP, NULL);
 						}
 					}
+				} else {
+					ESP_LOGI(TAG, "Disconnected");
 				}
 
 				/* callback */
@@ -1218,7 +1245,9 @@ void wifi_manager( void * pvParameters ){
 				http_app_start(true);
 
 				/* start DNS */
-				dns_server_start();
+				if(dns_server_enable) {
+					dns_server_start();
+				}
 
 				/* callback */
 				if(cb_ptr_arr[msg.code]) (*cb_ptr_arr[msg.code])(NULL);
@@ -1240,7 +1269,9 @@ void wifi_manager( void * pvParameters ){
 					esp_wifi_set_mode(WIFI_MODE_STA);
 
 					/* stop DNS */
-					dns_server_stop();
+					if(dns_server_enable) {
+						dns_server_stop();
+					}
 
 					/* restart HTTP daemon */
 					http_app_stop();
@@ -1283,7 +1314,9 @@ void wifi_manager( void * pvParameters ){
 				else { abort(); }
 
 				/* bring down DNS hijack */
-				dns_server_stop();
+				if(dns_server_enable) {
+					dns_server_stop();
+				}
 
 				/* start the timer that will eventually shutdown the access point
 				 * We check first that it's actually running because in case of a boot and restore connection

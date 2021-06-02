@@ -1,5 +1,11 @@
 menu "Wifi Manager Configuration"
 
+config WIFI_MANAGER_DNS_SERVER_ENABLE
+    bool "Enable the DNS server if set"
+    default y
+    help
+    Enables the DNS Server when set to true.
+
 config WIFI_MANAGER_TASK_PRIORITY
     int "RTOS Task Priority for the wifi_manager"
     default 5
