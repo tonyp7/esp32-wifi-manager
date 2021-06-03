@@ -49,6 +49,9 @@ http_server_resp_t
 http_server_resp_503(void);
 
 http_server_resp_t
+http_server_resp_504(void);
+
+http_server_resp_t
 http_server_resp_data_in_flash(
     const http_content_type_e     content_type,
     const char *                  p_content_type_param,

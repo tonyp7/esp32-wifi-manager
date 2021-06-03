@@ -266,6 +266,7 @@ typedef enum http_resp_code_e
     HTTP_RESP_CODE_403 = 403,
     HTTP_RESP_CODE_404 = 404,
     HTTP_RESP_CODE_503 = 503,
+    HTTP_RESP_CODE_504 = 504,
 } http_resp_code_e;
 
 typedef enum http_content_type_e

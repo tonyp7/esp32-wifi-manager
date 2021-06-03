@@ -509,6 +509,19 @@ http_server_netconn_resp_503(struct netconn *p_conn)
         "\r\n");
 }
 
+static void
+http_server_netconn_resp_504(struct netconn *p_conn)
+{
+    LOG_WARN("Respond: 504 Gateway timeout");
+    http_server_netconn_printf(
+        p_conn,
+        false,
+        "HTTP/1.1 504 Gateway timeout\r\n"
+        "Server: Ruuvi Gateway\r\n"
+        "Content-Length: 0\r\n"
+        "\r\n");
+}
+
 void
 http_server_start(void)
 {
@@ -930,6 +943,9 @@ http_server_netconn_serve(struct netconn *const p_conn)
             return;
         case HTTP_RESP_CODE_503:
             http_server_netconn_resp_503(p_conn);
+            return;
+        case HTTP_RESP_CODE_504:
+            http_server_netconn_resp_504(p_conn);
             return;
     }
     assert(0);

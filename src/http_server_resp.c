@@ -106,6 +106,12 @@ http_server_resp_503(void)
 }
 
 http_server_resp_t
+http_server_resp_504(void)
+{
+    return http_server_resp_err(HTTP_RESP_CODE_504);
+}
+
+http_server_resp_t
 http_server_resp_data_in_flash(
     const http_content_type_e     content_type,
     const char *                  p_content_type_param,
