@@ -86,7 +86,7 @@ function to process requests, decode URLs, serve files, etc. etc.
 #define HTTP_SERVER_STATUS_JSON_REQUEST_TIMEOUT_MS (20 * 1000)
 #define HTTP_SERVER_STA_AP_TIMEOUT_MS              (60 * 1000)
 
-#define HTTP_HEADER_DATE_EXAMPLE "Date: Thu, 01 Jan 2021 00:00:00 GMT\n"
+#define HTTP_HEADER_DATE_EXAMPLE "Date: Thu, 01 Jan 2021 00:00:00 GMT\r\n"
 
 typedef struct http_header_date_str_t
 {
