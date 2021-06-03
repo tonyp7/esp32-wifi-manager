@@ -116,6 +116,7 @@ static os_signal_static_t g_http_server_signal_mem;
 static os_signal_t *      gp_http_server_sig;
 static os_delta_ticks_t   g_timestamp_last_http_status_request;
 static bool               g_is_ap_sta_ip_assigned;
+static bool               g_http_server_disable_ap_stopping_by_timeout;
 
 static http_header_extra_fields_t g_http_server_extra_header_fields;
 
@@ -126,6 +127,12 @@ http_server_init(void)
     g_http_server_mutex = os_mutex_create_static(&g_http_server_mutex_mem);
     gp_http_server_sig  = os_signal_create_static(&g_http_server_signal_mem);
     os_signal_add(gp_http_server_sig, HTTP_SERVER_SIG_STOP);
+}
+
+void
+http_server_disable_ap_stopping_by_timeout(void)
+{
+    g_http_server_disable_ap_stopping_by_timeout = true;
 }
 
 ATTR_PRINTF(3, 4)
@@ -653,7 +660,8 @@ http_server_check_if_configuring_complete(const os_delta_ticks_t time_for_proces
         if (g_is_ap_sta_ip_assigned)
         {
             const uint32_t timeout_ms = HTTP_SERVER_STATUS_JSON_REQUEST_TIMEOUT_MS;
-            if (http_server_is_status_json_timeout_expired(timeout_ms + time_for_processing_request))
+            if (!g_http_server_disable_ap_stopping_by_timeout
+                && http_server_is_status_json_timeout_expired(timeout_ms + time_for_processing_request))
             {
                 LOG_INFO("There are no HTTP requests for status.json while AP_STA is connected for %u ms", timeout_ms);
                 return true;
@@ -662,7 +670,8 @@ http_server_check_if_configuring_complete(const os_delta_ticks_t time_for_proces
         else
         {
             const uint32_t timeout_ms = HTTP_SERVER_STA_AP_TIMEOUT_MS;
-            if (http_server_is_status_json_timeout_expired(timeout_ms + time_for_processing_request))
+            if (!g_http_server_disable_ap_stopping_by_timeout
+                && http_server_is_status_json_timeout_expired(timeout_ms + time_for_processing_request))
             {
                 LOG_INFO(
                     "There are no HTTP requests for status.json while AP_STA is not connected for %u ms",
@@ -678,7 +687,8 @@ http_server_check_if_configuring_complete(const os_delta_ticks_t time_for_proces
             g_is_network_connected = true;
             http_server_update_last_http_status_request();
         }
-        if (http_server_is_status_json_timeout_expired(
+        if (!g_http_server_disable_ap_stopping_by_timeout
+            && http_server_is_status_json_timeout_expired(
                 HTTP_SERVER_STATUS_JSON_REQUEST_TIMEOUT_MS + time_for_processing_request))
         {
             LOG_INFO(

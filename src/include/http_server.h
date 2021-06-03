@@ -49,6 +49,9 @@ extern "C" {
 void
 http_server_init(void);
 
+void
+http_server_disable_ap_stopping_by_timeout(void);
+
 /**
  * @brief Create the task for the http server.
  */
