@@ -146,6 +146,9 @@ wifi_manager_update_network_connection_info(
     const wifi_ssid_t *const             p_ssid,
     const tcpip_adapter_ip_info_t *const p_ip_info);
 
+void
+wifi_manager_set_extra_info_for_status_json(const char *const p_extra);
+
 #ifdef __cplusplus
 }
 #endif

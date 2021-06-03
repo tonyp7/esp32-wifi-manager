@@ -460,7 +460,7 @@ wifi_manager_update_network_connection_info(
             g_wifi_manager_event_group,
             WIFI_MANAGER_WIFI_CONNECTED_BIT | WIFI_MANAGER_ETH_CONNECTED_BIT);
     }
-    json_network_info_generate(p_ssid, &ip_info_str, update_reason_code);
+    json_network_info_update(p_ssid, &ip_info_str, update_reason_code);
 }
 
 bool
@@ -1276,4 +1276,10 @@ bool
 wifi_manager_is_sta_configured(void)
 {
     return wifi_sta_config_is_ssid_configured();
+}
+
+void
+wifi_manager_set_extra_info_for_status_json(const char *const p_extra)
+{
+    json_network_set_extra_info(p_extra);
 }

@@ -168,13 +168,15 @@ typedef struct wifi_password_t
     (JSON_ACCESS_POINT_ONE_RECORD_SIZE * MAX_AP_NUM + 2 * (MAX_AP_NUM - 1) \
      + 5) /* 5 bytes for json encapsulation of "[\n" and "]\n\0" */
 
+#define JSON_NETWORK_EXTRA_INFO_SIZE (100U)
+
 /**
  * @brief Defines the maximum length in bytes of a JSON representation of the IP information
  * assuming all ips are 4*3 digits, and all characters in the ssid require to be escaped.
  * example:
- * {"ssid":"abcdefghijklmnopqrstuvwxyz012345","ip":"192.168.1.119","netmask":"255.255.255.0","gw":"192.168.1.1","urc":0}
+ * {"ssid":"abcdefghijklmnopqrstuvwxyz012345","ip":"192.168.1.119","netmask":"255.255.255.0","gw":"192.168.1.1","urc":0,"extra":{"fw_updating":1,"percentage":50}}
  */
-#define JSON_IP_INFO_SIZE 150
+#define JSON_IP_INFO_SIZE (150 + JSON_NETWORK_EXTRA_INFO_SIZE)
 
 /**
  * @brief Defines the complete list of all messages that the wifi_manager can process.
@@ -213,10 +215,11 @@ typedef enum message_code_e
  */
 typedef enum update_reason_code_e
 {
-    UPDATE_CONNECTION_OK   = 0,
-    UPDATE_FAILED_ATTEMPT  = 1,
-    UPDATE_USER_DISCONNECT = 2,
-    UPDATE_LOST_CONNECTION = 3
+    UPDATE_CONNECTION_UNDEF = -1,
+    UPDATE_CONNECTION_OK    = 0,
+    UPDATE_FAILED_ATTEMPT   = 1,
+    UPDATE_USER_DISCONNECT  = 2,
+    UPDATE_LOST_CONNECTION  = 3
 } update_reason_code_e;
 
 typedef enum connection_request_made_by_code_e

@@ -25,6 +25,8 @@
 
 static const char TAG[] = "http_server";
 
+static http_server_resp_status_json_t g_resp_status_json;
+
 static void
 http_server_gen_resp_status_json(json_network_info_t *const p_info, void *const p_param)
 {
@@ -37,8 +39,9 @@ http_server_gen_resp_status_json(json_network_info_t *const p_info, void *const 
     }
     else
     {
-        LOG_INFO("status.json: %s", p_info->json_buf);
-        *p_http_resp = http_server_resp_200_json(p_info->json_buf);
+        json_network_info_do_generate(p_info, &g_resp_status_json);
+        LOG_INFO("status.json: %s", g_resp_status_json.buf);
+        *p_http_resp = http_server_resp_200_json(g_resp_status_json.buf);
     }
 }
 
@@ -106,6 +109,7 @@ http_server_handle_req_get(
         else if (0 == strcmp(p_file_name, "status.json"))
         {
             http_server_update_last_http_status_request();
+            json_network_info_generate(&g_resp_status_json);
 
             http_server_resp_t     http_resp     = { 0 };
             const os_delta_ticks_t ticks_to_wait = 10U;

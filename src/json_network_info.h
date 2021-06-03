@@ -45,8 +45,17 @@ extern "C" {
 
 typedef struct json_network_info_t
 {
-    char json_buf[JSON_IP_INFO_SIZE];
+    wifi_ssid_t          ssid;
+    network_info_str_t   network_info;
+    update_reason_code_e update_reason_code;
+    bool                 is_ssid_null;
+    char                 extra_info[JSON_NETWORK_EXTRA_INFO_SIZE];
 } json_network_info_t;
+
+typedef struct http_server_resp_status_json_t
+{
+    char buf[JSON_IP_INFO_SIZE];
+} http_server_resp_status_json_t;
 
 /**
  * @brief Init json_network_info
@@ -86,13 +95,30 @@ json_network_info_do_action(
 
 /**
  * @brief Generates the connection status json: ssid and IP addresses.
- * @note This is not thread-safe and should be called only if wifi_manager_lock_json_buffer call is successful.
  */
 void
-json_network_info_generate(
+json_network_info_generate(http_server_resp_status_json_t *const p_resp_status_json);
+
+/**
+ * @brief Generates the connection status json: ssid and IP addresses.
+ */
+void
+json_network_info_do_generate(json_network_info_t *const p_info, void *const p_param);
+
+/**
+ * @brief Updates the connection status info: ssid and IP addresses.
+ */
+void
+json_network_info_update(
     const wifi_ssid_t *        p_ssid,
     const network_info_str_t * p_network_info,
     const update_reason_code_e update_reason_code);
+
+/**
+ * @brief Set extra info.
+ */
+void
+json_network_set_extra_info(const char *const p_extra);
 
 /**
  * @brief Clears the connection status json.

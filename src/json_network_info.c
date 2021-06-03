@@ -32,6 +32,7 @@ Contains the freeRTOS task and all necessary support
 
 #include "json_network_info.h"
 #include <stddef.h>
+#include <stdio.h>
 #include "json.h"
 #include "wifi_manager_defs.h"
 #include "esp_type_wrapper.h"
@@ -102,8 +103,13 @@ json_network_info_deinit(void)
 static void
 json_network_info_do_clear(json_network_info_t *const p_info, void *const p_param)
 {
-    str_buf_t str_buf = STR_BUF_INIT_WITH_ARR(p_info->json_buf);
-    str_buf_printf(&str_buf, "{}\n");
+    (void)p_param;
+    p_info->is_ssid_null            = true;
+    p_info->ssid.ssid_buf[0]        = '\0';
+    p_info->network_info.ip[0]      = '\0';
+    p_info->network_info.netmask[0] = '\0';
+    p_info->network_info.gw[0]      = '\0';
+    p_info->update_reason_code      = UPDATE_CONNECTION_UNDEF;
 }
 
 void
@@ -112,47 +118,125 @@ json_network_info_clear(void)
     json_network_info_do_action(&json_network_info_do_clear, NULL);
 }
 
-typedef struct json_network_info_generate_t
+void
+json_network_info_do_generate(json_network_info_t *const p_info, void *const p_param)
+{
+    http_server_resp_status_json_t *const p_resp_status_json = p_param;
+    str_buf_t                             str_buf            = STR_BUF_INIT_WITH_ARR(p_resp_status_json->buf);
+    str_buf_printf(&str_buf, "{");
+    if (UPDATE_CONNECTION_UNDEF != p_info->update_reason_code)
+    {
+        str_buf_printf(&str_buf, "\"ssid\":");
+        if (p_info->is_ssid_null)
+        {
+            str_buf_printf(&str_buf, "null");
+        }
+        else
+        {
+            if ('\0' != p_info->ssid.ssid_buf[0])
+            {
+                json_print_escaped_string(&str_buf, p_info->ssid.ssid_buf);
+            }
+            else
+            {
+                str_buf_printf(&str_buf, "\"\"");
+            }
+        }
+        str_buf_printf(
+            &str_buf,
+            ",\"ip\":\"%s\",\"netmask\":\"%s\",\"gw\":\"%s\",\"urc\":%d",
+            p_info->network_info.ip,
+            p_info->network_info.netmask,
+            p_info->network_info.gw,
+            (printf_int_t)p_info->update_reason_code);
+
+        if ('\0' != p_info->extra_info[0])
+        {
+            str_buf_printf(&str_buf, ",");
+        }
+    }
+    if ('\0' != p_info->extra_info[0])
+    {
+        str_buf_printf(&str_buf, "\"extra\":{%s}", p_info->extra_info);
+    }
+    str_buf_printf(&str_buf, "}\n");
+}
+
+void
+json_network_info_generate(http_server_resp_status_json_t *const p_resp_status_json)
+{
+    json_network_info_do_action(&json_network_info_do_generate, p_resp_status_json);
+}
+
+typedef struct json_network_info_update_t
 {
     const wifi_ssid_t *const        p_ssid;
     const network_info_str_t *const p_network_info;
     const update_reason_code_e      update_reason_code;
-} json_network_info_generate_t;
+} json_network_info_update_t;
 
 static void
-json_network_info_do_generate(json_network_info_t *const p_info, void *const p_param)
+json_network_info_do_update(json_network_info_t *const p_info, void *const p_param)
 {
-    json_network_info_generate_t *p_gen_info = p_param;
-    str_buf_t                     str_buf    = STR_BUF_INIT_WITH_ARR(p_info->json_buf);
-    str_buf_printf(&str_buf, "{\"ssid\":");
-    if (NULL != p_gen_info->p_ssid)
+    json_network_info_update_t *p_update_info = p_param;
+    if (NULL == p_update_info->p_ssid)
     {
-        json_print_escaped_string(&str_buf, p_gen_info->p_ssid->ssid_buf);
+        p_info->ssid.ssid_buf[0] = '\0';
+        p_info->is_ssid_null     = true;
     }
     else
     {
-        str_buf_printf(&str_buf, "null");
+        p_info->ssid         = *p_update_info->p_ssid;
+        p_info->is_ssid_null = false;
     }
-
-    str_buf_printf(
-        &str_buf,
-        ",\"ip\":\"%s\",\"netmask\":\"%s\",\"gw\":\"%s\",\"urc\":%d}\n",
-        p_gen_info->p_network_info->ip,
-        p_gen_info->p_network_info->netmask,
-        p_gen_info->p_network_info->gw,
-        (printf_int_t)p_gen_info->update_reason_code);
+    if (NULL == p_update_info->p_network_info)
+    {
+        p_info->network_info.ip[0]      = '\0';
+        p_info->network_info.netmask[0] = '\0';
+        p_info->network_info.gw[0]      = '\0';
+    }
+    else
+    {
+        p_info->network_info = *p_update_info->p_network_info;
+    }
+    p_info->update_reason_code = p_update_info->update_reason_code;
 }
 
 void
-json_network_info_generate(
+json_network_info_update(
     const wifi_ssid_t *const        p_ssid,
     const network_info_str_t *const p_network_info,
     const update_reason_code_e      update_reason_code)
 {
-    json_network_info_generate_t gen_info = {
+    json_network_info_update_t update_info = {
         .p_ssid             = p_ssid,
         .p_network_info     = p_network_info,
         .update_reason_code = update_reason_code,
     };
-    json_network_info_do_action(&json_network_info_do_generate, &gen_info);
+    json_network_info_do_action(&json_network_info_do_update, &update_info);
+}
+
+typedef struct json_network_info_set_extra_t
+{
+    const char *const p_extra;
+} json_network_info_set_extra_t;
+
+static void
+json_network_info_do_set_extra_info(json_network_info_t *const p_info, void *const p_param)
+{
+    json_network_info_set_extra_t *p_extra_info = p_param;
+    snprintf(
+        p_info->extra_info,
+        sizeof(p_info->extra_info),
+        "%s",
+        (NULL != p_extra_info->p_extra) ? p_extra_info->p_extra : "");
+}
+
+void
+json_network_set_extra_info(const char *const p_extra)
+{
+    json_network_info_set_extra_t extra_info = {
+        .p_extra = p_extra,
+    };
+    json_network_info_do_action(&json_network_info_do_set_extra_info, &extra_info);
 }
