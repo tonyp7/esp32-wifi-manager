@@ -74,7 +74,7 @@ function to process requests, decode URLs, serve files, etc. etc.
 #include "http_server_handle_req_get_auth.h"
 #include "http_server_handle_req.h"
 
-#define LOG_LOCAL_LEVEL LOG_LEVEL_DEBUG
+#define LOG_LOCAL_LEVEL LOG_LEVEL_INFO
 #include "log.h"
 
 #define HTTP_SERVER_SIG_STOP (OS_SIGNAL_NUM_0)
