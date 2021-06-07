@@ -78,14 +78,7 @@ static wifi_ap_record_t g_wifi_accessp_records[MAX_AP_NUM];
 
 static wifi_manager_cb_ptr g_wifi_cb_ptr_arr[MESSAGE_CODE_COUNT];
 
-static wifi_manager_http_callback_t                   g_wifi_cb_on_http_get;
-static wifi_manager_http_cb_on_post_t                 g_wifi_cb_on_http_post;
-static wifi_manager_http_callback_t                   g_wifi_cb_on_http_delete;
-static wifi_manager_callback_on_cmd_connect_eth_t     g_wifi_cb_on_connect_eth_cmd;
-static wifi_manager_callback_on_cmd_disconnect_eth_t  g_wifi_cb_on_disconnect_eth_cmd;
-static wifi_manager_callback_on_cmd_disconnect_sta_t  g_wifi_cb_on_disconnect_sta_cmd;
-static wifi_manager_callback_on_ap_sta_connected_t    g_wifi_cb_on_ap_sta_connected;
-static wifi_manager_callback_on_ap_sta_disconnected_t g_wifi_cb_on_ap_sta_disconnected;
+static wifi_manager_callbacks_t g_wifi_callbacks;
 
 static EventGroupHandle_t g_wifi_manager_event_group;
 static StaticEventGroup_t g_wifi_manager_event_group_mem;
@@ -171,7 +164,7 @@ wifi_manager_init_start_wifi(const WiFiAntConfig_t *p_wifi_ant_config, const wif
 
     json_access_points_init();
 
-    for (message_code_e i = 0; i < MESSAGE_CODE_COUNT; ++i)
+    for (uint32_t i = 0; i < MESSAGE_CODE_COUNT; ++i)
     {
         g_wifi_cb_ptr_arr[i] = NULL;
     }
@@ -261,17 +254,10 @@ wifi_manager_init_start_wifi(const WiFiAntConfig_t *p_wifi_ant_config, const wif
 
 static bool
 wifi_manager_init(
-    const bool                                     flag_start_wifi,
-    const wifi_ssid_t *const                       p_gw_wifi_ssid,
-    const WiFiAntConfig_t *                        p_wifi_ant_config,
-    wifi_manager_http_callback_t                   cb_on_http_get,
-    wifi_manager_http_cb_on_post_t                 cb_on_http_post,
-    wifi_manager_http_callback_t                   cb_on_http_delete,
-    wifi_manager_callback_on_cmd_connect_eth_t     cb_on_connect_eth_cmd,
-    wifi_manager_callback_on_cmd_disconnect_eth_t  cb_on_disconnect_eth_cmd,
-    wifi_manager_callback_on_cmd_disconnect_sta_t  cb_on_disconnect_sta_cmd,
-    wifi_manager_callback_on_ap_sta_connected_t    cb_on_ap_sta_connected,
-    wifi_manager_callback_on_ap_sta_disconnected_t cb_on_ap_sta_disconnected)
+    const bool                            flag_start_wifi,
+    const wifi_ssid_t *const              p_gw_wifi_ssid,
+    const WiFiAntConfig_t *               p_wifi_ant_config,
+    const wifi_manager_callbacks_t *const p_callbacks)
 {
     LOG_INFO("WiFi manager init");
     if (wifi_manager_is_working())
@@ -281,14 +267,7 @@ wifi_manager_init(
     }
     xEventGroupSetBits(g_wifi_manager_event_group, WIFI_MANAGER_IS_WORKING);
 
-    g_wifi_cb_on_http_get            = cb_on_http_get;
-    g_wifi_cb_on_http_post           = cb_on_http_post;
-    g_wifi_cb_on_http_delete         = cb_on_http_delete;
-    g_wifi_cb_on_connect_eth_cmd     = cb_on_connect_eth_cmd;
-    g_wifi_cb_on_disconnect_eth_cmd  = cb_on_disconnect_eth_cmd;
-    g_wifi_cb_on_disconnect_sta_cmd  = cb_on_disconnect_sta_cmd;
-    g_wifi_cb_on_ap_sta_connected    = cb_on_ap_sta_connected;
-    g_wifi_cb_on_ap_sta_disconnected = cb_on_ap_sta_disconnected;
+    g_wifi_callbacks = *p_callbacks;
 
     wifi_sta_config_init(p_gw_wifi_ssid);
     json_network_info_init();
@@ -332,17 +311,10 @@ wifi_manager_init(
 
 bool
 wifi_manager_start(
-    const bool                                     flag_start_wifi,
-    const wifi_ssid_t *const                       p_gw_wifi_ssid,
-    const WiFiAntConfig_t *                        p_wifi_ant_config,
-    wifi_manager_http_callback_t                   cb_on_http_get,
-    wifi_manager_http_cb_on_post_t                 cb_on_http_post,
-    wifi_manager_http_callback_t                   cb_on_http_delete,
-    wifi_manager_callback_on_cmd_connect_eth_t     cb_on_connect_eth_cmd,
-    wifi_manager_callback_on_cmd_disconnect_eth_t  cb_on_disconnect_eth_cmd,
-    wifi_manager_callback_on_cmd_disconnect_sta_t  cb_on_disconnect_sta_cmd,
-    wifi_manager_callback_on_ap_sta_connected_t    cb_on_ap_sta_connected,
-    wifi_manager_callback_on_ap_sta_disconnected_t cb_on_ap_sta_disconnected)
+    const bool                            flag_start_wifi,
+    const wifi_ssid_t *const              p_gw_wifi_ssid,
+    const WiFiAntConfig_t *               p_wifi_ant_config,
+    const wifi_manager_callbacks_t *const p_callbacks)
 {
     if (NULL == gh_wifi_mutex)
     {
@@ -360,18 +332,7 @@ wifi_manager_start(
         g_wifi_manager_event_group = xEventGroupCreateStatic(&g_wifi_manager_event_group_mem);
     }
 
-    const bool res = wifi_manager_init(
-        flag_start_wifi,
-        p_gw_wifi_ssid,
-        p_wifi_ant_config,
-        cb_on_http_get,
-        cb_on_http_post,
-        cb_on_http_delete,
-        cb_on_connect_eth_cmd,
-        cb_on_disconnect_eth_cmd,
-        cb_on_disconnect_sta_cmd,
-        cb_on_ap_sta_connected,
-        cb_on_ap_sta_disconnected);
+    const bool res = wifi_manager_init(flag_start_wifi, p_gw_wifi_ssid, p_wifi_ant_config, p_callbacks);
     if (!res)
     {
         xEventGroupClearBits(g_wifi_manager_event_group, WIFI_MANAGER_IS_WORKING);
@@ -384,31 +345,31 @@ wifi_manager_start(
 http_server_resp_t
 wifi_manager_cb_on_http_get(const char *p_path, const http_server_resp_t *const p_resp_auth)
 {
-    if (NULL == g_wifi_cb_on_http_get)
+    if (NULL == g_wifi_callbacks.cb_on_http_get)
     {
         return http_server_resp_404();
     }
-    return g_wifi_cb_on_http_get(p_path, p_resp_auth);
+    return g_wifi_callbacks.cb_on_http_get(p_path, p_resp_auth);
 }
 
 http_server_resp_t
 wifi_manager_cb_on_http_post(const char *p_path, const http_req_body_t http_body)
 {
-    if (NULL == g_wifi_cb_on_http_post)
+    if (NULL == g_wifi_callbacks.cb_on_http_post)
     {
         return http_server_resp_404();
     }
-    return g_wifi_cb_on_http_post(p_path, http_body.ptr);
+    return g_wifi_callbacks.cb_on_http_post(p_path, http_body.ptr);
 }
 
 http_server_resp_t
 wifi_manager_cb_on_http_delete(const char *p_path, const http_server_resp_t *const p_resp_auth)
 {
-    if (NULL == g_wifi_cb_on_http_delete)
+    if (NULL == g_wifi_callbacks.cb_on_http_delete)
     {
         return http_server_resp_404();
     }
-    return g_wifi_cb_on_http_delete(p_path, p_resp_auth);
+    return g_wifi_callbacks.cb_on_http_delete(p_path, p_resp_auth);
 }
 
 bool
@@ -635,7 +596,7 @@ wifi_handle_cmd_start_wifi_scan(void)
     /* if a scan is already in progress this message is simply ignored thanks to the
      * WIFI_MANAGER_SCAN_BIT uxBit */
     const EventBits_t uxBits = xEventGroupGetBits(g_wifi_manager_event_group);
-    if (0 == (uxBits & (uint32_t)WIFI_MANAGER_SCAN_BIT))
+    if (0 == (uxBits & WIFI_MANAGER_SCAN_BIT))
     {
         xEventGroupSetBits(g_wifi_manager_event_group, WIFI_MANAGER_SCAN_BIT);
         /* wifi scanner config */
@@ -669,9 +630,9 @@ static void
 wifi_handle_cmd_connect_eth(void)
 {
     LOG_INFO("MESSAGE: ORDER_CONNECT_ETH");
-    if (NULL != g_wifi_cb_on_connect_eth_cmd)
+    if (NULL != g_wifi_callbacks.cb_on_connect_eth_cmd)
     {
-        g_wifi_cb_on_connect_eth_cmd();
+        g_wifi_callbacks.cb_on_connect_eth_cmd();
     }
 }
 
@@ -699,7 +660,7 @@ wifi_handle_cmd_connect_sta(const wifiman_msg_param_t *p_param)
     }
 
     const EventBits_t uxBits = xEventGroupGetBits(g_wifi_manager_event_group);
-    if (0 != (uxBits & (uint32_t)WIFI_MANAGER_WIFI_CONNECTED_BIT))
+    if (0 != (uxBits & WIFI_MANAGER_WIFI_CONNECTED_BIT))
     {
         wifiman_msg_send_cmd_disconnect_sta();
         /* todo: reconnect */
@@ -796,7 +757,7 @@ wifi_handle_ev_sta_disconnected(const wifiman_msg_param_t *p_param)
     const EventBits_t event_bits           = xEventGroupClearBits(g_wifi_manager_event_group, WIFI_MANAGER_SCAN_BIT);
 
     update_reason_code_e update_reason_code = UPDATE_LOST_CONNECTION;
-    if (0 != (event_bits & (uint32_t)WIFI_MANAGER_REQUEST_STA_CONNECT_BIT))
+    if (0 != (event_bits & WIFI_MANAGER_REQUEST_STA_CONNECT_BIT))
     {
         LOG_INFO("event_bits & WIFI_MANAGER_REQUEST_STA_CONNECT_BIT");
         /* there are no retries when it's a user requested connection by design. This avoids a user
@@ -806,7 +767,7 @@ wifi_handle_ev_sta_disconnected(const wifiman_msg_param_t *p_param)
 
         update_reason_code = UPDATE_FAILED_ATTEMPT;
     }
-    else if (0 != (event_bits & (uint32_t)WIFI_MANAGER_REQUEST_DISCONNECT_BIT))
+    else if (0 != (event_bits & WIFI_MANAGER_REQUEST_DISCONNECT_BIT))
     {
         LOG_INFO("User manually requested a disconnect so the lost connection is a normal event");
         xEventGroupClearBits(g_wifi_manager_event_group, WIFI_MANAGER_REQUEST_DISCONNECT_BIT);
@@ -860,7 +821,7 @@ wifi_handle_ev_sta_got_ip(const wifiman_msg_param_t *p_param)
         WIFI_MANAGER_REQUEST_STA_CONNECT_BIT | WIFI_MANAGER_REQUEST_RESTORE_STA_BIT);
 
     /* save wifi config in NVS if it wasn't a restored of a connection */
-    if (0 == (event_bits & (uint32_t)WIFI_MANAGER_REQUEST_RESTORE_STA_BIT))
+    if (0 == (event_bits & WIFI_MANAGER_REQUEST_RESTORE_STA_BIT))
     {
         wifi_sta_config_save();
     }
@@ -890,9 +851,9 @@ wifi_handle_ev_ap_sta_connected(void)
     xEventGroupClearBits(g_wifi_manager_event_group, WIFI_MANAGER_AP_STA_IP_ASSIGNED_BIT);
     xEventGroupSetBits(g_wifi_manager_event_group, WIFI_MANAGER_AP_STA_CONNECTED_BIT);
     http_server_on_ap_sta_connected();
-    if (NULL != g_wifi_cb_on_ap_sta_connected)
+    if (NULL != g_wifi_callbacks.cb_on_ap_sta_connected)
     {
-        g_wifi_cb_on_ap_sta_connected();
+        g_wifi_callbacks.cb_on_ap_sta_connected();
     }
     if (!wifi_manager_is_connected_to_wifi())
     {
@@ -908,9 +869,9 @@ wifi_handle_ev_ap_sta_disconnected(void)
         g_wifi_manager_event_group,
         WIFI_MANAGER_AP_STA_CONNECTED_BIT | WIFI_MANAGER_AP_STA_IP_ASSIGNED_BIT);
     http_server_on_ap_sta_disconnected();
-    if (NULL != g_wifi_cb_on_ap_sta_disconnected)
+    if (NULL != g_wifi_callbacks.cb_on_ap_sta_disconnected)
     {
-        g_wifi_cb_on_ap_sta_disconnected();
+        g_wifi_callbacks.cb_on_ap_sta_disconnected();
     }
     dns_server_stop();
 }
@@ -927,9 +888,9 @@ static void
 wifi_handle_cmd_disconnect_eth(void)
 {
     LOG_INFO("MESSAGE: ORDER_DISCONNECT_ETH");
-    if (NULL != g_wifi_cb_on_disconnect_eth_cmd)
+    if (NULL != g_wifi_callbacks.cb_on_disconnect_eth_cmd)
     {
-        g_wifi_cb_on_disconnect_eth_cmd();
+        g_wifi_callbacks.cb_on_disconnect_eth_cmd();
     }
 }
 
@@ -946,9 +907,9 @@ wifi_handle_cmd_disconnect_sta(void)
     {
         LOG_ERR_ESP(err, "%s failed", "esp_wifi_disconnect");
     }
-    if (NULL != g_wifi_cb_on_disconnect_sta_cmd)
+    if (NULL != g_wifi_callbacks.cb_on_disconnect_sta_cmd)
     {
-        g_wifi_cb_on_disconnect_sta_cmd();
+        g_wifi_callbacks.cb_on_disconnect_sta_cmd();
     }
 }
 

@@ -47,19 +47,16 @@ http_server_gen_resp_status_json(json_network_info_t *const p_info, void *const 
 
 static http_server_resp_t
 http_server_handle_req_get(
-    const char *                         p_file_name,
+    const char *const                    p_file_name_unchecked,
     const bool                           flag_access_from_lan,
     const http_req_header_t              http_header,
     const sta_ip_string_t *const         p_remote_ip,
     const http_server_auth_info_t *const p_auth_info,
     http_header_extra_fields_t *const    p_extra_header_fields)
 {
-    LOG_INFO("GET /%s", p_file_name);
+    LOG_INFO("GET /%s", p_file_name_unchecked);
 
-    if (0 == strcmp(p_file_name, ""))
-    {
-        p_file_name = "index.html";
-    }
+    const char *const p_file_name = (0 == strcmp(p_file_name_unchecked, "")) ? "index.html" : p_file_name_unchecked;
 
     const char *const p_file_ext = strrchr(p_file_name, '.');
 
@@ -117,12 +114,9 @@ http_server_handle_req_get(
             return http_resp;
         }
     }
-    if (NULL == p_file_ext)
+    if ((NULL == p_file_ext) && (HTTP_RESP_CODE_200 != resp_auth.http_resp_code))
     {
-        if (HTTP_RESP_CODE_200 != resp_auth.http_resp_code)
-        {
-            return http_server_resp_302();
-        }
+        return http_server_resp_302();
     }
 
     if (0 == strcmp(p_file_name, "auth.html"))
@@ -142,7 +136,6 @@ http_server_handle_req_delete(
     const http_req_header_t              http_header,
     const sta_ip_string_t *const         p_remote_ip,
     const http_server_auth_info_t *const p_auth_info,
-    const http_req_body_t                http_body,
     http_header_extra_fields_t *const    p_extra_header_fields)
 {
     LOG_INFO("DELETE /%s", p_file_name);
@@ -293,7 +286,6 @@ http_server_handle_req(
             p_req_info->http_header,
             p_remote_ip,
             p_auth_info,
-            p_req_info->http_body,
             p_extra_header_fields);
     }
     else if (0 == strcmp("POST", p_req_info->http_cmd.ptr))

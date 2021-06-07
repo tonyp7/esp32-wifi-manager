@@ -25,7 +25,7 @@ typedef struct wifiman_sha256_digest_t
 
 typedef struct wifiman_sha256_digest_hex_str_t
 {
-    char buf[2 * SHA256_DIGEST_SIZE + 1];
+    char buf[(2 * SHA256_DIGEST_SIZE) + 1];
 } wifiman_sha256_digest_hex_str_t;
 
 bool

@@ -57,6 +57,8 @@ typedef struct http_server_resp_status_json_t
     char buf[JSON_IP_INFO_SIZE];
 } http_server_resp_status_json_t;
 
+typedef void (*json_network_info_do_action_callback_t)(json_network_info_t *const p_info, void *const p_param);
+
 /**
  * @brief Init json_network_info
  */
@@ -79,9 +81,9 @@ json_network_info_deinit(void);
  */
 void
 json_network_info_do_action_with_timeout(
-    void (*cb_func)(json_network_info_t *const p_info, void *const p_param),
-    void *const            p_param,
-    const os_delta_ticks_t ticks_to_wait);
+    json_network_info_do_action_callback_t cb_func,
+    void *const                            p_param,
+    const os_delta_ticks_t                 ticks_to_wait);
 
 /**
  * @brief Lock access to json_network_info and perform specified action.
@@ -89,9 +91,7 @@ json_network_info_do_action_with_timeout(
  * @param p_param - pointer to be passed to the callback-function
  */
 void
-json_network_info_do_action(
-    void (*cb_func)(json_network_info_t *const p_info, void *const p_param),
-    void *const p_param);
+json_network_info_do_action(json_network_info_do_action_callback_t cb_func, void *const p_param);
 
 /**
  * @brief Generates the connection status json: ssid and IP addresses.

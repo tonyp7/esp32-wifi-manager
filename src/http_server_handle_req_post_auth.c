@@ -12,8 +12,15 @@
 #include "http_server_auth.h"
 #include "cJSON.h"
 
+#define MBEDTLS_SHA256_USE_224 1
+#define MBEDTLS_SHA256_USE_256 0
+
 static bool
-http_server_json_get_string_val(const cJSON *p_json_root, const char *p_attr_name, char *buf, const size_t buf_len)
+http_server_json_get_string_val(
+    const cJSON *const p_json_root,
+    const char *const  p_attr_name,
+    char *const        buf,
+    const size_t       buf_len)
 {
     if ((NULL == buf) || (0 == buf_len))
     {
@@ -35,7 +42,7 @@ http_server_json_get_string_val(const cJSON *p_json_root, const char *p_attr_nam
 }
 
 static bool
-json_ruuvi_auth_parse(cJSON *p_json_root, http_server_auth_ruuvi_req_t *p_auth_req)
+json_ruuvi_auth_parse(const cJSON *const p_json_root, http_server_auth_ruuvi_req_t *const p_auth_req)
 {
     if (!http_server_json_get_string_val(p_json_root, "login", p_auth_req->username, sizeof(p_auth_req->username)))
     {
@@ -49,7 +56,7 @@ json_ruuvi_auth_parse(cJSON *p_json_root, http_server_auth_ruuvi_req_t *p_auth_r
 }
 
 static bool
-json_ruuvi_auth_parse_http_body(const char *p_body, http_server_auth_ruuvi_req_t *p_auth_req)
+json_ruuvi_auth_parse_http_body(const char *const p_body, http_server_auth_ruuvi_req_t *const p_auth_req)
 {
     cJSON *p_json_root = cJSON_Parse(p_body);
     if (NULL == p_json_root)
@@ -69,8 +76,7 @@ http_server_auth_ruuvi_gen_hashed_password(
 {
     mbedtls_sha256_context ctx = { 0 };
     mbedtls_sha256_init(&ctx);
-    const int flag_is_224 = 0;
-    if (0 != mbedtls_sha256_starts_ret(&ctx, flag_is_224))
+    if (0 != mbedtls_sha256_starts_ret(&ctx, MBEDTLS_SHA256_USE_256))
     {
         mbedtls_sha256_free(&ctx);
         return false;

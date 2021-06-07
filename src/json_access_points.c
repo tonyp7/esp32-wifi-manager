@@ -81,7 +81,7 @@ json_access_points_generate(const wifi_ap_record_t *p_access_points, const uint3
             ap.primary,
             ap.rssi,
             ap.authmode,
-            ((i) < (num_ap_checked - 1)) ? "," : "");
+            (i < (num_ap_checked - 1)) ? "," : "");
     }
     str_buf_printf(&str_buf, "]\n");
 }

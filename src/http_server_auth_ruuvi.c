@@ -7,6 +7,7 @@
 
 #include "http_server_auth_ruuvi.h"
 #include <string.h>
+#include <stdio.h>
 #include "http_server_auth.h"
 #include "http_req.h"
 
@@ -31,14 +32,14 @@ http_server_auth_ruuvi_get_ruuvi_session_from_cookies(
     {
         p_end_of_cookie = p_ruuvi_session + len_from_ruuvi_session_till_eol;
     }
-    const size_t      len_ruuvi_session_cookie = p_end_of_cookie - p_ruuvi_session;
+    const size_t      len_ruuvi_session_cookie = (size_t)(ptrdiff_t)(p_end_of_cookie - p_ruuvi_session);
     const char *const p_delimiter              = http_server_strnstr(p_ruuvi_session, "=", len_ruuvi_session_cookie);
     if ((NULL == p_delimiter) || (p_delimiter > p_end_of_cookie))
     {
         return false;
     }
     const char *const p_cookie_value = p_delimiter + 1;
-    const size_t      cookie_len     = p_end_of_cookie - p_cookie_value;
+    const size_t      cookie_len     = (size_t)(ptrdiff_t)(p_end_of_cookie - p_cookie_value);
     if (0 == cookie_len)
     {
         return false;
@@ -47,8 +48,7 @@ http_server_auth_ruuvi_get_ruuvi_session_from_cookies(
     {
         return false;
     }
-    strncpy(p_session_id->buf, p_cookie_value, cookie_len);
-    p_session_id->buf[cookie_len] = '\0';
+    snprintf(p_session_id->buf, sizeof(p_session_id->buf), "%s", p_cookie_value);
     return true;
 }
 

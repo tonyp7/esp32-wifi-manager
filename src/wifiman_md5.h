@@ -25,7 +25,7 @@ typedef struct wifiman_md5_digest_t
 
 typedef struct wifiman_md5_digest_hex_str_t
 {
-    char buf[2 * WIFIMAN_MD5_DIGEST_SIZE + 1];
+    char buf[(2 * WIFIMAN_MD5_DIGEST_SIZE) + 1];
 } wifiman_md5_digest_hex_str_t;
 
 bool

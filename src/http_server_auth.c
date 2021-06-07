@@ -77,6 +77,11 @@ http_server_set_auth(const char *const p_auth_type, const char *const p_auth_use
     {
         auth_type = HTTP_SERVER_AUTH_TYPE_RUUVI;
     }
+    else
+    {
+        // MISRA C:2012, 15.7 - All if...else if constructs shall be terminated with an else statement
+        auth_type = HTTP_SERVER_AUTH_TYPE_DENY;
+    }
 
     if ((NULL != p_auth_user) && (strlen(p_auth_user) >= sizeof(g_auth_info.auth_user)))
     {

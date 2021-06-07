@@ -137,7 +137,7 @@ http_server_handle_req_get_auth_ruuvi(
     {
         return http_server_resp_401_auth_ruuvi(p_remote_ip, p_ap_ssid, p_extra_header_fields);
     }
-    http_server_auth_ruuvi_authorized_session_t *const p_authorized_session
+    const http_server_auth_ruuvi_authorized_session_t *const p_authorized_session
         = http_server_auth_ruuvi_find_authorized_session(&session_id, p_remote_ip);
 
     if (NULL == p_authorized_session)

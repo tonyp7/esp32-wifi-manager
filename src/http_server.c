@@ -636,66 +636,88 @@ http_server_on_ap_sta_ip_assigned(void)
 }
 
 static bool
+http_server_check_if_configuring_complete_wifi(
+    bool *const            p_is_network_connected,
+    bool *const            p_is_ap_sta_ip_assigned,
+    const os_delta_ticks_t time_for_processing_request)
+{
+    if (!*p_is_network_connected)
+    {
+        *p_is_network_connected = true;
+        http_server_update_last_http_status_request();
+    }
+    if ((!*p_is_ap_sta_ip_assigned) && wifi_manager_is_ap_sta_ip_assigned())
+    {
+        *p_is_ap_sta_ip_assigned = true;
+        http_server_update_last_http_status_request();
+    }
+    else if ((*p_is_ap_sta_ip_assigned) && (!wifi_manager_is_ap_sta_ip_assigned()))
+    {
+        *p_is_ap_sta_ip_assigned = false;
+        http_server_update_last_http_status_request();
+    }
+    else
+    {
+        // MISRA C:2012, 15.7 - All if...else if constructs shall be terminated with an else statement
+    }
+    if (*p_is_ap_sta_ip_assigned)
+    {
+        const uint32_t timeout_ms = HTTP_SERVER_STATUS_JSON_REQUEST_TIMEOUT_MS;
+        if ((!g_http_server_disable_ap_stopping_by_timeout)
+            && http_server_is_status_json_timeout_expired(timeout_ms + time_for_processing_request))
+        {
+            LOG_INFO("There are no HTTP requests for status.json while AP_STA is connected for %u ms", timeout_ms);
+            return true;
+        }
+    }
+    else
+    {
+        const uint32_t timeout_ms = HTTP_SERVER_STA_AP_TIMEOUT_MS;
+        if ((!g_http_server_disable_ap_stopping_by_timeout)
+            && http_server_is_status_json_timeout_expired(timeout_ms + time_for_processing_request))
+        {
+            LOG_INFO("There are no HTTP requests for status.json while AP_STA is not connected for %u ms", timeout_ms);
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool
+http_server_check_if_configuring_complete_ethernet(
+    bool *const            p_is_network_connected,
+    const os_delta_ticks_t time_for_processing_request)
+{
+    if (!*p_is_network_connected)
+    {
+        *p_is_network_connected = true;
+        http_server_update_last_http_status_request();
+    }
+    if ((!g_http_server_disable_ap_stopping_by_timeout)
+        && http_server_is_status_json_timeout_expired(
+            HTTP_SERVER_STATUS_JSON_REQUEST_TIMEOUT_MS + time_for_processing_request))
+    {
+        LOG_INFO("There are no HTTP requests for status.json for %u ms", HTTP_SERVER_STATUS_JSON_REQUEST_TIMEOUT_MS);
+        return true;
+    }
+    return false;
+}
+
+static bool
 http_server_check_if_configuring_complete(const os_delta_ticks_t time_for_processing_request)
 {
     static bool g_is_network_connected = false;
 
     if (wifi_manager_is_ap_active() && wifi_manager_is_connected_to_wifi())
     {
-        if (!g_is_network_connected)
-        {
-            g_is_network_connected = true;
-            http_server_update_last_http_status_request();
-        }
-        if (!g_is_ap_sta_ip_assigned && wifi_manager_is_ap_sta_ip_assigned())
-        {
-            g_is_ap_sta_ip_assigned = true;
-            http_server_update_last_http_status_request();
-        }
-        else if (g_is_ap_sta_ip_assigned && !wifi_manager_is_ap_sta_ip_assigned())
-        {
-            g_is_ap_sta_ip_assigned = false;
-            http_server_update_last_http_status_request();
-        }
-        if (g_is_ap_sta_ip_assigned)
-        {
-            const uint32_t timeout_ms = HTTP_SERVER_STATUS_JSON_REQUEST_TIMEOUT_MS;
-            if (!g_http_server_disable_ap_stopping_by_timeout
-                && http_server_is_status_json_timeout_expired(timeout_ms + time_for_processing_request))
-            {
-                LOG_INFO("There are no HTTP requests for status.json while AP_STA is connected for %u ms", timeout_ms);
-                return true;
-            }
-        }
-        else
-        {
-            const uint32_t timeout_ms = HTTP_SERVER_STA_AP_TIMEOUT_MS;
-            if (!g_http_server_disable_ap_stopping_by_timeout
-                && http_server_is_status_json_timeout_expired(timeout_ms + time_for_processing_request))
-            {
-                LOG_INFO(
-                    "There are no HTTP requests for status.json while AP_STA is not connected for %u ms",
-                    timeout_ms);
-                return true;
-            }
-        }
+        return http_server_check_if_configuring_complete_wifi(
+            &g_is_network_connected,
+            &g_is_ap_sta_ip_assigned,
+            time_for_processing_request);
     }
     else if (wifi_manager_is_connected_to_ethernet())
     {
-        if (!g_is_network_connected)
-        {
-            g_is_network_connected = true;
-            http_server_update_last_http_status_request();
-        }
-        if (!g_http_server_disable_ap_stopping_by_timeout
-            && http_server_is_status_json_timeout_expired(
-                HTTP_SERVER_STATUS_JSON_REQUEST_TIMEOUT_MS + time_for_processing_request))
-        {
-            LOG_INFO(
-                "There are no HTTP requests for status.json for %u ms",
-                HTTP_SERVER_STATUS_JSON_REQUEST_TIMEOUT_MS);
-            return true;
-        }
+        http_server_check_if_configuring_complete_ethernet(&g_is_network_connected, time_for_processing_request);
     }
     else
     {
@@ -754,13 +776,11 @@ http_server_task(void)
         {
             LOG_ERR("netconn_accept: %d", err);
         }
-        if (wifi_manager_is_ap_active() && http_server_check_if_configuring_complete(time_for_processing_request))
+        if (wifi_manager_is_ap_active() && http_server_check_if_configuring_complete(time_for_processing_request)
+            && wifi_manager_is_connected_to_wifi_or_ethernet())
         {
-            if (wifi_manager_is_connected_to_wifi_or_ethernet())
-            {
-                LOG_INFO("Stop WiFi AP");
-                wifi_manager_stop_ap();
-            }
+            LOG_INFO("Stop WiFi AP");
+            wifi_manager_stop_ap();
         }
         taskYIELD(); /* allows the freeRTOS scheduler to take over if needed. */
     }
@@ -925,7 +945,7 @@ http_server_netconn_serve(struct netconn *const p_conn)
         http_server_get_auth(),
         &g_http_server_extra_header_fields,
         flag_access_from_lan);
-    if (HTTP_CONENT_TYPE_APPLICATION_JSON == resp.content_type
+    if ((HTTP_CONENT_TYPE_APPLICATION_JSON == resp.content_type)
         && ((HTTP_CONTENT_LOCATION_STATIC_MEM == resp.content_location)
             || (HTTP_CONTENT_LOCATION_HEAP == resp.content_location)))
     {

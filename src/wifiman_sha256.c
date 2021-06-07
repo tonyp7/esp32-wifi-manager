@@ -9,6 +9,9 @@
 #include "mbedtls/sha256.h"
 #include "str_buf.h"
 
+#define MBEDTLS_SHA256_USE_224 1
+#define MBEDTLS_SHA256_USE_256 0
+
 wifiman_sha256_digest_hex_str_t
 wifiman_sha256_hex_str(const wifiman_sha256_digest_t *const p_digest)
 {
@@ -23,8 +26,7 @@ wifiman_sha256_calc(const void *const p_buf, const size_t buf_size, wifiman_sha2
 {
     mbedtls_sha256_context ctx = { 0 };
     mbedtls_sha256_init(&ctx);
-    const int flag_is_224 = 0;
-    if (0 != mbedtls_sha256_starts_ret(&ctx, flag_is_224))
+    if (0 != mbedtls_sha256_starts_ret(&ctx, MBEDTLS_SHA256_USE_256))
     {
         mbedtls_sha256_free(&ctx);
         return false;
@@ -50,7 +52,7 @@ wifiman_sha256_calc_hex_str(const void *const p_buf, const size_t buf_size)
     if (!wifiman_sha256_calc(p_buf, buf_size, &digest))
     {
         // return empty string
-        const wifiman_sha256_digest_hex_str_t digest_hex_str = { { '\0' } };
+        const wifiman_sha256_digest_hex_str_t digest_hex_str = { 0 };
         return digest_hex_str;
     }
     return wifiman_sha256_hex_str(&digest);

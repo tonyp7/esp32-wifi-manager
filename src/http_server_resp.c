@@ -251,7 +251,7 @@ http_server_fill_buf_with_random_u8(uint8_t *const p_buf, const size_t buf_size)
 {
     for (uint32_t i = 0; i < buf_size; ++i)
     {
-        p_buf[i] = esp_random();
+        p_buf[i] = (uint8_t)esp_random();
     }
 }
 
@@ -268,7 +268,7 @@ http_server_login_session_init(
     p_login_session->challenge = wifiman_sha256_hex_str(&challenge_sha256);
     p_login_session->remote_ip = *p_remote_ip;
 
-    for (uint32_t i = 0; i < HTTP_SERVER_AUTH_RUUVI_SESSION_ID_SIZE - 1; ++i)
+    for (uint32_t i = 0; i < (HTTP_SERVER_AUTH_RUUVI_SESSION_ID_SIZE - 1); ++i)
     {
         p_login_session->session_id.buf[i] = g_ascii_upper[esp_random() % (sizeof(g_ascii_upper) - 1)];
     }

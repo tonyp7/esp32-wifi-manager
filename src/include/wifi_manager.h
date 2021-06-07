@@ -48,22 +48,27 @@ typedef struct
     wifi_ant_config_t      wifi_ant_config;
 } WiFiAntConfig_t;
 
+typedef struct wifi_manager_callbacks_t
+{
+    wifi_manager_http_callback_t                   cb_on_http_get;
+    wifi_manager_http_cb_on_post_t                 cb_on_http_post;
+    wifi_manager_http_callback_t                   cb_on_http_delete;
+    wifi_manager_callback_on_cmd_connect_eth_t     cb_on_connect_eth_cmd;
+    wifi_manager_callback_on_cmd_disconnect_eth_t  cb_on_disconnect_eth_cmd;
+    wifi_manager_callback_on_cmd_disconnect_sta_t  cb_on_disconnect_sta_cmd;
+    wifi_manager_callback_on_ap_sta_connected_t    cb_on_ap_sta_connected;
+    wifi_manager_callback_on_ap_sta_disconnected_t cb_on_ap_sta_disconnected;
+} wifi_manager_callbacks_t;
+
 /**
  * @brief Allocate heap memory for the wifi manager and start the wifi_manager RTOS task.
  */
 bool
 wifi_manager_start(
-    const bool                                     flag_start_wifi,
-    const wifi_ssid_t *const                       p_gw_wifi_ssid,
-    const WiFiAntConfig_t *                        p_wifi_ant_config,
-    wifi_manager_http_callback_t                   cb_on_http_get,
-    wifi_manager_http_cb_on_post_t                 cb_on_http_post,
-    wifi_manager_http_callback_t                   cb_on_http_delete,
-    wifi_manager_callback_on_cmd_connect_eth_t     cb_on_connect_eth_cmd,
-    wifi_manager_callback_on_cmd_disconnect_eth_t  cb_on_disconnect_eth_cmd,
-    wifi_manager_callback_on_cmd_disconnect_sta_t  cb_on_disconnect_sta_cmd,
-    wifi_manager_callback_on_ap_sta_connected_t    cb_on_ap_sta_connected,
-    wifi_manager_callback_on_ap_sta_disconnected_t cb_on_ap_sta_disconnected);
+    const bool                            flag_start_wifi,
+    const wifi_ssid_t *const              p_gw_wifi_ssid,
+    const WiFiAntConfig_t *               p_wifi_ant_config,
+    const wifi_manager_callbacks_t *const p_callbacks);
 
 /**
  * @brief Stop WiFi access-point

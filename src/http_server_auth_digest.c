@@ -25,12 +25,15 @@ http_server_parse_token(
         return false;
     }
     p_idx1 += strlen(p_prefix);
-    const char *const p_idx2 = http_server_strnstr(p_idx1, p_suffix, len - (p_idx1 - p_str));
+    const char *const p_idx2 = http_server_strnstr(
+        p_idx1,
+        p_suffix,
+        (size_t)(len - (uint32_t)(ptrdiff_t)(p_idx1 - p_str)));
     if (NULL == p_idx2)
     {
         return false;
     }
-    const size_t token_len = p_idx2 - p_idx1;
+    const size_t token_len = (size_t)(ptrdiff_t)(p_idx2 - p_idx1);
     if (token_len >= buf_size)
     {
         return false;

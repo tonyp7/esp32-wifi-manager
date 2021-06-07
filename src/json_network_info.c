@@ -68,9 +68,9 @@ json_network_info_unlock(json_network_info_t **pp_info)
 
 void
 json_network_info_do_action_with_timeout(
-    void (*cb_func)(json_network_info_t *const p_info, void *const p_param),
-    void *const            p_param,
-    const os_delta_ticks_t ticks_to_wait)
+    json_network_info_do_action_callback_t cb_func,
+    void *const                            p_param,
+    const os_delta_ticks_t                 ticks_to_wait)
 {
     json_network_info_t *p_info = json_network_info_lock_with_timeout(ticks_to_wait);
     cb_func(p_info, p_param);
@@ -78,9 +78,7 @@ json_network_info_do_action_with_timeout(
 }
 
 void
-json_network_info_do_action(
-    void (*cb_func)(json_network_info_t *const p_info, void *const p_param),
-    void *const p_param)
+json_network_info_do_action(json_network_info_do_action_callback_t cb_func, void *const p_param)
 {
     json_network_info_do_action_with_timeout(cb_func, p_param, OS_DELTA_TICKS_INFINITE);
 }
@@ -178,7 +176,7 @@ typedef struct json_network_info_update_t
 static void
 json_network_info_do_update(json_network_info_t *const p_info, void *const p_param)
 {
-    json_network_info_update_t *p_update_info = p_param;
+    const json_network_info_update_t *const p_update_info = p_param;
     if (NULL == p_update_info->p_ssid)
     {
         p_info->ssid.ssid_buf[0] = '\0';
@@ -224,7 +222,7 @@ typedef struct json_network_info_set_extra_t
 static void
 json_network_info_do_set_extra_info(json_network_info_t *const p_info, void *const p_param)
 {
-    json_network_info_set_extra_t *p_extra_info = p_param;
+    const json_network_info_set_extra_t *const p_extra_info = p_param;
     snprintf(
         p_info->extra_info,
         sizeof(p_info->extra_info),

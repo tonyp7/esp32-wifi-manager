@@ -49,7 +49,7 @@ wifiman_md5_calc_hex_str(const void *const p_buf, const size_t buf_size)
     if (!wifiman_md5_calc(p_buf, buf_size, &digest))
     {
         // return empty string
-        const wifiman_md5_digest_hex_str_t digest_hex_str = { { '\0' } };
+        const wifiman_md5_digest_hex_str_t digest_hex_str = { 0 };
         return digest_hex_str;
     }
     return wifiman_md5_hex_str(&digest);
