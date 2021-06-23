@@ -121,11 +121,11 @@ http_server_handle_req_get(
 
     if (0 == strcmp(p_file_name, "auth.html"))
     {
-        return wifi_manager_cb_on_http_get(p_file_name, &resp_auth);
+        return wifi_manager_cb_on_http_get(p_file_name, flag_access_from_lan, &resp_auth);
     }
     else
     {
-        return wifi_manager_cb_on_http_get(p_file_name, NULL);
+        return wifi_manager_cb_on_http_get(p_file_name, flag_access_from_lan, NULL);
     }
 }
 
@@ -177,7 +177,7 @@ http_server_handle_req_delete(
         }
         return http_server_resp_200_json("{}");
     }
-    return wifi_manager_cb_on_http_delete(p_file_name, NULL);
+    return wifi_manager_cb_on_http_delete(p_file_name, flag_access_from_lan, NULL);
 }
 
 static http_server_resp_t

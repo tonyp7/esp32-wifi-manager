@@ -322,8 +322,10 @@ typedef struct http_server_resp_t
     } select_location;
 } http_server_resp_t;
 
-typedef http_server_resp_t (
-    *wifi_manager_http_callback_t)(const char *path, const http_server_resp_t *const p_resp_auth);
+typedef http_server_resp_t (*wifi_manager_http_callback_t)(
+    const char *                    path,
+    const bool                      flag_access_from_lan,
+    const http_server_resp_t *const p_resp_auth);
 typedef http_server_resp_t (*wifi_manager_http_cb_on_post_t)(const char *path, const char *body);
 
 typedef void (*wifi_manager_callback_on_cmd_connect_eth_t)(void);
