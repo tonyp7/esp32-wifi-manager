@@ -758,11 +758,18 @@ http_server_task(void)
         os_delta_ticks_t time_for_processing_request = 0;
         if (ERR_OK == err)
         {
-            const os_delta_ticks_t t0 = xTaskGetTickCount();
-            http_server_netconn_serve(p_new_conn);
-            netconn_close(p_new_conn);
-            netconn_delete(p_new_conn);
-            time_for_processing_request = xTaskGetTickCount() - t0;
+            if (NULL == p_new_conn)
+            {
+                LOG_ERR("netconn_accept returned OK, but p_new_conn is NULL");
+            }
+            else
+            {
+                const os_delta_ticks_t t0 = xTaskGetTickCount();
+                http_server_netconn_serve(p_new_conn);
+                netconn_close(p_new_conn);
+                netconn_delete(p_new_conn);
+                time_for_processing_request = xTaskGetTickCount() - t0;
+            }
         }
         else if (ERR_TIMEOUT == err)
         {
@@ -902,6 +909,13 @@ http_server_netconn_serve(struct netconn *const p_conn)
     LOG_DBG("Request from %s to %s: %s", remote_ip_str.buf, local_ip_str.buf, req_buf);
 
     const http_req_info_t req_info = http_req_parse(req_buf);
+
+    LOG_INFO(
+        "Request from %s to %s: %s %s",
+        remote_ip_str.buf,
+        local_ip_str.buf,
+        req_info.http_cmd.ptr,
+        req_info.http_uri.ptr);
 
     LOG_DBG("p_http_cmd: %s", req_info.http_cmd.ptr);
     LOG_DBG("p_http_uri: %s", req_info.http_uri.ptr);
