@@ -79,7 +79,14 @@ http_server_handle_req_get(
     {
         if ((HTTP_RESP_CODE_200 != resp_auth.http_resp_code) && (0 != strcmp(p_file_name, "auth.html")))
         {
-            return http_server_resp_302();
+            if (HTTP_SERVER_AUTH_TYPE_RUUVI == p_auth_info->auth_type)
+            {
+                return http_server_resp_302();
+            }
+            else
+            {
+                return resp_auth;
+            }
         }
 
         if (0 == strcmp(p_file_name, "ap.json"))
@@ -116,7 +123,14 @@ http_server_handle_req_get(
     }
     if ((NULL == p_file_ext) && (HTTP_RESP_CODE_200 != resp_auth.http_resp_code))
     {
-        return http_server_resp_302();
+        if (HTTP_SERVER_AUTH_TYPE_RUUVI == p_auth_info->auth_type)
+        {
+            return http_server_resp_302();
+        }
+        else
+        {
+            return resp_auth;
+        }
     }
 
     if (0 == strcmp(p_file_name, "auth.html"))
