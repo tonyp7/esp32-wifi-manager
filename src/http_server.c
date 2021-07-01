@@ -831,10 +831,12 @@ http_server_recv_and_handle(struct netconn *p_conn, char *p_req_buf, uint32_t *p
 {
     struct netbuf *p_netbuf_in = NULL;
 
-    const err_t err = netconn_recv(p_conn, &p_netbuf_in);
+    const os_delta_ticks_t t0                    = xTaskGetTickCount();
+    const err_t            err                   = netconn_recv(p_conn, &p_netbuf_in);
+    const os_delta_ticks_t time_for_netconn_recv = xTaskGetTickCount() - t0;
     if (ERR_OK != err)
     {
-        LOG_ERR("netconn recv: %d", err);
+        LOG_ERR("netconn recv: %d (time: %lu ticks)", (printf_int_t)err, (printf_ulong_t)time_for_netconn_recv);
         return false;
     }
 
