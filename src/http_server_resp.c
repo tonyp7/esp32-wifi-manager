@@ -276,14 +276,18 @@ http_server_login_session_init(
 }
 
 const http_server_resp_auth_json_t *
-http_server_fill_auth_json(const bool is_successful, const wifi_ssid_t *const p_ap_ssid)
+http_server_fill_auth_json(
+    const bool               is_successful,
+    const wifi_ssid_t *const p_ap_ssid,
+    const char *const        p_lan_auth_type)
 {
     snprintf(
         g_auth_json.buf,
         sizeof(g_auth_json.buf),
-        "{\"success\": %s, \"gateway_name\": \"%s\"}",
+        "{\"success\": %s, \"gateway_name\": \"%s\", \"lan_auth_type\": \"%s\"}",
         is_successful ? "true" : "false",
-        p_ap_ssid->ssid_buf);
+        p_ap_ssid->ssid_buf,
+        p_lan_auth_type);
     return &g_auth_json;
 }
 
@@ -306,7 +310,10 @@ http_server_resp_401_auth_digest(
         p_ap_ssid->ssid_buf,
         strlen(p_ap_ssid->ssid_buf));
 
-    const http_server_resp_auth_json_t *const p_auth_json = http_server_fill_auth_json(false, p_ap_ssid);
+    const http_server_resp_auth_json_t *const p_auth_json = http_server_fill_auth_json(
+        false,
+        p_ap_ssid,
+        HTTP_SERVER_AUTH_TYPE_STR_DIGEST);
     snprintf(
         p_extra_header_fields->buf,
         sizeof(p_extra_header_fields->buf),
@@ -353,13 +360,19 @@ http_server_resp_401_auth_ruuvi(
     }
 
     http_server_resp_auth_ruuvi_prep_www_authenticate_header(p_ap_ssid, p_login_session, p_extra_header_fields);
-    const http_server_resp_auth_json_t *const p_auth_json = http_server_fill_auth_json(false, p_ap_ssid);
+    const http_server_resp_auth_json_t *const p_auth_json = http_server_fill_auth_json(
+        false,
+        p_ap_ssid,
+        HTTP_SERVER_AUTH_TYPE_STR_RUUVI);
     return http_server_resp_401_json(p_auth_json);
 }
 
 http_server_resp_t
 http_server_resp_403_auth_deny(const wifi_ssid_t *const p_ap_ssid)
 {
-    const http_server_resp_auth_json_t *const p_auth_json = http_server_fill_auth_json(false, p_ap_ssid);
+    const http_server_resp_auth_json_t *const p_auth_json = http_server_fill_auth_json(
+        false,
+        p_ap_ssid,
+        HTTP_SERVER_AUTH_TYPE_STR_DENY);
     return http_server_resp_403_json(p_auth_json);
 }

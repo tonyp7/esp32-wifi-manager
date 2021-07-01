@@ -103,7 +103,10 @@ http_server_resp_t
 http_server_resp_403_auth_deny(const wifi_ssid_t *const p_ap_ssid);
 
 const http_server_resp_auth_json_t *
-http_server_fill_auth_json(const bool is_successful, const wifi_ssid_t *const p_ap_ssid);
+http_server_fill_auth_json(
+    const bool               is_successful,
+    const wifi_ssid_t *const p_ap_ssid,
+    const char *const        p_lan_auth_type);
 
 #ifdef __cplusplus
 }

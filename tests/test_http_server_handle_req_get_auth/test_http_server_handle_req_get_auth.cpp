@@ -105,7 +105,8 @@ TEST_F(TestHttpServerHandleReqGetAuth, test_auth_allow) // NOLINT
 
     const http_server_resp_t resp
         = http_server_handle_req_get_auth(true, http_header, &remote_ip, &auth_info, &ap_ssid, &extra_header_fields);
-    const string exp_json_resp = R"({"success": true, "gateway_name": "RuuviGatewayEEFF"})";
+    const string exp_json_resp
+        = R"({"success": true, "gateway_name": "RuuviGatewayEEFF", "lan_auth_type": "lan_auth_allow"})";
     ASSERT_EQ(HTTP_RESP_CODE_200, resp.http_resp_code);
     ASSERT_EQ(HTTP_CONTENT_LOCATION_STATIC_MEM, resp.content_location);
     ASSERT_TRUE(resp.flag_no_cache);
@@ -133,7 +134,8 @@ TEST_F(TestHttpServerHandleReqGetAuth, test_auth_deny) // NOLINT
 
     const http_server_resp_t resp
         = http_server_handle_req_get_auth(true, http_header, &remote_ip, &auth_info, &ap_ssid, &extra_header_fields);
-    const string exp_json_resp = R"({"success": false, "gateway_name": "RuuviGatewayEEFF"})";
+    const string exp_json_resp
+        = R"({"success": false, "gateway_name": "RuuviGatewayEEFF", "lan_auth_type": "lan_auth_deny"})";
     ASSERT_EQ(HTTP_RESP_CODE_403, resp.http_resp_code);
     ASSERT_EQ(HTTP_CONTENT_LOCATION_STATIC_MEM, resp.content_location);
     ASSERT_TRUE(resp.flag_no_cache);
@@ -174,7 +176,8 @@ TEST_F(TestHttpServerHandleReqGetAuth, test_auth_basic_success) // NOLINT
 
     const http_server_resp_t resp
         = http_server_handle_req_get_auth(true, http_header, &remote_ip, &auth_info, &ap_ssid, &extra_header_fields);
-    const string exp_json_resp = R"({"success": true, "gateway_name": "RuuviGatewayEEFF"})";
+    const string exp_json_resp
+        = R"({"success": true, "gateway_name": "RuuviGatewayEEFF", "lan_auth_type": "lan_auth_basic"})";
     ASSERT_EQ(HTTP_RESP_CODE_200, resp.http_resp_code);
     ASSERT_EQ(HTTP_CONTENT_LOCATION_STATIC_MEM, resp.content_location);
     ASSERT_TRUE(resp.flag_no_cache);
@@ -214,7 +217,8 @@ TEST_F(TestHttpServerHandleReqGetAuth, test_auth_basic_fail_no_header_authorizat
 
     const http_server_resp_t resp
         = http_server_handle_req_get_auth(true, http_header, &remote_ip, &auth_info, &ap_ssid, &extra_header_fields);
-    const string exp_json_resp = R"({"success": false, "gateway_name": "RuuviGatewayEEFF"})";
+    const string exp_json_resp
+        = R"({"success": false, "gateway_name": "RuuviGatewayEEFF", "lan_auth_type": "lan_auth_basic"})";
     ASSERT_EQ(HTTP_RESP_CODE_401, resp.http_resp_code);
     ASSERT_EQ(HTTP_CONTENT_LOCATION_STATIC_MEM, resp.content_location);
     ASSERT_TRUE(resp.flag_no_cache);
@@ -257,7 +261,8 @@ TEST_F(TestHttpServerHandleReqGetAuth, test_auth_basic_fail_wrong_header_authori
 
     const http_server_resp_t resp
         = http_server_handle_req_get_auth(true, http_header, &remote_ip, &auth_info, &ap_ssid, &extra_header_fields);
-    const string exp_json_resp = R"({"success": false, "gateway_name": "RuuviGatewayEEFF"})";
+    const string exp_json_resp
+        = R"({"success": false, "gateway_name": "RuuviGatewayEEFF", "lan_auth_type": "lan_auth_basic"})";
     ASSERT_EQ(HTTP_RESP_CODE_401, resp.http_resp_code);
     ASSERT_EQ(HTTP_CONTENT_LOCATION_STATIC_MEM, resp.content_location);
     ASSERT_TRUE(resp.flag_no_cache);
@@ -300,7 +305,8 @@ TEST_F(TestHttpServerHandleReqGetAuth, test_auth_basic_fail_short_password) // N
 
     const http_server_resp_t resp
         = http_server_handle_req_get_auth(true, http_header, &remote_ip, &auth_info, &ap_ssid, &extra_header_fields);
-    const string exp_json_resp = R"({"success": false, "gateway_name": "RuuviGatewayEEFF"})";
+    const string exp_json_resp
+        = R"({"success": false, "gateway_name": "RuuviGatewayEEFF", "lan_auth_type": "lan_auth_basic"})";
     ASSERT_EQ(HTTP_RESP_CODE_401, resp.http_resp_code);
     ASSERT_EQ(HTTP_CONTENT_LOCATION_STATIC_MEM, resp.content_location);
     ASSERT_TRUE(resp.flag_no_cache);
@@ -343,7 +349,8 @@ TEST_F(TestHttpServerHandleReqGetAuth, test_auth_basic_fail_incorrect_password) 
 
     const http_server_resp_t resp
         = http_server_handle_req_get_auth(true, http_header, &remote_ip, &auth_info, &ap_ssid, &extra_header_fields);
-    const string exp_json_resp = R"({"success": false, "gateway_name": "RuuviGatewayEEFF"})";
+    const string exp_json_resp
+        = R"({"success": false, "gateway_name": "RuuviGatewayEEFF", "lan_auth_type": "lan_auth_basic"})";
     ASSERT_EQ(HTTP_RESP_CODE_401, resp.http_resp_code);
     ASSERT_EQ(HTTP_CONTENT_LOCATION_STATIC_MEM, resp.content_location);
     ASSERT_TRUE(resp.flag_no_cache);
@@ -381,7 +388,8 @@ TEST_F(TestHttpServerHandleReqGetAuth, test_auth_digest_success) // NOLINT
 
     const http_server_resp_t resp
         = http_server_handle_req_get_auth(true, http_header, &remote_ip, &auth_info, &ap_ssid, &extra_header_fields);
-    const string exp_json_resp = R"({"success": true, "gateway_name": "RuuviGatewayEEFF"})";
+    const string exp_json_resp
+        = R"({"success": true, "gateway_name": "RuuviGatewayEEFF", "lan_auth_type": "lan_auth_digest"})";
     ASSERT_EQ(HTTP_RESP_CODE_200, resp.http_resp_code);
     ASSERT_EQ(HTTP_CONTENT_LOCATION_STATIC_MEM, resp.content_location);
     ASSERT_TRUE(resp.flag_no_cache);
@@ -423,7 +431,8 @@ TEST_F(TestHttpServerHandleReqGetAuth, test_auth_digest_fail_no_header_authoriza
 
     const http_server_resp_t resp
         = http_server_handle_req_get_auth(true, http_header, &remote_ip, &auth_info, &ap_ssid, &extra_header_fields);
-    const string exp_json_resp = R"({"success": false, "gateway_name": "RuuviGatewayEEFF"})";
+    const string exp_json_resp
+        = R"({"success": false, "gateway_name": "RuuviGatewayEEFF", "lan_auth_type": "lan_auth_digest"})";
     ASSERT_EQ(HTTP_RESP_CODE_401, resp.http_resp_code);
     ASSERT_EQ(HTTP_CONTENT_LOCATION_STATIC_MEM, resp.content_location);
     ASSERT_TRUE(resp.flag_no_cache);
@@ -469,7 +478,8 @@ TEST_F(TestHttpServerHandleReqGetAuth, test_auth_digest_fail_wrong_header_author
 
     const http_server_resp_t resp
         = http_server_handle_req_get_auth(true, http_header, &remote_ip, &auth_info, &ap_ssid, &extra_header_fields);
-    const string exp_json_resp = R"({"success": false, "gateway_name": "RuuviGatewayEEFF"})";
+    const string exp_json_resp
+        = R"({"success": false, "gateway_name": "RuuviGatewayEEFF", "lan_auth_type": "lan_auth_digest"})";
     ASSERT_EQ(HTTP_RESP_CODE_401, resp.http_resp_code);
     ASSERT_EQ(HTTP_CONTENT_LOCATION_STATIC_MEM, resp.content_location);
     ASSERT_TRUE(resp.flag_no_cache);
@@ -516,7 +526,8 @@ TEST_F(TestHttpServerHandleReqGetAuth, test_auth_digest_fail_wrong_password) // 
 
     const http_server_resp_t resp
         = http_server_handle_req_get_auth(true, http_header, &remote_ip, &auth_info, &ap_ssid, &extra_header_fields);
-    const string exp_json_resp = R"({"success": false, "gateway_name": "RuuviGatewayEEFF"})";
+    const string exp_json_resp
+        = R"({"success": false, "gateway_name": "RuuviGatewayEEFF", "lan_auth_type": "lan_auth_digest"})";
     ASSERT_EQ(HTTP_RESP_CODE_401, resp.http_resp_code);
     ASSERT_EQ(HTTP_CONTENT_LOCATION_STATIC_MEM, resp.content_location);
     ASSERT_TRUE(resp.flag_no_cache);
@@ -563,7 +574,8 @@ TEST_F(TestHttpServerHandleReqGetAuth, test_auth_digest_fail_wrong_user) // NOLI
 
     const http_server_resp_t resp
         = http_server_handle_req_get_auth(true, http_header, &remote_ip, &auth_info, &ap_ssid, &extra_header_fields);
-    const string exp_json_resp = R"({"success": false, "gateway_name": "RuuviGatewayEEFF"})";
+    const string exp_json_resp
+        = R"({"success": false, "gateway_name": "RuuviGatewayEEFF", "lan_auth_type": "lan_auth_digest"})";
     ASSERT_EQ(HTTP_RESP_CODE_401, resp.http_resp_code);
     ASSERT_EQ(HTTP_CONTENT_LOCATION_STATIC_MEM, resp.content_location);
     ASSERT_TRUE(resp.flag_no_cache);
@@ -615,7 +627,8 @@ TEST_F(TestHttpServerHandleReqGetAuth, test_auth_ruuvi_success) // NOLINT
             &auth_info,
             &ap_ssid,
             &extra_header_fields);
-        const string exp_json_resp = R"({"success": false, "gateway_name": "RuuviGatewayEEFF"})";
+        const string exp_json_resp
+            = R"({"success": false, "gateway_name": "RuuviGatewayEEFF", "lan_auth_type": "lan_auth_ruuvi"})";
         ASSERT_EQ(HTTP_RESP_CODE_401, resp.http_resp_code);
         ASSERT_EQ(HTTP_CONTENT_LOCATION_STATIC_MEM, resp.content_location);
         ASSERT_TRUE(resp.flag_no_cache);
@@ -688,7 +701,8 @@ TEST_F(TestHttpServerHandleReqGetAuth, test_auth_ruuvi_success) // NOLINT
             &auth_info,
             &ap_ssid,
             &extra_header_fields);
-        const string exp_json_resp = R"({"success": true, "gateway_name": "RuuviGatewayEEFF"})";
+        const string exp_json_resp
+            = R"({"success": true, "gateway_name": "RuuviGatewayEEFF", "lan_auth_type": "lan_auth_ruuvi"})";
         ASSERT_EQ(HTTP_RESP_CODE_200, resp.http_resp_code);
         ASSERT_EQ(HTTP_CONTENT_LOCATION_STATIC_MEM, resp.content_location);
         ASSERT_TRUE(resp.flag_no_cache);
@@ -741,7 +755,8 @@ TEST_F(TestHttpServerHandleReqGetAuth, test_auth_ruuvi_success) // NOLINT
             &auth_info,
             &ap_ssid,
             &extra_header_fields);
-        const string exp_json_resp = R"({"success": false, "gateway_name": "RuuviGatewayEEFF"})";
+        const string exp_json_resp
+            = R"({"success": false, "gateway_name": "RuuviGatewayEEFF", "lan_auth_type": "lan_auth_ruuvi"})";
         ASSERT_EQ(HTTP_RESP_CODE_401, resp.http_resp_code);
         ASSERT_EQ(HTTP_CONTENT_LOCATION_STATIC_MEM, resp.content_location);
         ASSERT_TRUE(resp.flag_no_cache);
@@ -795,7 +810,8 @@ TEST_F(TestHttpServerHandleReqGetAuth, test_auth_ruuvi_fail_wrong_password) // N
             &auth_info,
             &ap_ssid,
             &extra_header_fields);
-        const string exp_json_resp = R"({"success": false, "gateway_name": "RuuviGatewayEEFF"})";
+        const string exp_json_resp
+            = R"({"success": false, "gateway_name": "RuuviGatewayEEFF", "lan_auth_type": "lan_auth_ruuvi"})";
         ASSERT_EQ(HTTP_RESP_CODE_401, resp.http_resp_code);
         ASSERT_EQ(HTTP_CONTENT_LOCATION_STATIC_MEM, resp.content_location);
         ASSERT_TRUE(resp.flag_no_cache);
@@ -843,7 +859,8 @@ TEST_F(TestHttpServerHandleReqGetAuth, test_auth_ruuvi_fail_wrong_password) // N
             &auth_info,
             &ap_ssid,
             &extra_header_fields);
-        const string exp_json_resp = R"({"success": false, "gateway_name": "RuuviGatewayEEFF"})";
+        const string exp_json_resp
+            = R"({"success": false, "gateway_name": "RuuviGatewayEEFF", "lan_auth_type": "lan_auth_ruuvi"})";
         ASSERT_EQ(HTTP_RESP_CODE_401, resp.http_resp_code);
         ASSERT_EQ(HTTP_CONTENT_LOCATION_STATIC_MEM, resp.content_location);
         ASSERT_TRUE(resp.flag_no_cache);
@@ -897,7 +914,8 @@ TEST_F(TestHttpServerHandleReqGetAuth, test_auth_ruuvi_fail_wrong_user) // NOLIN
             &auth_info,
             &ap_ssid,
             &extra_header_fields);
-        const string exp_json_resp = R"({"success": false, "gateway_name": "RuuviGatewayEEFF"})";
+        const string exp_json_resp
+            = R"({"success": false, "gateway_name": "RuuviGatewayEEFF", "lan_auth_type": "lan_auth_ruuvi"})";
         ASSERT_EQ(HTTP_RESP_CODE_401, resp.http_resp_code);
         ASSERT_EQ(HTTP_CONTENT_LOCATION_STATIC_MEM, resp.content_location);
         ASSERT_TRUE(resp.flag_no_cache);
@@ -945,7 +963,8 @@ TEST_F(TestHttpServerHandleReqGetAuth, test_auth_ruuvi_fail_wrong_user) // NOLIN
             &auth_info,
             &ap_ssid,
             &extra_header_fields);
-        const string exp_json_resp = R"({"success": false, "gateway_name": "RuuviGatewayEEFF"})";
+        const string exp_json_resp
+            = R"({"success": false, "gateway_name": "RuuviGatewayEEFF", "lan_auth_type": "lan_auth_ruuvi"})";
         ASSERT_EQ(HTTP_RESP_CODE_401, resp.http_resp_code);
         ASSERT_EQ(HTTP_CONTENT_LOCATION_STATIC_MEM, resp.content_location);
         ASSERT_TRUE(resp.flag_no_cache);
@@ -999,7 +1018,8 @@ TEST_F(TestHttpServerHandleReqGetAuth, test_auth_ruuvi_fail_empty_user) // NOLIN
             &auth_info,
             &ap_ssid,
             &extra_header_fields);
-        const string exp_json_resp = R"({"success": false, "gateway_name": "RuuviGatewayEEFF"})";
+        const string exp_json_resp
+            = R"({"success": false, "gateway_name": "RuuviGatewayEEFF", "lan_auth_type": "lan_auth_ruuvi"})";
         ASSERT_EQ(HTTP_RESP_CODE_401, resp.http_resp_code);
         ASSERT_EQ(HTTP_CONTENT_LOCATION_STATIC_MEM, resp.content_location);
         ASSERT_TRUE(resp.flag_no_cache);
@@ -1047,7 +1067,8 @@ TEST_F(TestHttpServerHandleReqGetAuth, test_auth_ruuvi_fail_empty_user) // NOLIN
             &auth_info,
             &ap_ssid,
             &extra_header_fields);
-        const string exp_json_resp = R"({"success": false, "gateway_name": "RuuviGatewayEEFF"})";
+        const string exp_json_resp
+            = R"({"success": false, "gateway_name": "RuuviGatewayEEFF", "lan_auth_type": "lan_auth_ruuvi"})";
         ASSERT_EQ(HTTP_RESP_CODE_401, resp.http_resp_code);
         ASSERT_EQ(HTTP_CONTENT_LOCATION_STATIC_MEM, resp.content_location);
         ASSERT_TRUE(resp.flag_no_cache);
@@ -1101,7 +1122,8 @@ TEST_F(TestHttpServerHandleReqGetAuth, test_auth_ruuvi_fail_wrong_realm) // NOLI
             &auth_info,
             &ap_ssid,
             &extra_header_fields);
-        const string exp_json_resp = R"({"success": false, "gateway_name": "RuuviGatewayEEFF"})";
+        const string exp_json_resp
+            = R"({"success": false, "gateway_name": "RuuviGatewayEEFF", "lan_auth_type": "lan_auth_ruuvi"})";
         ASSERT_EQ(HTTP_RESP_CODE_401, resp.http_resp_code);
         ASSERT_EQ(HTTP_CONTENT_LOCATION_STATIC_MEM, resp.content_location);
         ASSERT_TRUE(resp.flag_no_cache);
@@ -1149,7 +1171,8 @@ TEST_F(TestHttpServerHandleReqGetAuth, test_auth_ruuvi_fail_wrong_realm) // NOLI
             &auth_info,
             &ap_ssid,
             &extra_header_fields);
-        const string exp_json_resp = R"({"success": false, "gateway_name": "RuuviGatewayEEFF"})";
+        const string exp_json_resp
+            = R"({"success": false, "gateway_name": "RuuviGatewayEEFF", "lan_auth_type": "lan_auth_ruuvi"})";
         ASSERT_EQ(HTTP_RESP_CODE_401, resp.http_resp_code);
         ASSERT_EQ(HTTP_CONTENT_LOCATION_STATIC_MEM, resp.content_location);
         ASSERT_TRUE(resp.flag_no_cache);
@@ -1203,7 +1226,8 @@ TEST_F(TestHttpServerHandleReqGetAuth, test_auth_ruuvi_fail_wrong_remote_ip) // 
             &auth_info,
             &ap_ssid,
             &extra_header_fields);
-        const string exp_json_resp = R"({"success": false, "gateway_name": "RuuviGatewayEEFF"})";
+        const string exp_json_resp
+            = R"({"success": false, "gateway_name": "RuuviGatewayEEFF", "lan_auth_type": "lan_auth_ruuvi"})";
         ASSERT_EQ(HTTP_RESP_CODE_401, resp.http_resp_code);
         ASSERT_EQ(HTTP_CONTENT_LOCATION_STATIC_MEM, resp.content_location);
         ASSERT_TRUE(resp.flag_no_cache);
@@ -1251,7 +1275,8 @@ TEST_F(TestHttpServerHandleReqGetAuth, test_auth_ruuvi_fail_wrong_remote_ip) // 
             &auth_info,
             &ap_ssid,
             &extra_header_fields);
-        const string exp_json_resp = R"({"success": false, "gateway_name": "RuuviGatewayEEFF"})";
+        const string exp_json_resp
+            = R"({"success": false, "gateway_name": "RuuviGatewayEEFF", "lan_auth_type": "lan_auth_ruuvi"})";
         ASSERT_EQ(HTTP_RESP_CODE_401, resp.http_resp_code);
         ASSERT_EQ(HTTP_CONTENT_LOCATION_STATIC_MEM, resp.content_location);
         ASSERT_TRUE(resp.flag_no_cache);
@@ -1305,7 +1330,8 @@ TEST_F(TestHttpServerHandleReqGetAuth, test_auth_ruuvi_fail_wrong_session_id) //
             &auth_info,
             &ap_ssid,
             &extra_header_fields);
-        const string exp_json_resp = R"({"success": false, "gateway_name": "RuuviGatewayEEFF"})";
+        const string exp_json_resp
+            = R"({"success": false, "gateway_name": "RuuviGatewayEEFF", "lan_auth_type": "lan_auth_ruuvi"})";
         ASSERT_EQ(HTTP_RESP_CODE_401, resp.http_resp_code);
         ASSERT_EQ(HTTP_CONTENT_LOCATION_STATIC_MEM, resp.content_location);
         ASSERT_TRUE(resp.flag_no_cache);
@@ -1353,7 +1379,8 @@ TEST_F(TestHttpServerHandleReqGetAuth, test_auth_ruuvi_fail_wrong_session_id) //
             &auth_info,
             &ap_ssid,
             &extra_header_fields);
-        const string exp_json_resp = R"({"success": false, "gateway_name": "RuuviGatewayEEFF"})";
+        const string exp_json_resp
+            = R"({"success": false, "gateway_name": "RuuviGatewayEEFF", "lan_auth_type": "lan_auth_ruuvi"})";
         ASSERT_EQ(HTTP_RESP_CODE_401, resp.http_resp_code);
         ASSERT_EQ(HTTP_CONTENT_LOCATION_STATIC_MEM, resp.content_location);
         ASSERT_TRUE(resp.flag_no_cache);
@@ -1407,7 +1434,8 @@ TEST_F(TestHttpServerHandleReqGetAuth, test_auth_ruuvi_fail_empty_session_id) //
             &auth_info,
             &ap_ssid,
             &extra_header_fields);
-        const string exp_json_resp = R"({"success": false, "gateway_name": "RuuviGatewayEEFF"})";
+        const string exp_json_resp
+            = R"({"success": false, "gateway_name": "RuuviGatewayEEFF", "lan_auth_type": "lan_auth_ruuvi"})";
         ASSERT_EQ(HTTP_RESP_CODE_401, resp.http_resp_code);
         ASSERT_EQ(HTTP_CONTENT_LOCATION_STATIC_MEM, resp.content_location);
         ASSERT_TRUE(resp.flag_no_cache);
@@ -1455,7 +1483,8 @@ TEST_F(TestHttpServerHandleReqGetAuth, test_auth_ruuvi_fail_empty_session_id) //
             &auth_info,
             &ap_ssid,
             &extra_header_fields);
-        const string exp_json_resp = R"({"success": false, "gateway_name": "RuuviGatewayEEFF"})";
+        const string exp_json_resp
+            = R"({"success": false, "gateway_name": "RuuviGatewayEEFF", "lan_auth_type": "lan_auth_ruuvi"})";
         ASSERT_EQ(HTTP_RESP_CODE_401, resp.http_resp_code);
         ASSERT_EQ(HTTP_CONTENT_LOCATION_STATIC_MEM, resp.content_location);
         ASSERT_TRUE(resp.flag_no_cache);
@@ -1509,7 +1538,8 @@ TEST_F(TestHttpServerHandleReqGetAuth, test_auth_ruuvi_fail_no_session_id) // NO
             &auth_info,
             &ap_ssid,
             &extra_header_fields);
-        const string exp_json_resp = R"({"success": false, "gateway_name": "RuuviGatewayEEFF"})";
+        const string exp_json_resp
+            = R"({"success": false, "gateway_name": "RuuviGatewayEEFF", "lan_auth_type": "lan_auth_ruuvi"})";
         ASSERT_EQ(HTTP_RESP_CODE_401, resp.http_resp_code);
         ASSERT_EQ(HTTP_CONTENT_LOCATION_STATIC_MEM, resp.content_location);
         ASSERT_TRUE(resp.flag_no_cache);
@@ -1556,7 +1586,8 @@ TEST_F(TestHttpServerHandleReqGetAuth, test_auth_ruuvi_fail_no_session_id) // NO
             &auth_info,
             &ap_ssid,
             &extra_header_fields);
-        const string exp_json_resp = R"({"success": false, "gateway_name": "RuuviGatewayEEFF"})";
+        const string exp_json_resp
+            = R"({"success": false, "gateway_name": "RuuviGatewayEEFF", "lan_auth_type": "lan_auth_ruuvi"})";
         ASSERT_EQ(HTTP_RESP_CODE_401, resp.http_resp_code);
         ASSERT_EQ(HTTP_CONTENT_LOCATION_STATIC_MEM, resp.content_location);
         ASSERT_TRUE(resp.flag_no_cache);
@@ -1610,7 +1641,8 @@ TEST_F(TestHttpServerHandleReqGetAuth, test_auth_ruuvi_fail_bad_body_missing_quo
             &auth_info,
             &ap_ssid,
             &extra_header_fields);
-        const string exp_json_resp = R"({"success": false, "gateway_name": "RuuviGatewayEEFF"})";
+        const string exp_json_resp
+            = R"({"success": false, "gateway_name": "RuuviGatewayEEFF", "lan_auth_type": "lan_auth_ruuvi"})";
         ASSERT_EQ(HTTP_RESP_CODE_401, resp.http_resp_code);
         ASSERT_EQ(HTTP_CONTENT_LOCATION_STATIC_MEM, resp.content_location);
         ASSERT_TRUE(resp.flag_no_cache);
@@ -1658,7 +1690,8 @@ TEST_F(TestHttpServerHandleReqGetAuth, test_auth_ruuvi_fail_bad_body_missing_quo
             &auth_info,
             &ap_ssid,
             &extra_header_fields);
-        const string exp_json_resp = R"({"success": false, "gateway_name": "RuuviGatewayEEFF"})";
+        const string exp_json_resp
+            = R"({"success": false, "gateway_name": "RuuviGatewayEEFF", "lan_auth_type": "lan_auth_ruuvi"})";
         ASSERT_EQ(HTTP_RESP_CODE_401, resp.http_resp_code);
         ASSERT_EQ(HTTP_CONTENT_LOCATION_STATIC_MEM, resp.content_location);
         ASSERT_TRUE(resp.flag_no_cache);
@@ -1712,7 +1745,8 @@ TEST_F(TestHttpServerHandleReqGetAuth, test_auth_ruuvi_fail_bad_body_no_username
             &auth_info,
             &ap_ssid,
             &extra_header_fields);
-        const string exp_json_resp = R"({"success": false, "gateway_name": "RuuviGatewayEEFF"})";
+        const string exp_json_resp
+            = R"({"success": false, "gateway_name": "RuuviGatewayEEFF", "lan_auth_type": "lan_auth_ruuvi"})";
         ASSERT_EQ(HTTP_RESP_CODE_401, resp.http_resp_code);
         ASSERT_EQ(HTTP_CONTENT_LOCATION_STATIC_MEM, resp.content_location);
         ASSERT_TRUE(resp.flag_no_cache);
@@ -1759,7 +1793,8 @@ TEST_F(TestHttpServerHandleReqGetAuth, test_auth_ruuvi_fail_bad_body_no_username
             &auth_info,
             &ap_ssid,
             &extra_header_fields);
-        const string exp_json_resp = R"({"success": false, "gateway_name": "RuuviGatewayEEFF"})";
+        const string exp_json_resp
+            = R"({"success": false, "gateway_name": "RuuviGatewayEEFF", "lan_auth_type": "lan_auth_ruuvi"})";
         ASSERT_EQ(HTTP_RESP_CODE_401, resp.http_resp_code);
         ASSERT_EQ(HTTP_CONTENT_LOCATION_STATIC_MEM, resp.content_location);
         ASSERT_TRUE(resp.flag_no_cache);
@@ -1813,7 +1848,8 @@ TEST_F(TestHttpServerHandleReqGetAuth, test_auth_ruuvi_fail_bad_body_no_password
             &auth_info,
             &ap_ssid,
             &extra_header_fields);
-        const string exp_json_resp = R"({"success": false, "gateway_name": "RuuviGatewayEEFF"})";
+        const string exp_json_resp
+            = R"({"success": false, "gateway_name": "RuuviGatewayEEFF", "lan_auth_type": "lan_auth_ruuvi"})";
         ASSERT_EQ(HTTP_RESP_CODE_401, resp.http_resp_code);
         ASSERT_EQ(HTTP_CONTENT_LOCATION_STATIC_MEM, resp.content_location);
         ASSERT_TRUE(resp.flag_no_cache);
@@ -1849,7 +1885,8 @@ TEST_F(TestHttpServerHandleReqGetAuth, test_auth_ruuvi_fail_bad_body_no_password
             &auth_info,
             &ap_ssid,
             &extra_header_fields);
-        const string exp_json_resp = R"({"success": false, "gateway_name": "RuuviGatewayEEFF"})";
+        const string exp_json_resp
+            = R"({"success": false, "gateway_name": "RuuviGatewayEEFF", "lan_auth_type": "lan_auth_ruuvi"})";
         ASSERT_EQ(HTTP_RESP_CODE_401, resp.http_resp_code);
         ASSERT_EQ(HTTP_CONTENT_LOCATION_STATIC_MEM, resp.content_location);
         ASSERT_TRUE(resp.flag_no_cache);

@@ -18,7 +18,10 @@ static http_server_resp_t
 http_server_handle_req_get_auth_allow(const wifi_ssid_t *const p_ap_ssid)
 {
     const bool                                is_successful = true;
-    const http_server_resp_auth_json_t *const p_auth_json   = http_server_fill_auth_json(is_successful, p_ap_ssid);
+    const http_server_resp_auth_json_t *const p_auth_json   = http_server_fill_auth_json(
+        is_successful,
+        p_ap_ssid,
+        HTTP_SERVER_AUTH_TYPE_STR_ALLOW);
     return http_server_resp_200_json(p_auth_json->buf);
 }
 
@@ -27,7 +30,10 @@ http_server_resp_401_auth_basic(
     const wifi_ssid_t *const          p_ap_ssid,
     http_header_extra_fields_t *const p_extra_header_fields)
 {
-    const http_server_resp_auth_json_t *const p_auth_json = http_server_fill_auth_json(false, p_ap_ssid);
+    const http_server_resp_auth_json_t *const p_auth_json = http_server_fill_auth_json(
+        false,
+        p_ap_ssid,
+        HTTP_SERVER_AUTH_TYPE_STR_BASIC);
     snprintf(
         p_extra_header_fields->buf,
         sizeof(p_extra_header_fields->buf),
@@ -67,7 +73,10 @@ http_server_handle_req_get_auth_basic(
         return http_server_resp_401_auth_basic(p_ap_ssid, p_extra_header_fields);
     }
 
-    const http_server_resp_auth_json_t *p_auth_json = http_server_fill_auth_json(true, p_ap_ssid);
+    const http_server_resp_auth_json_t *p_auth_json = http_server_fill_auth_json(
+        true,
+        p_ap_ssid,
+        HTTP_SERVER_AUTH_TYPE_STR_BASIC);
     return http_server_resp_200_json(p_auth_json->buf);
 }
 
@@ -121,7 +130,10 @@ http_server_handle_req_get_auth_digest(
         return http_server_resp_401_auth_digest(p_ap_ssid, p_extra_header_fields);
     }
 
-    const http_server_resp_auth_json_t *p_auth_json = http_server_fill_auth_json(true, p_ap_ssid);
+    const http_server_resp_auth_json_t *p_auth_json = http_server_fill_auth_json(
+        true,
+        p_ap_ssid,
+        HTTP_SERVER_AUTH_TYPE_STR_DIGEST);
     return http_server_resp_200_json(p_auth_json->buf);
 }
 
@@ -145,7 +157,10 @@ http_server_handle_req_get_auth_ruuvi(
         return http_server_resp_401_auth_ruuvi(p_remote_ip, p_ap_ssid, p_extra_header_fields);
     }
 
-    const http_server_resp_auth_json_t *p_auth_json = http_server_fill_auth_json(true, p_ap_ssid);
+    const http_server_resp_auth_json_t *p_auth_json = http_server_fill_auth_json(
+        true,
+        p_ap_ssid,
+        HTTP_SERVER_AUTH_TYPE_STR_RUUVI);
     return http_server_resp_200_json(p_auth_json->buf);
 }
 
