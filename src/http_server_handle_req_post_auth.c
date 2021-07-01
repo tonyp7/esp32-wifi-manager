@@ -145,6 +145,7 @@ http_server_handle_req_post_auth(
     {
         return http_server_resp_401_auth_ruuvi(p_remote_ip, p_ap_ssid, p_extra_header_fields);
     }
+    const http_server_auth_ruuvi_prev_url_t prev_url = http_server_auth_ruuvi_get_prev_url_from_cookies(http_header);
 
     http_server_auth_ruuvi_t *const p_auth_ruuvi = http_server_auth_ruuvi_get_info();
     if ('\0' == p_auth_ruuvi->login_session.session_id.buf[0])
@@ -188,5 +189,15 @@ http_server_handle_req_post_auth(
     p_auth_ruuvi->login_session.session_id.buf[0] = '\0';
     p_auth_ruuvi->login_session.challenge.buf[0]  = '\0';
     p_auth_ruuvi->login_session.remote_ip.buf[0]  = '\0';
+    if ('\0' != prev_url.buf[0])
+    {
+        snprintf(
+            p_extra_header_fields->buf,
+            sizeof(p_extra_header_fields->buf),
+            "Ruuvi-prev-url: %s\r\n"
+            "Set-Cookie: %s=; Max-Age=-1; Expires=Thu, 01 Jan 1970 00:00:00 GMT\r\n",
+            prev_url.buf,
+            HTTP_SERVER_AUTH_RUUVI_COOKIE_PREV_URL);
+    }
     return http_server_resp_200_json("{}");
 }

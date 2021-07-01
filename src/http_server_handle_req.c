@@ -81,6 +81,12 @@ http_server_handle_req_get(
         {
             if (HTTP_SERVER_AUTH_TYPE_RUUVI == p_auth_info->auth_type)
             {
+                snprintf(
+                    p_extra_header_fields->buf,
+                    sizeof(p_extra_header_fields->buf),
+                    "Set-Cookie: %s=/%s",
+                    HTTP_SERVER_AUTH_RUUVI_COOKIE_PREV_URL,
+                    p_file_name);
                 return http_server_resp_302();
             }
             else
@@ -125,6 +131,12 @@ http_server_handle_req_get(
     {
         if (HTTP_SERVER_AUTH_TYPE_RUUVI == p_auth_info->auth_type)
         {
+            snprintf(
+                p_extra_header_fields->buf,
+                sizeof(p_extra_header_fields->buf),
+                "Set-Cookie: %s=/%s",
+                HTTP_SERVER_AUTH_RUUVI_COOKIE_PREV_URL,
+                p_file_name);
             return http_server_resp_302();
         }
         else

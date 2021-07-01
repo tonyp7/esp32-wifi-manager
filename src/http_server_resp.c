@@ -220,32 +220,6 @@ http_server_resp_data_from_file(
     return resp;
 }
 
-http_server_resp_t
-http_server_resp_401_with_data_from_file(
-    const http_content_type_e     content_type,
-    const char *                  p_content_type_param,
-    const size_t                  content_len,
-    const http_content_encoding_e content_encoding,
-    const socket_t                fd)
-{
-    const http_server_resp_t resp = {
-        .http_resp_code       = HTTP_RESP_CODE_401,
-        .content_location     = HTTP_CONTENT_LOCATION_FATFS,
-        .flag_no_cache        = false,
-        .flag_add_header_date = false,
-        .content_type         = content_type,
-        .p_content_type_param = p_content_type_param,
-        .content_len          = content_len,
-        .content_encoding     = content_encoding,
-        .select_location      = {
-            .fatfs = {
-                .fd = fd,
-            },
-        },
-    };
-    return resp;
-}
-
 static void
 http_server_fill_buf_with_random_u8(uint8_t *const p_buf, const size_t buf_size)
 {

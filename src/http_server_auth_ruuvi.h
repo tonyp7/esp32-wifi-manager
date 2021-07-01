@@ -19,7 +19,10 @@ extern "C" {
 
 #define HTTP_SERVER_AUTH_RUUVI_SESSION_ID_SIZE (16U + 1U)
 
-#define HTTP_SERVER_AUTH_RUUVI_COOKIE_SESSION "RUUVISESSION"
+#define HTTP_SERVER_AUTH_RUUVI_PREV_URL_SIZE (64U + 1U)
+
+#define HTTP_SERVER_AUTH_RUUVI_COOKIE_SESSION  "RUUVISESSION"
+#define HTTP_SERVER_AUTH_RUUVI_COOKIE_PREV_URL "RUUVI_PREV_URL"
 
 #define HTTP_SERVER_AUTH_RUUVI_MAX_NUM_SESSIONS (4U)
 
@@ -33,6 +36,11 @@ typedef struct http_server_auth_ruuvi_session_id_t
 {
     char buf[HTTP_SERVER_AUTH_RUUVI_SESSION_ID_SIZE];
 } http_server_auth_ruuvi_session_id_t;
+
+typedef struct http_server_auth_ruuvi_prev_url_t
+{
+    char buf[HTTP_SERVER_AUTH_RUUVI_PREV_URL_SIZE];
+} http_server_auth_ruuvi_prev_url_t;
 
 typedef struct http_server_auth_ruuvi_login_session_t
 {
@@ -57,6 +65,9 @@ bool
 http_server_auth_ruuvi_get_session_id_from_cookies(
     const http_req_header_t                    http_header,
     http_server_auth_ruuvi_session_id_t *const p_session_id);
+
+http_server_auth_ruuvi_prev_url_t
+http_server_auth_ruuvi_get_prev_url_from_cookies(const http_req_header_t http_header);
 
 http_server_auth_ruuvi_authorized_session_t *
 http_server_auth_ruuvi_find_authorized_session(

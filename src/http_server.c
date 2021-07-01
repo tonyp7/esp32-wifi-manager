@@ -305,7 +305,10 @@ http_server_gen_header_date_str(const bool flag_gen_date)
 }
 
 static void
-http_server_netconn_resp_200(struct netconn *p_conn, http_server_resp_t *p_resp)
+http_server_netconn_resp_200(
+    struct netconn *                        p_conn,
+    http_server_resp_t *                    p_resp,
+    const http_header_extra_fields_t *const p_extra_header_fields)
 {
     const bool use_extra_content_type_param = (NULL != p_resp->p_content_type_param)
                                               && ('\0' != p_resp->p_content_type_param[0]);
@@ -321,6 +324,7 @@ http_server_netconn_resp_200(struct netconn *p_conn, http_server_resp_t *p_resp)
         "Content-Length: %lu\r\n"
         "%s"
         "%s"
+        "%s"
         "\r\n",
         date_str.buf,
         http_get_content_type_str(p_resp->content_type),
@@ -328,7 +332,8 @@ http_server_netconn_resp_200(struct netconn *p_conn, http_server_resp_t *p_resp)
         use_extra_content_type_param ? p_resp->p_content_type_param : "",
         (printf_ulong_t)p_resp->content_len,
         http_get_content_encoding_str(p_resp),
-        http_get_cache_control_str(p_resp));
+        http_get_cache_control_str(p_resp),
+        (NULL != p_extra_header_fields) ? p_extra_header_fields->buf : "");
 
     switch (p_resp->content_location)
     {
@@ -364,7 +369,10 @@ http_server_netconn_resp_302(struct netconn *p_conn)
 }
 
 static void
-http_server_netconn_resp_302_auth_html(struct netconn *p_conn, const sta_ip_string_t *const p_ip_str)
+http_server_netconn_resp_302_auth_html(
+    struct netconn *                        p_conn,
+    const sta_ip_string_t *const            p_ip_str,
+    const http_header_extra_fields_t *const p_extra_header_fields)
 {
     LOG_INFO("Respond: 302 Found");
     http_server_netconn_printf(
@@ -373,8 +381,10 @@ http_server_netconn_resp_302_auth_html(struct netconn *p_conn, const sta_ip_stri
         "HTTP/1.1 302 Found\r\n"
         "Server: Ruuvi Gateway\r\n"
         "Location: http://%s/auth.html\r\n"
+        "%s"
         "\r\n",
-        p_ip_str->buf);
+        p_ip_str->buf,
+        (NULL != p_extra_header_fields) ? p_extra_header_fields->buf : "");
 }
 
 static void
@@ -968,10 +978,10 @@ http_server_netconn_serve(struct netconn *const p_conn)
     switch (resp.http_resp_code)
     {
         case HTTP_RESP_CODE_200:
-            http_server_netconn_resp_200(p_conn, &resp);
+            http_server_netconn_resp_200(p_conn, &resp, &g_http_server_extra_header_fields);
             return;
         case HTTP_RESP_CODE_302:
-            http_server_netconn_resp_302_auth_html(p_conn, &local_ip_str);
+            http_server_netconn_resp_302_auth_html(p_conn, &local_ip_str, &g_http_server_extra_header_fields);
             return;
         case HTTP_RESP_CODE_400:
             http_server_netconn_resp_400(p_conn);
