@@ -40,18 +40,16 @@ http_req_parse(char *p_req_buf)
     char *p2 = strstr(p_req_buf, g_two_crlf);
     if (NULL != p2)
     {
-        *p2 = '\0';
-        p2 += strlen(g_two_crlf);
-        req_info.http_body.ptr = p2;
+        p2[strlen(g_one_crlf)] = '\0';
+        req_info.http_body.ptr = p2 + strlen(g_two_crlf);
     }
     else
     {
         p2 = strstr(p_req_buf, g_two_lf);
         if (NULL != p2)
         {
-            *p2 = '\0';
-            p2 += strlen(g_two_lf);
-            req_info.http_body.ptr = p2;
+            p2[strlen(g_one_lf)]   = '\0';
+            req_info.http_body.ptr = p2 + strlen(g_two_lf);
         }
         else
         {
@@ -63,18 +61,16 @@ http_req_parse(char *p_req_buf)
     p2 = strstr(p_req_buf, g_one_crlf);
     if (NULL != p2)
     {
-        *p2 = '\0';
-        p2 += strlen(g_one_crlf);
-        req_info.http_header.ptr = p2;
+        *p2                      = '\0';
+        req_info.http_header.ptr = p2 + strlen(g_one_crlf);
     }
     else
     {
         p2 = strstr(p_req_buf, g_one_lf);
         if (NULL != p2)
         {
-            *p2 = '\0';
-            p2 += strlen(g_one_lf);
-            req_info.http_header.ptr = p2;
+            *p2                      = '\0';
+            req_info.http_header.ptr = p2 + strlen(g_one_lf);
         }
         else
         {
@@ -125,11 +121,8 @@ http_req_header_get_field(const http_req_header_t req_header, const char *field_
     const char *p_end = strpbrk(p_val, "\r\n");
     if (NULL == p_end)
     {
-        *p_len = strlen(p_val);
+        return NULL;
     }
-    else
-    {
-        *p_len = (uint32_t)(ptrdiff_t)(p_end - p_val);
-    }
+    *p_len = (uint32_t)(ptrdiff_t)(p_end - p_val);
     return p_val;
 }
