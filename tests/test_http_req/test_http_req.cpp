@@ -71,7 +71,7 @@ TEST_F(TestHttpReq, test_lf) // NOLINT
                "Accept-Language: en-US\n"
                "Cache-Control: no-cache, no-store, must-revalidate\n"
                "Content-Type: text/plain\n"
-               "User-Agent: Mozilla/5.0"),
+               "User-Agent: Mozilla/5.0\n"),
         req_info.http_header.ptr);
     ASSERT_EQ(string(""), req_info.http_body.ptr);
 }
@@ -104,7 +104,7 @@ TEST_F(TestHttpReq, test_crlf) // NOLINT
                "Accept-Language: en-US\r\n"
                "Cache-Control: no-cache, no-store, must-revalidate\r\n"
                "Content-Type: text/plain\r\n"
-               "User-Agent: Mozilla/5.0"),
+               "User-Agent: Mozilla/5.0\r\n"),
         req_info.http_header.ptr);
     ASSERT_EQ(string(""), req_info.http_body.ptr);
 }
@@ -245,7 +245,7 @@ TEST_F(TestHttpReq, test_lf_http_req_header_get_field) // NOLINT
                "Accept-Language: en-US\n"
                "Cache-Control: no-cache, no-store, must-revalidate\n"
                "Content-Type: text/plain\n"
-               "User-Agent: Mozilla/5.0"),
+               "User-Agent: Mozilla/5.0\n"),
         req_info.http_header.ptr);
 
     {
@@ -313,7 +313,7 @@ TEST_F(TestHttpReq, test_crlf_http_req_header_get_field) // NOLINT
                "Accept-Language: en-US\r\n"
                "Cache-Control: no-cache, no-store, must-revalidate\r\n"
                "Content-Type: text/plain\r\n"
-               "User-Agent: Mozilla/5.0"),
+               "User-Agent: Mozilla/5.0\r\n"),
         req_info.http_header.ptr);
 
     {

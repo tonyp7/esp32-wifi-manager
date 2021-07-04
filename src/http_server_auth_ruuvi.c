@@ -8,6 +8,7 @@
 #include "http_server_auth_ruuvi.h"
 #include <string.h>
 #include <stdio.h>
+#include "esp_type_wrapper.h"
 #include "http_server_auth.h"
 #include "http_req.h"
 
@@ -47,7 +48,7 @@ http_server_auth_ruuvi_get_cookie(
     {
         return false;
     }
-    snprintf(p_buf, buf_size, "%.*s", cookie_len, p_cookie_value);
+    snprintf(p_buf, buf_size, "%.*s", (printf_int_t)cookie_len, p_cookie_value);
     return true;
 }
 

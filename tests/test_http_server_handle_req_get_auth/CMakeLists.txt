@@ -55,6 +55,7 @@ target_include_directories(${ProjectId} PUBLIC
 )
 
 target_compile_definitions(${ProjectId} PUBLIC
+        LOG_LOCAL_DISABLED=1
         RUUVI_TESTS_HTTP_SERVER_HANDLE_REQ_GET_AUTH=1
 )
 

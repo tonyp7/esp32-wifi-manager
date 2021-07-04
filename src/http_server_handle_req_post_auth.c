@@ -11,9 +11,11 @@
 #include "mbedtls/sha256.h"
 #include "http_server_auth.h"
 #include "cJSON.h"
+
+#define LOG_LOCAL_LEVEL LOG_LEVEL_INFO
 #include "log.h"
 
-static const char* TAG = "req_post_auth";
+static const char *TAG = "req_post_auth";
 
 #define MBEDTLS_SHA256_USE_224 1
 #define MBEDTLS_SHA256_USE_256 0

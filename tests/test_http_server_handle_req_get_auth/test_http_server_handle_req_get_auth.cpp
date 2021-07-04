@@ -169,7 +169,7 @@ TEST_F(TestHttpServerHandleReqGetAuth, test_auth_basic_success) // NOLINT
     snprintf(auth_info.auth_pass, sizeof(auth_info.auth_pass), "%s", encoded_pass.c_str());
     const wifi_ssid_t ap_ssid = { "RuuviGatewayEEFF" };
 
-    const string               auth_header         = string("Authorization: Basic ") + encoded_pass;
+    const string               auth_header         = string("Authorization: Basic ") + encoded_pass + string("\r\n");
     const http_req_header_t    http_header         = { auth_header.c_str() };
     http_header_extra_fields_t extra_header_fields = { .buf = { '\0' } };
     const sta_ip_string_t      remote_ip           = { "192.168.1.10" };
@@ -373,6 +373,13 @@ TEST_F(TestHttpServerHandleReqGetAuth, test_auth_digest_success) // NOLINT
         raw_user_pass.c_str(),
         raw_user_pass.length());
 
+    std::array<uint32_t, 32> random_values = { 0 };
+    for (uint32_t i = 0; i < random_values.size(); ++i)
+    {
+        random_values[i] = 0xAABBCC00U + i * 17;
+    }
+    this->set_random_values(random_values.begin(), random_values.size());
+
     http_server_auth_info_t auth_info = {
         HTTP_SERVER_AUTH_TYPE_DIGEST,
         "user1",
@@ -380,8 +387,10 @@ TEST_F(TestHttpServerHandleReqGetAuth, test_auth_digest_success) // NOLINT
     };
     snprintf(auth_info.auth_pass, sizeof(auth_info.auth_pass), "%s", user_pass_md5.buf);
 
-    const string auth_header = string(
-        R"(Authorization: Digest username="user1", realm="RuuviGatewayEEFF", nonce="9689933745abb987e2cfae61d46f50c9efe2fbe9cfa6ad9c3ceb3c54fa2a2833", uri="/auth", response="32a8cf9eae6af8a897ed57a2c51f055d", opaque="d3f1a85625217a33bdda63c646418c2be492100d9d1dec34d6e738c3a1766bc4", qop=auth, nc=00000001, cnonce="3e48baed2616a1e9")");
+    const string auth_header
+        = string(
+              R"(Authorization: Digest username="user1", realm="RuuviGatewayEEFF", nonce="9689933745abb987e2cfae61d46f50c9efe2fbe9cfa6ad9c3ceb3c54fa2a2833", uri="/auth", response="32a8cf9eae6af8a897ed57a2c51f055d", opaque="d3f1a85625217a33bdda63c646418c2be492100d9d1dec34d6e738c3a1766bc4", qop=auth, nc=00000001, cnonce="3e48baed2616a1e9")")
+          + string("\r\n");
     const http_req_header_t    http_header         = { auth_header.c_str() };
     http_header_extra_fields_t extra_header_fields = { .buf = { '\0' } };
     const sta_ip_string_t      remote_ip           = { "192.168.1.10" };
@@ -658,7 +667,7 @@ TEST_F(TestHttpServerHandleReqGetAuth, test_auth_ruuvi_success) // NOLINT
             string("a9c36943b9e6e9536bfd5afb610a0f26aea0bcfed5c2cb5d982f13154eab8bce"),
             string(password_sha256.buf));
 
-        const string            http_header_str = string(R"(Cookie: RUUVISESSION=EVMDULCTKBSJARIZ)");
+        const string            http_header_str = string(R"(Cookie: RUUVISESSION=EVMDULCTKBSJARIZ)") + string("\r\n");
         const http_req_header_t http_header     = { http_header_str.c_str() };
         const string http_body_str = string(R"({"login": "user1", "password": ")") + string(password_sha256.buf)
                                      + string("\"}");
@@ -689,8 +698,8 @@ TEST_F(TestHttpServerHandleReqGetAuth, test_auth_ruuvi_success) // NOLINT
 
     // ------ GET /auth -------------------------------------------------------------
     {
-        const string               http_header_str     = string(R"(Cookie: RUUVISESSION=EVMDULCTKBSJARIZ)");
-        const http_req_header_t    http_header         = { http_header_str.c_str() };
+        const string            http_header_str = string(R"(Cookie: RUUVISESSION=EVMDULCTKBSJARIZ)") + string("\r\n");
+        const http_req_header_t http_header     = { http_header_str.c_str() };
         http_header_extra_fields_t extra_header_fields = { .buf = { '\0' } };
         const sta_ip_string_t      remote_ip           = { "192.168.1.10" };
 
@@ -717,8 +726,8 @@ TEST_F(TestHttpServerHandleReqGetAuth, test_auth_ruuvi_success) // NOLINT
 
     // ------ DELETE /auth -------------------------------------------------------------
     {
-        const string               http_header_str     = string(R"(Cookie: RUUVISESSION=EVMDULCTKBSJARIZ)");
-        const http_req_header_t    http_header         = { http_header_str.c_str() };
+        const string            http_header_str = string(R"(Cookie: RUUVISESSION=EVMDULCTKBSJARIZ)") + string("\r\n");
+        const http_req_header_t http_header     = { http_header_str.c_str() };
         http_header_extra_fields_t extra_header_fields = { .buf = { '\0' } };
         const sta_ip_string_t      remote_ip           = { "192.168.1.10" };
 
