@@ -783,6 +783,8 @@ http_server_task(void)
             }
             else
             {
+                const int_fast32_t timeout_ms = 1500;
+                netconn_set_recvtimeout(p_new_conn, timeout_ms);
                 const os_delta_ticks_t t0 = xTaskGetTickCount();
                 http_server_netconn_serve(p_new_conn);
                 netconn_close(p_new_conn);
@@ -924,7 +926,7 @@ http_server_netconn_serve(struct netconn *const p_conn)
 
     if (!req_ready)
     {
-        LOG_WARN("the connection was closed by the client side");
+        LOG_WARN("The connection was closed by the client side");
         return;
     }
     LOG_DBG("Request from %s to %s: %s", remote_ip_str.buf, local_ip_str.buf, req_buf);
