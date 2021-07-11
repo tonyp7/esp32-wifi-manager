@@ -772,6 +772,15 @@ http_server_task(void)
             {
                 LOG_ERR("netconn_accept returned OK, but p_new_conn is NULL");
             }
+            else if (NULL == p_conn->pcb.tcp)
+            {
+                // It seems that's a bug in netconn_accept, err is ERR_OK, p_new_conn is not NULL,
+                // but p_conn->pcb.tcp is NULL.
+                // Perhaps, err_tcp() was called. So the socked has already been closed.
+                // As a workaround try to free resources and ignore this error.
+                LOG_ERR("netconn_accept returned OK, but p_conn->pcb.tcp is NULL");
+                netconn_delete(p_new_conn);
+            }
             else
             {
                 const os_delta_ticks_t t0 = xTaskGetTickCount();
