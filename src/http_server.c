@@ -718,7 +718,7 @@ http_server_check_if_configuring_complete(const os_delta_ticks_t time_for_proces
 {
     static bool g_is_network_connected = false;
 
-    if (wifi_manager_is_ap_active() && wifi_manager_is_connected_to_wifi())
+    if (wifi_manager_is_connected_to_wifi())
     {
         return http_server_check_if_configuring_complete_wifi(
             &g_is_network_connected,
@@ -727,7 +727,7 @@ http_server_check_if_configuring_complete(const os_delta_ticks_t time_for_proces
     }
     else if (wifi_manager_is_connected_to_ethernet())
     {
-        http_server_check_if_configuring_complete_ethernet(&g_is_network_connected, time_for_processing_request);
+        return http_server_check_if_configuring_complete_ethernet(&g_is_network_connected, time_for_processing_request);
     }
     else
     {
