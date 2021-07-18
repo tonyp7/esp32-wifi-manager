@@ -63,6 +63,7 @@ Contains the freeRTOS task and all necessary support
 #include "wifi_sta_config.h"
 #include "http_req.h"
 #include "os_mutex.h"
+#include "os_sema.h"
 
 #define LOG_LOCAL_LEVEL LOG_LEVEL_DEBUG
 #include "log.h"
@@ -82,6 +83,9 @@ static wifi_manager_callbacks_t g_wifi_callbacks;
 
 static EventGroupHandle_t g_wifi_manager_event_group;
 static StaticEventGroup_t g_wifi_manager_event_group_mem;
+
+static os_sema_t        g_scan_sync_sema;
+static os_sema_static_t g_scan_sync_sema_mem;
 
 /* @brief indicate that wifi_manager is working. */
 #define WIFI_MANAGER_IS_WORKING ((uint32_t)(BIT0))
@@ -139,6 +143,34 @@ void
 wifi_manager_scan_async(void)
 {
     wifiman_msg_send_cmd_start_wifi_scan();
+}
+
+const char *
+wifi_manager_scan_sync(void)
+{
+    wifi_manager_lock();
+    if (NULL != g_scan_sync_sema)
+    {
+        LOG_ERR("Another thread tries to perform the same operation");
+        wifi_manager_unlock();
+        return NULL;
+    }
+    g_scan_sync_sema = os_sema_create_static(&g_scan_sync_sema_mem);
+    if (!wifiman_msg_send_cmd_start_wifi_scan())
+    {
+        wifi_manager_unlock();
+        return NULL;
+    }
+    wifi_manager_unlock();
+
+    os_sema_wait_infinite(g_scan_sync_sema);
+
+    wifi_manager_lock();
+    os_sema_delete(&g_scan_sync_sema);
+    const char *const p_buf = wifi_manager_generate_json_access_points();
+    wifi_manager_unlock();
+
+    return p_buf;
 }
 
 void
@@ -476,7 +508,6 @@ wifi_manager_event_handler(
             case WIFI_EVENT_AP_START:
                 LOG_INFO("WIFI_EVENT_AP_START");
                 xEventGroupSetBits(g_wifi_manager_event_group, WIFI_MANAGER_AP_STARTED_BIT);
-                wifi_manager_scan_async();
                 break;
             case WIFI_EVENT_AP_STOP:
                 LOG_INFO("WIFI_EVENT_AP_STOP");
@@ -570,27 +601,50 @@ static void
 wifi_handle_ev_scan_done(void)
 {
     LOG_DBG("MESSAGE: EVENT_SCAN_DONE");
-    /* As input param, it stores max AP number ap_records can hold. As output param, it receives the
-     * actual AP number this API returns.
-     * As a consequence, ap_num MUST be reset to MAX_AP_NUM at every scan */
-    g_wifi_ap_num = MAX_AP_NUM;
-    esp_err_t err = esp_wifi_scan_get_ap_records(&g_wifi_ap_num, g_wifi_accessp_records);
-    if (ESP_OK != err)
-    {
-        LOG_ERR_ESP(err, "%s failed", "esp_wifi_scan_get_ap_records");
-        return;
-    }
     /* make sure the http server isn't trying to access the list while it gets refreshed */
     if (wifi_manager_lock_with_timeout(pdMS_TO_TICKS(1000)))
     {
-        /* Will remove the duplicate SSIDs from the list and update ap_num */
-        g_wifi_ap_num = ap_list_filter_unique(g_wifi_accessp_records, g_wifi_ap_num);
-        json_access_points_generate(g_wifi_accessp_records, g_wifi_ap_num);
+        /* As input param, it stores max AP number ap_records can hold. As output param, it receives the
+         * actual AP number this API returns.
+         * As a consequence, ap_num MUST be reset to MAX_AP_NUM at every scan */
+
+        g_wifi_ap_num = MAX_AP_NUM;
+        esp_err_t err = esp_wifi_scan_get_ap_records(&g_wifi_ap_num, g_wifi_accessp_records);
+        if (ESP_OK != err)
+        {
+            g_wifi_ap_num = 0;
+            LOG_ERR_ESP(err, "%s failed", "esp_wifi_scan_get_ap_records");
+        }
+        else
+        {
+            /* Will remove the duplicate SSIDs from the list and update ap_num */
+            g_wifi_ap_num = ap_list_filter_unique(g_wifi_accessp_records, g_wifi_ap_num);
+        }
         wifi_manager_unlock();
     }
     else
     {
         LOG_ERR("could not get access to json mutex in wifi_scan");
+    }
+    if (NULL != g_scan_sync_sema)
+    {
+        os_sema_signal(g_scan_sync_sema);
+    }
+}
+
+const char *
+wifi_manager_generate_json_access_points(void)
+{
+    if (wifi_manager_lock_with_timeout(pdMS_TO_TICKS(100)))
+    {
+        json_access_points_generate(g_wifi_accessp_records, g_wifi_ap_num);
+        const char *const p_buf = json_access_points_get();
+        wifi_manager_unlock();
+        return p_buf;
+    }
+    else
+    {
+        return NULL;
     }
 }
 

@@ -97,14 +97,7 @@ http_server_handle_req_get(
 
         if (0 == strcmp(p_file_name, "ap.json"))
         {
-            /* if we can get the mutex, write the last version of the AP list */
-            const TickType_t ticks_to_wait = 10U;
-            if (!wifi_manager_lock_with_timeout(ticks_to_wait))
-            {
-                LOG_ERR("GET /ap.json: failed to obtain mutex, return HTTP error 503");
-                return http_server_resp_503();
-            }
-            const char *p_buff = json_access_points_get();
+            const char *const p_buff = wifi_manager_scan_sync();
             if (NULL == p_buff)
             {
                 LOG_ERR("GET /ap.json: failed to get json, return HTTP error 503");
@@ -112,8 +105,6 @@ http_server_handle_req_get(
             }
             LOG_INFO("ap.json: %s", p_buff);
             const http_server_resp_t resp = http_server_resp_200_json(p_buff);
-            wifi_manager_unlock();
-            wifiman_msg_send_cmd_start_wifi_scan();
             return resp;
         }
         else if (0 == strcmp(p_file_name, "status.json"))

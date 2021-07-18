@@ -101,6 +101,12 @@ void
 wifi_manager_scan_async(void);
 
 /**
+ * @brief scan WiFi APs and return json
+ */
+const char *
+wifi_manager_scan_sync(void);
+
+/**
  * @brief requests to disconnect from Ethernet.
  */
 void
@@ -153,6 +159,9 @@ wifi_manager_update_network_connection_info(
 
 void
 wifi_manager_set_extra_info_for_status_json(const char *const p_extra);
+
+const char *
+wifi_manager_generate_json_access_points(void);
 
 #ifdef __cplusplus
 }
