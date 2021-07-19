@@ -66,6 +66,7 @@ typedef struct wifi_manager_callbacks_t
 bool
 wifi_manager_start(
     const bool                            flag_start_wifi,
+    const bool                            flag_start_ap_only,
     const wifi_ssid_t *const              p_gw_wifi_ssid,
     const WiFiAntConfig_t *               p_wifi_ant_config,
     const wifi_manager_callbacks_t *const p_callbacks);

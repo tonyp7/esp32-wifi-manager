@@ -287,6 +287,7 @@ wifi_manager_init_start_wifi(const WiFiAntConfig_t *p_wifi_ant_config, const wif
 static bool
 wifi_manager_init(
     const bool                            flag_start_wifi,
+    const bool                            flag_start_ap_only,
     const wifi_ssid_t *const              p_gw_wifi_ssid,
     const WiFiAntConfig_t *               p_wifi_ant_config,
     const wifi_manager_callbacks_t *const p_callbacks)
@@ -325,7 +326,7 @@ wifi_manager_init(
 
     if (flag_start_wifi)
     {
-        if (wifi_sta_config_fetch())
+        if (!flag_start_ap_only && wifi_sta_config_fetch())
         {
             LOG_INFO("Saved wifi found on startup. Will attempt to connect.");
             wifiman_msg_send_cmd_connect_sta(CONNECTION_REQUEST_RESTORE_CONNECTION);
@@ -344,6 +345,7 @@ wifi_manager_init(
 bool
 wifi_manager_start(
     const bool                            flag_start_wifi,
+    const bool                            flag_start_ap_only,
     const wifi_ssid_t *const              p_gw_wifi_ssid,
     const WiFiAntConfig_t *               p_wifi_ant_config,
     const wifi_manager_callbacks_t *const p_callbacks)
@@ -364,7 +366,12 @@ wifi_manager_start(
         g_wifi_manager_event_group = xEventGroupCreateStatic(&g_wifi_manager_event_group_mem);
     }
 
-    const bool res = wifi_manager_init(flag_start_wifi, p_gw_wifi_ssid, p_wifi_ant_config, p_callbacks);
+    const bool res = wifi_manager_init(
+        flag_start_wifi,
+        flag_start_ap_only,
+        p_gw_wifi_ssid,
+        p_wifi_ant_config,
+        p_callbacks);
     if (!res)
     {
         xEventGroupClearBits(g_wifi_manager_event_group, WIFI_MANAGER_IS_WORKING);
