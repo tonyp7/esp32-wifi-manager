@@ -59,6 +59,9 @@ _Static_assert(
     MAX_PASSWORD_SIZE == sizeof(g_wifi_sta_config.wifi_config_sta.sta.password),
     "sizeof(g_wifi_config_sta.sta.password) == MAX_PASSWORD_SIZE");
 
+static bool
+wifi_sta_config_do_save(wifiman_sta_config_t *const p_cfg, void *const p_param);
+
 static wifiman_sta_config_t *
 wifiman_sta_config_lock(void)
 {
@@ -128,7 +131,14 @@ static void
 wifiman_sta_config_do_init(wifiman_sta_config_t *const p_cfg, const void *const p_param)
 {
     const wifi_ssid_t *const p_gw_wifi_ssid = p_param;
-    g_wifi_ap_ssid                          = *p_gw_wifi_ssid;
+    if (NULL != p_gw_wifi_ssid)
+    {
+        g_wifi_ap_ssid = *p_gw_wifi_ssid;
+    }
+    else
+    {
+        g_wifi_ap_ssid.ssid_buf[0] = '\0';
+    }
 
     wifiman_sta_config_do_clear(p_cfg);
 }
@@ -148,14 +158,42 @@ wifi_sta_config_clear(void)
 }
 
 static bool
-wifi_sta_nvs_open(const nvs_open_mode_t open_mode, nvs_handle_t *const p_handle)
+wifi_sta_nvs_open(const nvs_open_mode_t open_mode, nvs_handle_t *const p_handle, wifiman_sta_config_t *const p_cfg)
 {
-    const char *    nvs_name = wifi_manager_nvs_namespace;
-    const esp_err_t err      = nvs_open(nvs_name, open_mode, p_handle);
+    const char *nvs_name = wifi_manager_nvs_namespace;
+    esp_err_t   err      = nvs_open(nvs_name, open_mode, p_handle);
     if (ESP_OK != err)
     {
-        LOG_ERR_ESP(err, "Can't open '%s' NVS namespace", nvs_name);
-        return false;
+        if (ESP_ERR_NVS_NOT_INITIALIZED == err)
+        {
+            LOG_WARN("NVS namespace '%s': StorageState is INVALID, need to erase NVS", nvs_name);
+            return false;
+        }
+        else if (ESP_ERR_NVS_NOT_FOUND == err)
+        {
+            LOG_WARN("NVS namespace '%s' doesn't exist and mode is NVS_READONLY, try to create it", nvs_name);
+            wifiman_sta_config_do_init(p_cfg, NULL);
+            wifiman_sta_config_do_clear(p_cfg);
+            wifiman_sta_config_t cfg = { 0 };
+            if (!wifi_sta_config_do_save(p_cfg, &cfg))
+            {
+                LOG_ERR("Failed to create the wifi-manager settings in NVS");
+                return false;
+            }
+
+            LOG_INFO("NVS namespace '%s' created successfully", nvs_name);
+            err = nvs_open(nvs_name, open_mode, p_handle);
+            if (ESP_OK != err)
+            {
+                LOG_ERR_ESP(err, "Can't open NVS namespace: '%s'", nvs_name);
+                return false;
+            }
+        }
+        else
+        {
+            LOG_ERR_ESP(err, "Can't open NVS namespace: '%s'", nvs_name);
+            return false;
+        }
     }
     return true;
 }
@@ -224,7 +262,7 @@ wifi_sta_config_do_save(wifiman_sta_config_t *const p_cfg, void *const p_param)
     wifiman_sta_config_t *const p_cfg_copy = p_param;
 
     nvs_handle handle = 0;
-    if (!wifi_sta_nvs_open(NVS_READWRITE, &handle))
+    if (!wifi_sta_nvs_open(NVS_READWRITE, &handle, p_cfg))
     {
         LOG_ERR("%s failed", "wifi_sta_nvs_open");
         return false;
@@ -304,7 +342,7 @@ wifi_sta_config_do_fetch(wifiman_sta_config_t *const p_cfg, void *const p_param)
     wifiman_sta_config_t *const p_cfg_copy = p_param;
 
     nvs_handle handle = 0;
-    if (!wifi_sta_nvs_open(NVS_READONLY, &handle))
+    if (!wifi_sta_nvs_open(NVS_READONLY, &handle, p_cfg))
     {
         LOG_ERR("%s failed", "wifi_sta_nvs_open");
         return false;
@@ -323,7 +361,21 @@ wifi_sta_config_do_fetch(wifiman_sta_config_t *const p_cfg, void *const p_param)
         LOG_ERR("%s failed", "wifi_sta_config_read_by_handle");
         return false;
     }
-    *p_cfg_copy = *p_cfg;
+    if (NULL != p_cfg_copy)
+    {
+        *p_cfg_copy = *p_cfg;
+    }
+    return true;
+}
+
+bool
+wifi_sta_config_check(void)
+{
+    if (!wifiman_sta_config_transaction(&wifi_sta_config_do_fetch, NULL))
+    {
+        LOG_ERR("%s failed", "wifi_sta_config_do_fetch");
+        return false;
+    }
     return true;
 }
 

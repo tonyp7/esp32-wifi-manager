@@ -53,6 +53,13 @@ bool
 wifi_sta_config_save(void);
 
 /**
+ * @brief Check if the STA wifi config in NVS is valid.
+ * @return true if it is valid.
+ */
+bool
+wifi_sta_config_check(void);
+
+/**
  * @brief Fetch a previously STA wifi config from NVS to the RAM storage.
  * @return true if a previously saved config was found, false otherwise.
  */

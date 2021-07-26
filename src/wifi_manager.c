@@ -418,6 +418,12 @@ wifi_manager_cb_on_http_delete(
 }
 
 bool
+wifi_manager_check_sta_config(void)
+{
+    return wifi_sta_config_check();
+}
+
+bool
 wifi_manager_clear_sta_config(const wifi_ssid_t *const p_gw_wifi_ssid)
 {
     wifi_sta_config_init(p_gw_wifi_ssid);

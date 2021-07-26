@@ -84,7 +84,13 @@ void
 wifi_manager_start_ap(void);
 
 /**
- * @brief clears the current STA wifi config in flash ram storage.
+ * @brief Checks if the current STA wifi config in NVS is valid.
+ */
+bool
+wifi_manager_check_sta_config(void);
+
+/**
+ * @brief Clears the current STA wifi config in NVS.
  */
 bool
 wifi_manager_clear_sta_config(const wifi_ssid_t *const p_gw_wifi_ssid);
