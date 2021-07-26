@@ -79,7 +79,8 @@ http_server_handle_req_get(
     {
         if ((HTTP_RESP_CODE_200 != resp_auth.http_resp_code) && (0 != strcmp(p_file_name, "auth.html")))
         {
-            if (HTTP_SERVER_AUTH_TYPE_RUUVI == p_auth_info->auth_type)
+            if ((HTTP_SERVER_AUTH_TYPE_RUUVI == p_auth_info->auth_type)
+                || ((HTTP_SERVER_AUTH_TYPE_DENY == p_auth_info->auth_type)))
             {
                 snprintf(
                     p_extra_header_fields->buf,
