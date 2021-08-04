@@ -381,6 +381,16 @@ wifi_manager_start(
     return res;
 }
 
+void
+wifi_manager_cb_on_user_req(const http_server_user_req_code_e req_code)
+{
+    if (NULL == g_wifi_callbacks.cb_on_http_user_req)
+    {
+        return;
+    }
+    g_wifi_callbacks.cb_on_http_user_req(req_code);
+}
+
 http_server_resp_t
 wifi_manager_cb_on_http_get(
     const char *const               p_path,

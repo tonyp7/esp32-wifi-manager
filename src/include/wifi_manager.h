@@ -50,6 +50,7 @@ typedef struct
 
 typedef struct wifi_manager_callbacks_t
 {
+    wifi_manager_http_cb_on_user_req_t             cb_on_http_user_req;
     wifi_manager_http_callback_t                   cb_on_http_get;
     wifi_manager_http_cb_on_post_t                 cb_on_http_post;
     wifi_manager_http_callback_t                   cb_on_http_delete;

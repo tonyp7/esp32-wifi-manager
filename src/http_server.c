@@ -77,7 +77,14 @@ function to process requests, decode URLs, serve files, etc. etc.
 #define LOG_LOCAL_LEVEL LOG_LEVEL_INFO
 #include "log.h"
 
-#define HTTP_SERVER_SIG_STOP (OS_SIGNAL_NUM_0)
+typedef enum http_server_sig_e
+{
+    HTTP_SERVER_SIG_STOP       = OS_SIGNAL_NUM_0,
+    HTTP_SERVER_SIG_USER_REQ_1 = OS_SIGNAL_NUM_1,
+} http_server_sig_e;
+
+#define HTTP_SERVER_SIG_FIRST (HTTP_SERVER_SIG_STOP)
+#define HTTP_SERVER_SIG_LAST  (HTTP_SERVER_SIG_USER_REQ_1)
 
 #define FULLBUF_SIZE (4U * 1024U)
 
@@ -120,13 +127,28 @@ static bool               g_http_server_disable_ap_stopping_by_timeout;
 
 static http_header_extra_fields_t g_http_server_extra_header_fields;
 
+ATTR_PURE
+static os_signal_num_e
+http_server_conv_to_sig_num(const http_server_sig_e sig)
+{
+    return (os_signal_num_e)sig;
+}
+
+static http_server_sig_e
+http_server_conv_from_sig_num(const os_signal_num_e sig_num)
+{
+    assert(((os_signal_num_e)HTTP_SERVER_SIG_FIRST <= sig_num) && (sig_num <= (os_signal_num_e)HTTP_SERVER_SIG_LAST));
+    return (http_server_sig_e)sig_num;
+}
+
 void
 http_server_init(void)
 {
     assert(NULL == g_http_server_mutex);
     g_http_server_mutex = os_mutex_create_static(&g_http_server_mutex_mem);
     gp_http_server_sig  = os_signal_create_static(&g_http_server_signal_mem);
-    os_signal_add(gp_http_server_sig, HTTP_SERVER_SIG_STOP);
+    os_signal_add(gp_http_server_sig, http_server_conv_to_sig_num(HTTP_SERVER_SIG_STOP));
+    os_signal_add(gp_http_server_sig, http_server_conv_to_sig_num(HTTP_SERVER_SIG_USER_REQ_1));
 }
 
 void
@@ -572,7 +594,7 @@ http_server_stop(void)
     if (os_signal_is_any_thread_registered(gp_http_server_sig))
     {
         LOG_INFO("Send request to stop HTTP-Server");
-        if (!os_signal_send(gp_http_server_sig, HTTP_SERVER_SIG_STOP))
+        if (!os_signal_send(gp_http_server_sig, http_server_conv_to_sig_num(HTTP_SERVER_SIG_STOP)))
         {
             LOG_ERR("Failed to send HTTP-Server stop request");
         }
@@ -580,6 +602,40 @@ http_server_stop(void)
     else
     {
         LOG_INFO("Send request to stop HTTP-Server, but HTTP-Server is not running");
+    }
+    os_mutex_unlock(g_http_server_mutex);
+}
+
+void
+http_server_user_req(const http_server_user_req_code_e req_code)
+{
+    assert(NULL != g_http_server_mutex);
+    os_mutex_lock(g_http_server_mutex);
+    if (os_signal_is_any_thread_registered(gp_http_server_sig))
+    {
+        http_server_sig_e sig_num = HTTP_SERVER_SIG_STOP;
+        switch (req_code)
+        {
+            case HTTP_SERVER_USER_REQ_CODE_1:
+                sig_num = HTTP_SERVER_SIG_USER_REQ_1;
+                break;
+        }
+        if (HTTP_SERVER_SIG_STOP == sig_num)
+        {
+            LOG_ERR("Unknown req_code=%d", (printf_int_t)sig_num);
+        }
+        else
+        {
+            LOG_INFO("Send user request to HTTP-Server: sig_num=%d", (printf_int_t)sig_num);
+            if (!os_signal_send(gp_http_server_sig, http_server_conv_to_sig_num(sig_num)))
+            {
+                LOG_ERR("Failed to send the user request to HTTP-Server");
+            }
+        }
+    }
+    else
+    {
+        LOG_ERR("Failed to send the user request to HTTP-Server - HTTP-Server is not working");
     }
     os_mutex_unlock(g_http_server_mutex);
 }
@@ -753,14 +809,34 @@ http_server_task(void)
     netconn_listen(p_conn);
     netconn_set_recvtimeout(p_conn, HTTP_SERVER_ACCEPT_TIMEOUT_MS);
     LOG_INFO("HTTP Server listening on 80/tcp");
-    for (;;)
+    bool flag_stop = false;
+    while (!flag_stop)
     {
         os_signal_events_t sig_events = { 0 };
         if (os_signal_wait_with_timeout(gp_http_server_sig, OS_DELTA_TICKS_IMMEDIATE, &sig_events))
         {
-            LOG_INFO("Got signal STOP");
-            break;
+            for (;;)
+            {
+                const os_signal_num_e sig_num = os_signal_num_get_next(&sig_events);
+                if (OS_SIGNAL_NUM_NONE == sig_num)
+                {
+                    break;
+                }
+                const http_server_sig_e http_server_task_sig = http_server_conv_from_sig_num(sig_num);
+                switch (http_server_task_sig)
+                {
+                    case HTTP_SERVER_SIG_STOP:
+                        LOG_INFO("Got signal STOP");
+                        flag_stop = true;
+                        break;
+                    case HTTP_SERVER_SIG_USER_REQ_1:
+                        LOG_INFO("Got signal USER_REQ_1");
+                        wifi_manager_cb_on_user_req(HTTP_SERVER_USER_REQ_CODE_1);
+                        break;
+                }
+            }
         }
+
         struct netconn *p_new_conn = NULL;
 
         const err_t err = netconn_accept(p_conn, &p_new_conn);

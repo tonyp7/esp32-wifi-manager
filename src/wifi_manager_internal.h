@@ -43,6 +43,9 @@ wifi_manager_lock(void);
 void
 wifi_manager_unlock(void);
 
+void
+wifi_manager_cb_on_user_req(const http_server_user_req_code_e req_code);
+
 http_server_resp_t
 wifi_manager_cb_on_http_get(
     const char *const               p_path,

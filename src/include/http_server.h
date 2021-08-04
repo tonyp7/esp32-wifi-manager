@@ -1,4 +1,3 @@
-#include <limits.h>
 /*
 Copyright (c) 2017-2019 Tony Pottier
 
@@ -36,11 +35,17 @@ function to process requests, decode URLs, serve files, etc. etc.
 #define HTTP_SERVER_H_INCLUDED
 
 #include <stdbool.h>
+#include <stdint.h>
 #include "http_server_auth_type.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+typedef enum http_server_user_req_code_e
+{
+    HTTP_SERVER_USER_REQ_CODE_1 = 1,
+} http_server_user_req_code_e;
 
 /**
  * @brief Init the http server.
@@ -63,6 +68,9 @@ http_server_start(void);
  */
 void
 http_server_stop(void);
+
+void
+http_server_user_req(const http_server_user_req_code_e req_code);
 
 void
 http_server_on_ap_sta_connected(void);
