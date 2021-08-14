@@ -33,6 +33,7 @@ Contains the freeRTOS task and all necessary support
 #define WIFI_MANAGER_H_INCLUDED
 
 #include <stdbool.h>
+#include "esp_wifi.h"
 
 
 #ifdef __cplusplus
