@@ -82,6 +82,12 @@ extern "C" {
  */
 #define WIFI_MANAGER_SHUTDOWN_AP_TIMER		CONFIG_WIFI_MANAGER_SHUTDOWN_AP_TIMER
 
+/**
+ * @brief Time (in ms) to wait before scan attempts
+ * Defines the time (in ms) to wait after failure before trying to start a scan again.
+ */
+#define WIFI_MANAGER_SCAN_RETRY				( 500 )
+
 
 /** @brief Defines the task priority of the wifi_manager.
  *

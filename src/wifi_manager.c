@@ -73,6 +73,10 @@ TimerHandle_t wifi_manager_retry_timer = NULL;
  * There is no point hogging a hardware timer for a functionality like this which only needs to be 'accurate enough' */
 TimerHandle_t wifi_manager_shutdown_ap_timer = NULL;
 
+/* @brief software timer that used to retry scanning, if scanning could not be
+ * started due to an in-progress connection attempt. */
+TimerHandle_t wifi_manager_scan_retry_timer = NULL;
+
 SemaphoreHandle_t wifi_manager_json_mutex = NULL;
 SemaphoreHandle_t wifi_manager_sta_ip_mutex = NULL;
 char *wifi_manager_sta_ip = NULL;
@@ -164,6 +168,15 @@ void wifi_manager_timer_shutdown_ap_cb( TimerHandle_t xTimer){
 	wifi_manager_send_message(WM_ORDER_STOP_AP, NULL);
 }
 
+void wifi_manager_timer_scan_retry_cb( TimerHandle_t xTimer){
+
+	/* stop the timer */
+	xTimerStop( xTimer, (TickType_t) 0 );
+
+	/* Retry scan */
+	wifi_manager_send_message(WM_ORDER_START_WIFI_SCAN, NULL);
+}
+
 void wifi_manager_scan_async(){
 	wifi_manager_send_message(WM_ORDER_START_WIFI_SCAN, NULL);
 }
@@ -207,6 +220,9 @@ void wifi_manager_start(){
 
 	/* create timer for to keep track of AP shutdown */
 	wifi_manager_shutdown_ap_timer = xTimerCreate( NULL, pdMS_TO_TICKS(WIFI_MANAGER_SHUTDOWN_AP_TIMER), pdFALSE, ( void * ) 0, wifi_manager_timer_shutdown_ap_cb);
+
+	/* create timer for retrying the start of a scan */
+	wifi_manager_scan_retry_timer = xTimerCreate( NULL, pdMS_TO_TICKS(WIFI_MANAGER_SCAN_RETRY), pdFALSE, ( void * ) 0, wifi_manager_timer_scan_retry_cb);
 
 	/* start wifi manager task */
 	xTaskCreate(&wifi_manager, "wifi_manager", 4096, NULL, WIFI_MANAGER_TASK_PRIORITY, &task_wifi_manager);
@@ -1011,13 +1027,18 @@ void wifi_manager( void * pvParameters ){
 				break;
 
 			case WM_ORDER_START_WIFI_SCAN:
-				ESP_LOGD(TAG, "MESSAGE: ORDER_START_WIFI_SCAN");
+				ESP_LOGI(TAG, "MESSAGE: ORDER_START_WIFI_SCAN");
 
 				/* if a scan is already in progress this message is simply ignored thanks to the WIFI_MANAGER_SCAN_BIT uxBit */
 				uxBits = xEventGroupGetBits(wifi_manager_event_group);
 				if(! (uxBits & WIFI_MANAGER_SCAN_BIT) ){
-					xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_SCAN_BIT);
-					ESP_ERROR_CHECK(esp_wifi_scan_start(&scan_config, false));
+					if( esp_wifi_scan_start(&scan_config, false) == ESP_OK ){
+						xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_SCAN_BIT);
+					}
+					else{
+						/* could not start scan, possibly due to in-progress connection attempt, retry later */
+						xTimerStart( wifi_manager_scan_retry_timer, (TickType_t)0 );
+					}
 				}
 
 				/* callback */
