@@ -989,8 +989,25 @@ http_server_netconn_serve(struct netconn *const p_conn)
 
     sta_ip_string_t local_ip_str  = { '\0' };
     sta_ip_string_t remote_ip_str = { '\0' };
-    ipaddr_ntoa_r(&p_conn->pcb.tcp->local_ip, local_ip_str.buf, sizeof(local_ip_str.buf));
-    ipaddr_ntoa_r(&p_conn->pcb.tcp->remote_ip, remote_ip_str.buf, sizeof(remote_ip_str.buf));
+
+    struct tcp_pcb *const p_tcp = p_conn->pcb.tcp;
+    if (NULL == p_tcp)
+    {
+        LOG_ERR("p_conn->pcb.tcp is NULL due to race condition(1)");
+        return;
+    }
+
+    const ip_addr_t local_ip  = p_tcp->local_ip;
+    const ip_addr_t remote_ip = p_tcp->remote_ip;
+
+    if (NULL == p_conn->pcb.tcp)
+    {
+        LOG_ERR("p_conn->pcb.tcp is NULL due to race condition(2)");
+        return;
+    }
+
+    ipaddr_ntoa_r(&local_ip, local_ip_str.buf, sizeof(local_ip_str.buf));
+    ipaddr_ntoa_r(&remote_ip, remote_ip_str.buf, sizeof(remote_ip_str.buf));
 
     while (!req_ready)
     {
