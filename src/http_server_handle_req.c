@@ -208,16 +208,53 @@ http_server_handle_req_post_connect_json(const http_req_header_t http_header)
     const char *p_password   = http_req_header_get_field(http_header, "X-Custom-pwd:", &len_password);
     if ((NULL == p_ssid) && (NULL == p_password))
     {
+        LOG_INFO("POST /connect.json: SSID:NULL, PWD: NULL - connect to Ethernet");
         wifiman_msg_send_cmd_connect_eth();
         return http_server_resp_200_json("{}");
     }
-    if ((NULL != p_ssid) && (len_ssid <= MAX_SSID_SIZE) && (NULL != p_password) && (len_password <= MAX_PASSWORD_SIZE))
+    if ((NULL != p_ssid) && (len_ssid <= MAX_SSID_SIZE))
     {
-        wifi_sta_config_set_ssid_and_password(p_ssid, len_ssid, p_password, len_password);
+        if (NULL == p_password)
+        {
+            const wifi_ssid_t saved_ssid = wifi_sta_config_get_ssid();
+            if ((0 == strncmp(saved_ssid.ssid_buf, p_ssid, len_ssid)) && (strlen(saved_ssid.ssid_buf) == len_ssid))
+            {
+                LOG_INFO(
+                    "POST /connect.json: SSID:%.*s, PWD: NULL - reconnect to saved WiFi",
+                    (printf_int_t)len_ssid,
+                    p_ssid);
+            }
+            else
+            {
+                LOG_WARN(
+                    "POST /connect.json: SSID:%.*s, PWD: NULL - try to reconnect to saved WiFi, but previous SSID=%s",
+                    (printf_int_t)len_ssid,
+                    p_ssid,
+                    saved_ssid.ssid_buf);
+                wifi_sta_config_set_ssid_and_password(p_ssid, len_ssid, "", 0);
+            }
+            LOG_DBG("http_server_netconn_serve: wifi_manager_connect_async() call");
+            wifi_manager_connect_async();
+            return http_server_resp_200_json("{}");
+        }
+        else
+        {
+            LOG_DBG(
+                "POST /connect.json: SSID:%.*s, PWD: %.*s - connect to WiFi",
+                (printf_int_t)len_ssid,
+                p_ssid,
+                (printf_int_t)len_password,
+                p_password);
+            LOG_INFO("POST /connect.json: SSID:%.*s, PWD: ******** - connect to WiFi", (printf_int_t)len_ssid, p_ssid);
+            if ((len_password <= MAX_PASSWORD_SIZE))
+            {
+                wifi_sta_config_set_ssid_and_password(p_ssid, len_ssid, p_password, len_password);
 
-        LOG_DBG("http_server_netconn_serve: wifi_manager_connect_async() call");
-        wifi_manager_connect_async();
-        return http_server_resp_200_json("{}");
+                LOG_DBG("http_server_netconn_serve: wifi_manager_connect_async() call");
+                wifi_manager_connect_async();
+                return http_server_resp_200_json("{}");
+            }
+        }
     }
     /* bad request the authentication header is not complete/not the correct format */
     return http_server_resp_400();
