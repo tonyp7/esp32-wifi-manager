@@ -863,7 +863,8 @@ wifi_handle_ev_sta_disconnected(const wifiman_msg_param_t *p_param)
         update_reason_code = UPDATE_LOST_CONNECTION;
         wifiman_msg_send_cmd_connect_sta(CONNECTION_REQUEST_AUTO_RECONNECT);
     }
-    wifi_manager_update_network_connection_info(update_reason_code, NULL, NULL);
+    const wifi_ssid_t ssid = wifi_sta_config_get_ssid();
+    wifi_manager_update_network_connection_info(update_reason_code, &ssid, NULL);
     if (!is_connected_to_wifi)
     {
         return false;
