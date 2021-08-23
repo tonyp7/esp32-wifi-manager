@@ -869,7 +869,6 @@ wifi_handle_ev_sta_disconnected(const wifiman_msg_param_t *p_param)
     {
         return false;
     }
-    dns_server_start();
     return true;
 }
 
@@ -923,9 +922,6 @@ wifi_handle_ev_sta_got_ip(const wifiman_msg_param_t *p_param)
     {
         LOG_ERR_ESP(err, "%s failed", "tcpip_adapter_get_ip_info");
     }
-
-    /* bring down DNS hijack */
-    dns_server_stop();
 }
 
 static void
