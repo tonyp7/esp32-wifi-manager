@@ -1026,24 +1026,26 @@ http_server_netconn_serve(struct netconn *const p_conn)
 
     const http_req_info_t req_info = http_req_parse(req_buf);
 
+    if (!req_info.is_success)
+    {
+        LOG_ERR("Request from %s to %s: failed to parse request: %s", remote_ip_str.buf, local_ip_str.buf, req_buf);
+        http_server_netconn_resp_400(p_conn);
+        return;
+    }
+
     LOG_INFO(
         "Request from %s to %s: %s %s",
         remote_ip_str.buf,
         local_ip_str.buf,
-        req_info.http_cmd.ptr,
-        req_info.http_uri.ptr);
+        req_info.http_cmd.ptr ? req_info.http_cmd.ptr : "NULL",
+        req_info.http_uri.ptr ? req_info.http_uri.ptr : "NULL");
 
-    LOG_DBG("p_http_cmd: %s", req_info.http_cmd.ptr);
-    LOG_DBG("p_http_uri: %s", req_info.http_uri.ptr);
-    LOG_DBG("p_http_ver: %s", req_info.http_ver.ptr);
-    LOG_DBG("p_http_header: %s", req_info.http_header.ptr);
-    LOG_DBG("p_http_body: %s", req_info.http_body.ptr);
+    LOG_DBG("p_http_cmd: %s", req_info.http_cmd.ptr ? req_info.http_cmd.ptr : "NULL");
+    LOG_DBG("p_http_uri: %s", req_info.http_uri.ptr ? req_info.http_uri.ptr : "NULL");
+    LOG_DBG("p_http_ver: %s", req_info.http_ver.ptr ? req_info.http_ver.ptr : "NULL");
+    LOG_DBG("p_http_header: %s", req_info.http_header.ptr ? req_info.http_header.ptr : "NULL");
+    LOG_DBG("p_http_body: %s", req_info.http_body.ptr ? req_info.http_body.ptr : "NULL");
 
-    if (!req_info.is_success)
-    {
-        http_server_netconn_resp_400(p_conn);
-        return;
-    }
     const bool is_wifi_manager_working = wifi_manager_is_working();
 
     /* captive portal functionality: redirect to access point IP for HOST that are not the access point IP OR the
