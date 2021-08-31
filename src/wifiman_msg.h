@@ -62,6 +62,9 @@ bool
 wifiman_msg_send_cmd_start_wifi_scan(void);
 
 bool
+wifiman_msg_send_ev_scan_next(void);
+
+bool
 wifiman_msg_send_ev_scan_done(void);
 
 bool

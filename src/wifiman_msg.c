@@ -170,6 +170,15 @@ wifiman_msg_send_cmd_start_wifi_scan(void)
 }
 
 bool
+wifiman_msg_send_ev_scan_next(void)
+{
+    const wifiman_msg_param_t msg_param = {
+        .ptr = NULL,
+    };
+    return wifiman_msg_send(EVENT_SCAN_NEXT, msg_param);
+}
+
+bool
 wifiman_msg_send_ev_scan_done(void)
 {
     const wifiman_msg_param_t msg_param = {

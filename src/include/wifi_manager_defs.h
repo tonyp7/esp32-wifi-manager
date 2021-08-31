@@ -201,12 +201,13 @@ typedef enum message_code_e
     ORDER_START_AP            = 8,
     ORDER_STOP_AP             = 9,
     EVENT_STA_DISCONNECTED    = 10,
-    EVENT_SCAN_DONE           = 11,
-    EVENT_STA_GOT_IP          = 12,
-    EVENT_AP_STA_CONNECTED    = 13,
-    EVENT_AP_STA_DISCONNECTED = 14,
-    EVENT_AP_STA_IP_ASSIGNED  = 15,
-    MESSAGE_CODE_COUNT        = 16 /* important for the callback array */
+    EVENT_SCAN_NEXT           = 11,
+    EVENT_SCAN_DONE           = 12,
+    EVENT_STA_GOT_IP          = 13,
+    EVENT_AP_STA_CONNECTED    = 14,
+    EVENT_AP_STA_DISCONNECTED = 15,
+    EVENT_AP_STA_IP_ASSIGNED  = 16,
+    MESSAGE_CODE_COUNT        = 17 /* important for the callback array */
 } message_code_e;
 
 /**

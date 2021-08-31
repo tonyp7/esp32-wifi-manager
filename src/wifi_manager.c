@@ -65,8 +65,18 @@ Contains the freeRTOS task and all necessary support
 #include "os_mutex.h"
 #include "os_sema.h"
 
-#define LOG_LOCAL_LEVEL LOG_LEVEL_DEBUG
+#define LOG_LOCAL_LEVEL LOG_LEVEL_INFO
 #include "log.h"
+
+#define WIFI_MANAGER_DELAY_BETWEEN_SCANNING_WIFI_CHANNELS_MS (200U)
+
+typedef struct wifi_manger_scan_info_t
+{
+    uint8_t  first_chan;
+    uint8_t  last_chan;
+    uint8_t  cur_chan;
+    uint16_t num_access_points;
+} wifi_manger_scan_info_t;
 
 /* @brief tag used for ESP serial console messages */
 static const char TAG[] = "wifi_manager";
@@ -86,6 +96,10 @@ static StaticEventGroup_t g_wifi_manager_event_group_mem;
 
 static os_sema_t        g_scan_sync_sema;
 static os_sema_static_t g_scan_sync_sema_mem;
+
+static wifi_manger_scan_info_t g_wifi_scan_info;
+static TimerHandle_t           g_wifi_scan_timer;
+static StaticTimer_t           g_wifi_scan_timer_mem;
 
 /* @brief indicate that wifi_manager is working. */
 #define WIFI_MANAGER_IS_WORKING ((uint32_t)(BIT0))
@@ -156,6 +170,7 @@ wifi_manager_scan_sync(void)
         return NULL;
     }
     g_scan_sync_sema = os_sema_create_static(&g_scan_sync_sema_mem);
+    LOG_INFO("wifi_manager_scan_sync: wifiman_msg_send_cmd_start_wifi_scan");
     if (!wifiman_msg_send_cmd_start_wifi_scan())
     {
         wifi_manager_unlock();
@@ -168,6 +183,7 @@ wifi_manager_scan_sync(void)
     wifi_manager_lock();
     os_sema_delete(&g_scan_sync_sema);
     const char *const p_buf = wifi_manager_generate_json_access_points();
+    LOG_INFO("wifi_manager_scan_sync: p_buf: %s", p_buf ? p_buf : "NULL");
     wifi_manager_unlock();
 
     return p_buf;
@@ -284,6 +300,12 @@ wifi_manager_init_start_wifi(const WiFiAntConfig_t *p_wifi_ant_config, const wif
     return true;
 }
 
+static void
+wifi_scan_next_timer_handler(TimerHandle_t xTimer)
+{
+    wifiman_msg_send_ev_scan_next();
+}
+
 static bool
 wifi_manager_init(
     const bool                            flag_start_wifi,
@@ -299,6 +321,14 @@ wifi_manager_init(
         return false;
     }
     xEventGroupSetBits(g_wifi_manager_event_group, WIFI_MANAGER_IS_WORKING);
+
+    g_wifi_scan_timer = xTimerCreateStatic(
+        "wifi_scan",
+        pdMS_TO_TICKS(WIFI_MANAGER_DELAY_BETWEEN_SCANNING_WIFI_CHANNELS_MS),
+        pdFALSE,
+        NULL,
+        &wifi_scan_next_timer_handler,
+        &g_wifi_scan_timer_mem);
 
     g_wifi_callbacks = *p_callbacks;
 
@@ -506,6 +536,22 @@ wifi_manager_unlock(void)
     xSemaphoreGiveRecursive(gh_wifi_mutex);
 }
 
+static bool
+wifi_scan_next(wifi_manger_scan_info_t *const p_scan_info)
+{
+    p_scan_info->cur_chan += 1;
+    if (p_scan_info->cur_chan > p_scan_info->last_chan)
+    {
+        return true; // scanning finished
+    }
+    LOG_INFO(
+        "Delay %u ms before scanning Wi-Fi APs on channel %u",
+        (printf_uint_t)WIFI_MANAGER_DELAY_BETWEEN_SCANNING_WIFI_CHANNELS_MS,
+        (printf_uint_t)p_scan_info->cur_chan);
+    xTimerStart(g_wifi_scan_timer, pdMS_TO_TICKS(WIFI_MANAGER_DELAY_BETWEEN_SCANNING_WIFI_CHANNELS_MS));
+    return false; // scanning not finished
+}
+
 static void
 wifi_manager_event_handler(
     ATTR_UNUSED void *     p_ctx,
@@ -521,8 +567,6 @@ wifi_manager_event_handler(
                 LOG_INFO("WIFI_EVENT_WIFI_READY");
                 break;
             case WIFI_EVENT_SCAN_DONE:
-                LOG_DBG("WIFI_EVENT_SCAN_DONE");
-                xEventGroupClearBits(g_wifi_manager_event_group, WIFI_MANAGER_SCAN_BIT);
                 wifiman_msg_send_ev_scan_done();
                 break;
             case WIFI_EVENT_STA_AUTHMODE_CHANGE:
@@ -621,37 +665,95 @@ wifi_manager_set_callback(const message_code_e message_code, wifi_manager_cb_ptr
 }
 
 static void
+wifi_manger_notify_scan_done(wifi_manger_scan_info_t *const p_scan_info)
+{
+    /* Will remove the duplicate SSIDs from the list and update ap_num */
+    g_wifi_ap_num = ap_list_filter_unique(g_wifi_accessp_records, p_scan_info->num_access_points);
+
+    xEventGroupClearBits(g_wifi_manager_event_group, WIFI_MANAGER_SCAN_BIT);
+    if (NULL != g_scan_sync_sema)
+    {
+        LOG_INFO("NOTIFY: wifi scan done");
+        os_sema_signal(g_scan_sync_sema);
+    }
+}
+
+static void
+wifi_handle_ev_scan_next(void)
+{
+    wifi_manger_scan_info_t *const p_scan_info = &g_wifi_scan_info;
+    /* wifi scanner config */
+    const wifi_scan_config_t scan_config = {
+        .ssid        = NULL,
+        .bssid       = NULL,
+        .channel     = p_scan_info->cur_chan,
+        .show_hidden = true,
+        .scan_type   = WIFI_SCAN_TYPE_ACTIVE,
+        .scan_time   = {
+            .active  = {
+                .min = 0,
+                .max = 100,
+            },
+        },
+    };
+
+    LOG_INFO("Start scanning WiFi channel %u", p_scan_info->cur_chan);
+    const esp_err_t ret = esp_wifi_scan_start(&scan_config, false);
+    // sometimes when connecting to a network, a scan is started at the same time and then the scan
+    // will fail that's fine because we already have a network to connect and we don't need new scan
+    // results
+    if (0 != ret)
+    {
+        LOG_WARN("EVENT_SCAN_NEXT: scan start return: %d", ret);
+        wifi_manager_lock();
+        wifi_manger_notify_scan_done(p_scan_info);
+        wifi_manager_unlock();
+    }
+}
+
+static void
 wifi_handle_ev_scan_done(void)
 {
-    LOG_DBG("MESSAGE: EVENT_SCAN_DONE");
-    /* make sure the http server isn't trying to access the list while it gets refreshed */
-    if (wifi_manager_lock_with_timeout(pdMS_TO_TICKS(1000)))
-    {
-        /* As input param, it stores max AP number ap_records can hold. As output param, it receives the
-         * actual AP number this API returns.
-         * As a consequence, ap_num MUST be reset to MAX_AP_NUM at every scan */
+    wifi_manger_scan_info_t *const p_scan_info = &g_wifi_scan_info;
+    LOG_DBG("MESSAGE: EVENT_SCAN_DONE: channel=%u", (printf_uint_t)p_scan_info->cur_chan);
 
-        g_wifi_ap_num = MAX_AP_NUM;
-        esp_err_t err = esp_wifi_scan_get_ap_records(&g_wifi_ap_num, g_wifi_accessp_records);
-        if (ESP_OK != err)
-        {
-            g_wifi_ap_num = 0;
-            LOG_ERR_ESP(err, "%s failed", "esp_wifi_scan_get_ap_records");
-        }
-        else
-        {
-            /* Will remove the duplicate SSIDs from the list and update ap_num */
-            g_wifi_ap_num = ap_list_filter_unique(g_wifi_accessp_records, g_wifi_ap_num);
-        }
+    wifi_manager_lock();
+
+    uint16_t        wifi_ap_num = MAX_AP_NUM - p_scan_info->num_access_points;
+    const esp_err_t err         = esp_wifi_scan_get_ap_records(
+        &wifi_ap_num,
+        &g_wifi_accessp_records[p_scan_info->num_access_points]);
+    if (ESP_OK != err)
+    {
+        LOG_ERR_ESP(
+            err,
+            "MESSAGE: EVENT_SCAN_DONE: channel=%u: esp_wifi_scan_get_ap_records failed",
+            (printf_uint_t)p_scan_info->cur_chan);
+        wifi_manger_notify_scan_done(p_scan_info);
+        wifi_manager_unlock();
+        return;
+    }
+    LOG_INFO(
+        "EVENT_SCAN_DONE: found %u Wi-Fi APs on channel %u",
+        (printf_uint_t)wifi_ap_num,
+        (printf_int_t)p_scan_info->cur_chan);
+    p_scan_info->num_access_points += wifi_ap_num;
+    if (p_scan_info->num_access_points >= MAX_AP_NUM)
+    {
+        p_scan_info->num_access_points = MAX_AP_NUM;
+        wifi_manger_notify_scan_done(p_scan_info);
+        wifi_manager_unlock();
+        return;
+    }
+    if (wifi_scan_next(&g_wifi_scan_info))
+    {
+        LOG_INFO("EVENT_SCAN_DONE: scanning finished");
+        wifi_manger_notify_scan_done(p_scan_info);
         wifi_manager_unlock();
     }
     else
     {
-        LOG_ERR("could not get access to json mutex in wifi_scan");
-    }
-    if (NULL != g_scan_sync_sema)
-    {
-        os_sema_signal(g_scan_sync_sema);
+        wifi_manager_unlock();
     }
 }
 
@@ -674,38 +776,36 @@ wifi_manager_generate_json_access_points(void)
 static void
 wifi_handle_cmd_start_wifi_scan(void)
 {
-    LOG_DBG("MESSAGE: ORDER_START_WIFI_SCAN");
+    LOG_INFO("MESSAGE: ORDER_START_WIFI_SCAN");
 
     /* if a scan is already in progress this message is simply ignored thanks to the
      * WIFI_MANAGER_SCAN_BIT uxBit */
     const EventBits_t uxBits = xEventGroupGetBits(g_wifi_manager_event_group);
-    if (0 == (uxBits & WIFI_MANAGER_SCAN_BIT))
+    if (0 != (uxBits & WIFI_MANAGER_SCAN_BIT))
     {
-        xEventGroupSetBits(g_wifi_manager_event_group, WIFI_MANAGER_SCAN_BIT);
-        /* wifi scanner config */
-        const wifi_scan_config_t scan_config = {
-            .ssid        = NULL,
-            .bssid       = NULL,
-            .channel     = 0,
-            .show_hidden = true,
-            .scan_type   = WIFI_SCAN_TYPE_ACTIVE,
-            .scan_time   = {
-                .active  = {
-                    .min = 0,
-                    .max = 0,
-                },
-            },
-        };
+        return;
+    }
 
-        const esp_err_t ret = esp_wifi_scan_start(&scan_config, false);
-        // sometimes when connecting to a network, a scan is started at the same time and then the scan
-        // will fail that's fine because we already have a network to connect and we don't need new scan
-        // results
-        // TODO: maybe fix this in the web page that scanning is stopped when connecting to a network
-        if (0 != ret)
-        {
-            LOG_WARN("scan start return: %d", ret);
-        }
+    xEventGroupSetBits(g_wifi_manager_event_group, WIFI_MANAGER_SCAN_BIT);
+
+    wifi_country_t  wifi_country = { 0 };
+    const esp_err_t err          = esp_wifi_get_country(&wifi_country);
+    if (ESP_OK != err)
+    {
+        LOG_ERR_ESP(err, "%s failed", "esp_wifi_get_country");
+        wifi_country.schan = 1;
+        wifi_country.nchan = 13;
+    }
+
+    wifi_manger_scan_info_t *const p_scan_info = &g_wifi_scan_info;
+    p_scan_info->first_chan                    = wifi_country.schan;
+    p_scan_info->last_chan                     = wifi_country.schan + wifi_country.nchan - 1;
+    p_scan_info->cur_chan                      = 0;
+    p_scan_info->num_access_points             = 0;
+
+    if (wifi_scan_next(p_scan_info))
+    {
+        wifiman_msg_send_ev_scan_done();
     }
 }
 
@@ -1044,6 +1144,9 @@ wifi_manager_recv_and_handle_msg(void)
             {
                 flag_do_not_call_cb = true;
             }
+            break;
+        case EVENT_SCAN_NEXT:
+            wifi_handle_ev_scan_next();
             break;
         case EVENT_SCAN_DONE:
             wifi_handle_ev_scan_done();
