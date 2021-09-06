@@ -319,13 +319,14 @@ http_server_resp_auth_ruuvi_prep_www_authenticate_header(
 }
 
 http_server_resp_t
-http_server_resp_401_auth_ruuvi(
+http_server_resp_401_auth_ruuvi_with_new_session_id(
     const sta_ip_string_t *const      p_remote_ip,
     const wifi_ssid_t *const          p_ap_ssid,
     http_header_extra_fields_t *const p_extra_header_fields)
 {
     http_server_auth_ruuvi_t *const               p_auth_info     = http_server_auth_ruuvi_get_info();
     http_server_auth_ruuvi_login_session_t *const p_login_session = &p_auth_info->login_session;
+
     http_server_login_session_init(p_login_session, p_remote_ip);
 
     if (wifiman_sha256_is_empty_digest_hex_str(&p_login_session->challenge))
@@ -334,6 +335,20 @@ http_server_resp_401_auth_ruuvi(
     }
 
     http_server_resp_auth_ruuvi_prep_www_authenticate_header(p_ap_ssid, p_login_session, p_extra_header_fields);
+
+    const http_server_resp_auth_json_t *const p_auth_json = http_server_fill_auth_json(
+        false,
+        p_ap_ssid,
+        HTTP_SERVER_AUTH_TYPE_STR_RUUVI);
+    return http_server_resp_401_json(p_auth_json);
+}
+
+http_server_resp_t
+http_server_resp_401_auth_ruuvi(
+    const sta_ip_string_t *const      p_remote_ip,
+    const wifi_ssid_t *const          p_ap_ssid,
+    http_header_extra_fields_t *const p_extra_header_fields)
+{
     const http_server_resp_auth_json_t *const p_auth_json = http_server_fill_auth_json(
         false,
         p_ap_ssid,

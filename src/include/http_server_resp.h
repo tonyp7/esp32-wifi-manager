@@ -94,6 +94,12 @@ http_server_resp_401_auth_digest(
     http_header_extra_fields_t *const p_extra_header_fields);
 
 http_server_resp_t
+http_server_resp_401_auth_ruuvi_with_new_session_id(
+    const sta_ip_string_t *const      p_remote_ip,
+    const wifi_ssid_t *const          p_ap_ssid,
+    http_header_extra_fields_t *const p_extra_header_fields);
+
+http_server_resp_t
 http_server_resp_401_auth_ruuvi(
     const sta_ip_string_t *const      p_remote_ip,
     const wifi_ssid_t *const          p_ap_ssid,

@@ -54,14 +54,28 @@ http_server_handle_req_get(
     const http_server_auth_info_t *const p_auth_info,
     http_header_extra_fields_t *const    p_extra_header_fields)
 {
-    LOG_INFO("GET /%s", p_file_name_unchecked);
+    LOG_INFO("http_server_handle_req_get /%s", p_file_name_unchecked);
 
     const char *const p_file_name = (0 == strcmp(p_file_name_unchecked, "")) ? "index.html" : p_file_name_unchecked;
 
     const char *const p_file_ext = strrchr(p_file_name, '.');
 
-    const wifi_ssid_t        ap_ssid   = wifi_sta_config_get_ap_ssid();
-    const http_server_resp_t resp_auth = http_server_handle_req_get_auth(
+    const wifi_ssid_t ap_ssid = wifi_sta_config_get_ap_ssid();
+
+    const char *p_auth_q = "auth?";
+    if ((0 == strcmp(p_file_name, "auth")) || (0 == strncmp(p_file_name, p_auth_q, strlen(p_auth_q))))
+    {
+        const http_server_resp_t resp_auth = http_server_handle_req_get_auth(
+            flag_access_from_lan,
+            http_header,
+            p_remote_ip,
+            p_auth_info,
+            &ap_ssid,
+            p_extra_header_fields);
+        return resp_auth;
+    }
+
+    const http_server_resp_t resp_auth_check = http_server_handle_req_check_auth(
         flag_access_from_lan,
         http_header,
         p_remote_ip,
@@ -69,15 +83,9 @@ http_server_handle_req_get(
         &ap_ssid,
         p_extra_header_fields);
 
-    const char *p_auth_q = "auth?";
-    if ((0 == strcmp(p_file_name, "auth")) || (0 == strncmp(p_file_name, p_auth_q, strlen(p_auth_q))))
-    {
-        return resp_auth;
-    }
-
     if ((NULL != p_file_ext) && ((0 == strcmp(p_file_ext, ".html")) || (0 == strcmp(p_file_ext, ".json"))))
     {
-        if ((HTTP_RESP_CODE_200 != resp_auth.http_resp_code) && (0 != strcmp(p_file_name, "auth.html")))
+        if ((HTTP_RESP_CODE_200 != resp_auth_check.http_resp_code) && (0 != strcmp(p_file_name, "auth.html")))
         {
             if ((HTTP_SERVER_AUTH_TYPE_RUUVI == p_auth_info->auth_type)
                 || ((HTTP_SERVER_AUTH_TYPE_DENY == p_auth_info->auth_type)))
@@ -92,7 +100,7 @@ http_server_handle_req_get(
             }
             else
             {
-                return resp_auth;
+                return resp_auth_check;
             }
         }
 
@@ -119,7 +127,7 @@ http_server_handle_req_get(
             return http_resp;
         }
     }
-    if ((NULL == p_file_ext) && (HTTP_RESP_CODE_200 != resp_auth.http_resp_code))
+    if ((NULL == p_file_ext) && (HTTP_RESP_CODE_200 != resp_auth_check.http_resp_code))
     {
         if (HTTP_SERVER_AUTH_TYPE_RUUVI == p_auth_info->auth_type)
         {
@@ -133,13 +141,13 @@ http_server_handle_req_get(
         }
         else
         {
-            return resp_auth;
+            return resp_auth_check;
         }
     }
 
     if (0 == strcmp(p_file_name, "auth.html"))
     {
-        return wifi_manager_cb_on_http_get(p_file_name, flag_access_from_lan, &resp_auth);
+        return wifi_manager_cb_on_http_get(p_file_name, flag_access_from_lan, &resp_auth_check);
     }
     else
     {
@@ -159,7 +167,7 @@ http_server_handle_req_delete(
     LOG_INFO("DELETE /%s", p_file_name);
     const wifi_ssid_t ap_ssid = wifi_sta_config_get_ap_ssid();
 
-    const http_server_resp_t resp_auth = http_server_handle_req_get_auth(
+    const http_server_resp_t resp_auth_check = http_server_handle_req_check_auth(
         flag_access_from_lan,
         http_header,
         p_remote_ip,
@@ -167,7 +175,7 @@ http_server_handle_req_delete(
         &ap_ssid,
         p_extra_header_fields);
 
-    if (HTTP_RESP_CODE_200 != resp_auth.http_resp_code)
+    if (HTTP_RESP_CODE_200 != resp_auth_check.http_resp_code)
     {
         return http_server_resp_302();
     }
@@ -286,7 +294,7 @@ http_server_handle_req_post(
             p_extra_header_fields);
     }
 
-    const http_server_resp_t resp_auth = http_server_handle_req_get_auth(
+    const http_server_resp_t resp_auth_check = http_server_handle_req_check_auth(
         flag_access_from_lan,
         http_header,
         p_remote_ip,
@@ -294,7 +302,7 @@ http_server_handle_req_post(
         &ap_ssid,
         p_extra_header_fields);
 
-    if (HTTP_RESP_CODE_200 != resp_auth.http_resp_code)
+    if (HTTP_RESP_CODE_200 != resp_auth_check.http_resp_code)
     {
         return http_server_resp_302();
     }

@@ -336,6 +336,7 @@ http_server_netconn_resp_200(
                                               && ('\0' != p_resp->p_content_type_param[0]);
     const http_header_date_str_t date_str = http_server_gen_header_date_str(p_resp->flag_add_header_date);
 
+    LOG_INFO("Respond: 200 OK");
     http_server_netconn_printf(
         p_conn,
         true,
@@ -1077,6 +1078,10 @@ http_server_netconn_serve(struct netconn *const p_conn)
         http_server_get_auth(),
         &g_http_server_extra_header_fields,
         flag_access_from_lan);
+    if ('\0' != g_http_server_extra_header_fields.buf[0])
+    {
+        LOG_INFO("Extra HTTP-header resp: %s", g_http_server_extra_header_fields.buf);
+    }
     if ((HTTP_CONENT_TYPE_APPLICATION_JSON == resp.content_type)
         && ((HTTP_CONTENT_LOCATION_STATIC_MEM == resp.content_location)
             || (HTTP_CONTENT_LOCATION_HEAP == resp.content_location)))

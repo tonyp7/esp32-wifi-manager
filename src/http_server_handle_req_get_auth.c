@@ -142,19 +142,34 @@ http_server_handle_req_get_auth_ruuvi(
     const http_req_header_t           http_header,
     const sta_ip_string_t *const      p_remote_ip,
     const wifi_ssid_t *const          p_ap_ssid,
+    const bool                        flag_check,
     http_header_extra_fields_t *const p_extra_header_fields)
 {
     http_server_auth_ruuvi_session_id_t session_id = { 0 };
     if (!http_server_auth_ruuvi_get_session_id_from_cookies(http_header, &session_id))
     {
-        return http_server_resp_401_auth_ruuvi(p_remote_ip, p_ap_ssid, p_extra_header_fields);
+        if (flag_check)
+        {
+            return http_server_resp_401_auth_ruuvi(p_remote_ip, p_ap_ssid, p_extra_header_fields);
+        }
+        else
+        {
+            return http_server_resp_401_auth_ruuvi_with_new_session_id(p_remote_ip, p_ap_ssid, p_extra_header_fields);
+        }
     }
     const http_server_auth_ruuvi_authorized_session_t *const p_authorized_session
         = http_server_auth_ruuvi_find_authorized_session(&session_id, p_remote_ip);
 
     if (NULL == p_authorized_session)
     {
-        return http_server_resp_401_auth_ruuvi(p_remote_ip, p_ap_ssid, p_extra_header_fields);
+        if (flag_check)
+        {
+            return http_server_resp_401_auth_ruuvi(p_remote_ip, p_ap_ssid, p_extra_header_fields);
+        }
+        else
+        {
+            return http_server_resp_401_auth_ruuvi_with_new_session_id(p_remote_ip, p_ap_ssid, p_extra_header_fields);
+        }
     }
 
     const http_server_resp_auth_json_t *p_auth_json = http_server_fill_auth_json(
@@ -170,13 +185,14 @@ http_server_handle_req_get_auth_deny(const wifi_ssid_t *const p_ap_ssid)
     return http_server_resp_403_auth_deny(p_ap_ssid);
 }
 
-http_server_resp_t
-http_server_handle_req_get_auth(
+static http_server_resp_t
+http_server_handle_req_get_or_check_auth(
     const bool                           flag_access_from_lan,
     const http_req_header_t              http_header,
     const sta_ip_string_t *const         p_remote_ip,
     const http_server_auth_info_t *const p_auth_info,
     const wifi_ssid_t *const             p_ap_ssid,
+    const bool                           flag_check,
     http_header_extra_fields_t *const    p_extra_header_fields)
 {
     if (!flag_access_from_lan)
@@ -192,9 +208,52 @@ http_server_handle_req_get_auth(
         case HTTP_SERVER_AUTH_TYPE_DIGEST:
             return http_server_handle_req_get_auth_digest(http_header, p_auth_info, p_ap_ssid, p_extra_header_fields);
         case HTTP_SERVER_AUTH_TYPE_RUUVI:
-            return http_server_handle_req_get_auth_ruuvi(http_header, p_remote_ip, p_ap_ssid, p_extra_header_fields);
+            return http_server_handle_req_get_auth_ruuvi(
+                http_header,
+                p_remote_ip,
+                p_ap_ssid,
+                flag_check,
+                p_extra_header_fields);
         case HTTP_SERVER_AUTH_TYPE_DENY:
             return http_server_handle_req_get_auth_deny(p_ap_ssid);
     }
     return http_server_resp_503();
+}
+
+http_server_resp_t
+http_server_handle_req_check_auth(
+    const bool                           flag_access_from_lan,
+    const http_req_header_t              http_header,
+    const sta_ip_string_t *const         p_remote_ip,
+    const http_server_auth_info_t *const p_auth_info,
+    const wifi_ssid_t *const             p_ap_ssid,
+    http_header_extra_fields_t *const    p_extra_header_fields)
+{
+    return http_server_handle_req_get_or_check_auth(
+        flag_access_from_lan,
+        http_header,
+        p_remote_ip,
+        p_auth_info,
+        p_ap_ssid,
+        true,
+        p_extra_header_fields);
+}
+
+http_server_resp_t
+http_server_handle_req_get_auth(
+    const bool                           flag_access_from_lan,
+    const http_req_header_t              http_header,
+    const sta_ip_string_t *const         p_remote_ip,
+    const http_server_auth_info_t *const p_auth_info,
+    const wifi_ssid_t *const             p_ap_ssid,
+    http_header_extra_fields_t *const    p_extra_header_fields)
+{
+    return http_server_handle_req_get_or_check_auth(
+        flag_access_from_lan,
+        http_header,
+        p_remote_ip,
+        p_auth_info,
+        p_ap_ssid,
+        false,
+        p_extra_header_fields);
 }
