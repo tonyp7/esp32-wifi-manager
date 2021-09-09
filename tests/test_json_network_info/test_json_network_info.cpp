@@ -155,10 +155,10 @@ os_mutex_unlock(os_mutex_t const h_mutex)
 } // extern "C"
 
 string
-json_network_info_get()
+json_network_info_get(const bool flag_access_from_lan)
 {
     http_server_resp_status_json_t resp_status_json = {};
-    json_network_info_generate(&resp_status_json);
+    json_network_info_generate(&resp_status_json, flag_access_from_lan);
     string json_info_copy(resp_status_json.buf);
     return json_info_copy;
 }
@@ -167,18 +167,18 @@ json_network_info_get()
 
 TEST_F(TestJsonNetworkInfo, test_after_init) // NOLINT
 {
-    string json_str = json_network_info_get();
+    string json_str = json_network_info_get(false);
     ASSERT_EQ(string("{}\n"), json_str);
 }
 
 TEST_F(TestJsonNetworkInfo, test_clear) // NOLINT
 {
     json_network_info_clear();
-    string json_str = json_network_info_get();
+    string json_str = json_network_info_get(false);
     ASSERT_EQ(string("{}\n"), json_str);
 }
 
-TEST_F(TestJsonNetworkInfo, test_generate_ssid_null) // NOLINT
+TEST_F(TestJsonNetworkInfo, test_generate_ssid_null_lan_false) // NOLINT
 {
     const network_info_str_t network_info = {
         { "192.168.0.50" },
@@ -186,10 +186,25 @@ TEST_F(TestJsonNetworkInfo, test_generate_ssid_null) // NOLINT
         { "255.255.255.0" },
     };
     json_network_info_update(nullptr, &network_info, UPDATE_CONNECTION_OK);
-    string json_str = json_network_info_get();
+    string json_str = json_network_info_get(false);
     ASSERT_EQ(
-        string(
-            "{\"ssid\":null,\"ip\":\"192.168.0.50\",\"netmask\":\"255.255.255.0\",\"gw\":\"192.168.0.1\",\"urc\":0}\n"),
+        string("{\"ssid\":null,\"ip\":\"192.168.0.50\",\"netmask\":\"255.255.255.0\",\"gw\":\"192.168.0.1\",\"urc\":0,"
+               "\"lan\":0}\n"),
+        json_str);
+}
+
+TEST_F(TestJsonNetworkInfo, test_generate_ssid_null_lan_true) // NOLINT
+{
+    const network_info_str_t network_info = {
+        { "192.168.0.50" },
+        { "192.168.0.1" },
+        { "255.255.255.0" },
+    };
+    json_network_info_update(nullptr, &network_info, UPDATE_CONNECTION_OK);
+    string json_str = json_network_info_get(true);
+    ASSERT_EQ(
+        string("{\"ssid\":null,\"ip\":\"192.168.0.50\",\"netmask\":\"255.255.255.0\",\"gw\":\"192.168.0.1\",\"urc\":0,"
+               "\"lan\":1}\n"),
         json_str);
 }
 
@@ -202,10 +217,10 @@ TEST_F(TestJsonNetworkInfo, test_generate_ssid_empty) // NOLINT
     };
     const wifi_ssid_t ssid = { "" };
     json_network_info_update(&ssid, &network_info, UPDATE_CONNECTION_OK);
-    string json_str = json_network_info_get();
+    string json_str = json_network_info_get(false);
     ASSERT_EQ(
-        string(
-            "{\"ssid\":\"\",\"ip\":\"192.168.0.50\",\"netmask\":\"255.255.255.0\",\"gw\":\"192.168.0.1\",\"urc\":0}\n"),
+        string("{\"ssid\":\"\",\"ip\":\"192.168.0.50\",\"netmask\":\"255.255.255.0\",\"gw\":\"192.168.0.1\",\"urc\":0,"
+               "\"lan\":0}\n"),
         json_str);
 }
 
@@ -219,14 +234,15 @@ TEST_F(TestJsonNetworkInfo, test_generate_connection_ok) // NOLINT
 
     const wifi_ssid_t ssid = { "test_ssid" };
     json_network_info_update(&ssid, &network_info, UPDATE_CONNECTION_OK);
-    string json_str = json_network_info_get();
+    string json_str = json_network_info_get(false);
     ASSERT_EQ(
         string("{"
                "\"ssid\":\"test_ssid\","
                "\"ip\":\"192.168.0.50\","
                "\"netmask\":\"255.255.255.0\","
                "\"gw\":\"192.168.0.1\","
-               "\"urc\":0"
+               "\"urc\":0,"
+               "\"lan\":0"
                "}\n"),
         json_str);
 }
@@ -240,14 +256,15 @@ TEST_F(TestJsonNetworkInfo, test_generate_failed_attempt) // NOLINT
     };
     const wifi_ssid_t ssid = { "test_ssid" };
     json_network_info_update(&ssid, &network_info, UPDATE_FAILED_ATTEMPT);
-    string json_str = json_network_info_get();
+    string json_str = json_network_info_get(false);
     ASSERT_EQ(
         string("{"
                "\"ssid\":\"test_ssid\","
                "\"ip\":\"0\","
                "\"netmask\":\"0\","
                "\"gw\":\"0\","
-               "\"urc\":1"
+               "\"urc\":1,"
+               "\"lan\":0"
                "}\n"),
         json_str);
 }
@@ -261,14 +278,15 @@ TEST_F(TestJsonNetworkInfo, test_generate_failed_attempt_2) // NOLINT
     };
     const wifi_ssid_t ssid = { "test_ssid" };
     json_network_info_update(&ssid, &network_info, UPDATE_FAILED_ATTEMPT);
-    string json_str = json_network_info_get();
+    string json_str = json_network_info_get(false);
     ASSERT_EQ(
         string("{"
                "\"ssid\":\"test_ssid\","
                "\"ip\":\"192.168.0.50\","
                "\"netmask\":\"255.255.255.0\","
                "\"gw\":\"192.168.0.1\","
-               "\"urc\":1"
+               "\"urc\":1,"
+               "\"lan\":0"
                "}\n"),
         json_str);
 }
@@ -282,14 +300,15 @@ TEST_F(TestJsonNetworkInfo, test_generate_user_disconnect) // NOLINT
     };
     const wifi_ssid_t ssid = { "test_ssid" };
     json_network_info_update(&ssid, &network_info, UPDATE_USER_DISCONNECT);
-    string json_str = json_network_info_get();
+    string json_str = json_network_info_get(false);
     ASSERT_EQ(
         string("{"
                "\"ssid\":\"test_ssid\","
                "\"ip\":\"0\","
                "\"netmask\":\"0\","
                "\"gw\":\"0\","
-               "\"urc\":2"
+               "\"urc\":2,"
+               "\"lan\":0"
                "}\n"),
         json_str);
 }
@@ -303,14 +322,15 @@ TEST_F(TestJsonNetworkInfo, test_generate_lost_connection) // NOLINT
     };
     const wifi_ssid_t ssid = { "test_ssid" };
     json_network_info_update(&ssid, &network_info, UPDATE_LOST_CONNECTION);
-    string json_str = json_network_info_get();
+    string json_str = json_network_info_get(false);
     ASSERT_EQ(
         string("{"
                "\"ssid\":\"test_ssid\","
                "\"ip\":\"0\","
                "\"netmask\":\"0\","
                "\"gw\":\"0\","
-               "\"urc\":3"
+               "\"urc\":3,"
+               "\"lan\":0"
                "}\n"),
         json_str);
 }

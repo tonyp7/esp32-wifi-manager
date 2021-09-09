@@ -25,23 +25,29 @@
 
 static const char TAG[] = "http_server";
 
+typedef struct http_server_gen_resp_status_json_param_t
+{
+    http_server_resp_t *const p_http_resp;
+    bool                      flag_access_from_lan;
+} http_server_gen_resp_status_json_param_t;
+
 static http_server_resp_status_json_t g_resp_status_json;
 
 static void
 http_server_gen_resp_status_json(json_network_info_t *const p_info, void *const p_param)
 {
-    http_server_resp_t *p_http_resp = p_param;
+    http_server_gen_resp_status_json_param_t *p_params = p_param;
     if (NULL == p_info)
     {
-        LOG_DBG("http_server_netconn_serve: GET /status failed to obtain mutex");
+        LOG_DBG("http_server_netconn_serve: GET /status.json failed to obtain mutex");
         LOG_INFO("status.json: 503");
-        *p_http_resp = http_server_resp_503();
+        *p_params->p_http_resp = http_server_resp_503();
     }
     else
     {
-        json_network_info_do_generate(p_info, &g_resp_status_json);
+        json_network_info_do_generate_internal(p_info, &g_resp_status_json, p_params->flag_access_from_lan);
         LOG_INFO("status.json: %s", g_resp_status_json.buf);
-        *p_http_resp = http_server_resp_200_json(g_resp_status_json.buf);
+        *p_params->p_http_resp = http_server_resp_200_json(g_resp_status_json.buf);
     }
 }
 
@@ -119,11 +125,14 @@ http_server_handle_req_get(
         else if (0 == strcmp(p_file_name, "status.json"))
         {
             http_server_update_last_http_status_request();
-            json_network_info_generate(&g_resp_status_json);
 
-            http_server_resp_t     http_resp     = { 0 };
+            http_server_resp_t                       http_resp = { 0 };
+            http_server_gen_resp_status_json_param_t params    = {
+                .p_http_resp          = &http_resp,
+                .flag_access_from_lan = flag_access_from_lan,
+            };
             const os_delta_ticks_t ticks_to_wait = 10U;
-            json_network_info_do_action_with_timeout(&http_server_gen_resp_status_json, &http_resp, ticks_to_wait);
+            json_network_info_do_action_with_timeout(&http_server_gen_resp_status_json, &params, ticks_to_wait);
             return http_resp;
         }
     }

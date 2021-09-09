@@ -38,6 +38,24 @@ Contains the freeRTOS task and all necessary support
 #include "esp_type_wrapper.h"
 #include "os_mutex.h"
 
+typedef struct json_network_info_update_t
+{
+    const wifi_ssid_t *const        p_ssid;
+    const network_info_str_t *const p_network_info;
+    const update_reason_code_e      update_reason_code;
+} json_network_info_update_t;
+
+typedef struct json_network_info_set_extra_t
+{
+    const char *const p_extra;
+} json_network_info_set_extra_t;
+
+typedef struct json_network_info_do_generate_param_t
+{
+    http_server_resp_status_json_t *p_resp_status_json;
+    bool                            flag_access_from_lan;
+} json_network_info_do_generate_param_t;
+
 static json_network_info_t g_json_network_info;
 static os_mutex_t          g_json_network_mutex;
 static os_mutex_static_t   g_json_network_mutex_mem;
@@ -117,10 +135,12 @@ json_network_info_clear(void)
 }
 
 void
-json_network_info_do_generate(json_network_info_t *const p_info, void *const p_param)
+json_network_info_do_generate_internal(
+    json_network_info_t *const            p_info,
+    http_server_resp_status_json_t *const p_resp_status_json,
+    const bool                            flag_access_from_lan)
 {
-    http_server_resp_status_json_t *const p_resp_status_json = p_param;
-    str_buf_t                             str_buf            = STR_BUF_INIT_WITH_ARR(p_resp_status_json->buf);
+    str_buf_t str_buf = STR_BUF_INIT_WITH_ARR(p_resp_status_json->buf);
     str_buf_printf(&str_buf, "{");
     if (UPDATE_CONNECTION_UNDEF != p_info->update_reason_code)
     {
@@ -142,11 +162,12 @@ json_network_info_do_generate(json_network_info_t *const p_info, void *const p_p
         }
         str_buf_printf(
             &str_buf,
-            ",\"ip\":\"%s\",\"netmask\":\"%s\",\"gw\":\"%s\",\"urc\":%d",
+            ",\"ip\":\"%s\",\"netmask\":\"%s\",\"gw\":\"%s\",\"urc\":%d,\"lan\":%d",
             p_info->network_info.ip,
             p_info->network_info.netmask,
             p_info->network_info.gw,
-            (printf_int_t)p_info->update_reason_code);
+            (printf_int_t)p_info->update_reason_code,
+            (printf_int_t)flag_access_from_lan);
 
         if ('\0' != p_info->extra_info[0])
         {
@@ -161,17 +182,21 @@ json_network_info_do_generate(json_network_info_t *const p_info, void *const p_p
 }
 
 void
-json_network_info_generate(http_server_resp_status_json_t *const p_resp_status_json)
+json_network_info_do_generate(json_network_info_t *const p_info, void *const p_param)
 {
-    json_network_info_do_action(&json_network_info_do_generate, p_resp_status_json);
+    json_network_info_do_generate_param_t *const p_params = p_param;
+    json_network_info_do_generate_internal(p_info, p_params->p_resp_status_json, p_params->flag_access_from_lan);
 }
 
-typedef struct json_network_info_update_t
+void
+json_network_info_generate(http_server_resp_status_json_t *const p_resp_status_json, const bool flag_access_from_lan)
 {
-    const wifi_ssid_t *const        p_ssid;
-    const network_info_str_t *const p_network_info;
-    const update_reason_code_e      update_reason_code;
-} json_network_info_update_t;
+    json_network_info_do_generate_param_t param = {
+        .p_resp_status_json   = p_resp_status_json,
+        .flag_access_from_lan = flag_access_from_lan,
+    };
+    json_network_info_do_action(&json_network_info_do_generate, &param);
+}
 
 static void
 json_network_info_do_update(json_network_info_t *const p_info, void *const p_param)
@@ -213,11 +238,6 @@ json_network_info_update(
     };
     json_network_info_do_action(&json_network_info_do_update, &update_info);
 }
-
-typedef struct json_network_info_set_extra_t
-{
-    const char *const p_extra;
-} json_network_info_set_extra_t;
 
 static void
 json_network_info_do_set_extra_info(json_network_info_t *const p_info, void *const p_param)

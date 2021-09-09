@@ -97,13 +97,23 @@ json_network_info_do_action(json_network_info_do_action_callback_t cb_func, void
  * @brief Generates the connection status json: ssid and IP addresses.
  */
 void
-json_network_info_generate(http_server_resp_status_json_t *const p_resp_status_json);
+json_network_info_generate(http_server_resp_status_json_t *const p_resp_status_json, const bool flag_access_from_lan);
+
+/**
+ * @brief Generates the connection status json: ssid and IP addresses.
+ * json_network_info_do_action_with_timeout
+ */
+void
+json_network_info_do_generate(json_network_info_t *const p_info, void *const p_param);
 
 /**
  * @brief Generates the connection status json: ssid and IP addresses.
  */
 void
-json_network_info_do_generate(json_network_info_t *const p_info, void *const p_param);
+json_network_info_do_generate_internal(
+    json_network_info_t *const            p_info,
+    http_server_resp_status_json_t *const p_resp_status_json,
+    const bool                            flag_access_from_lan);
 
 /**
  * @brief Updates the connection status info: ssid and IP addresses.
