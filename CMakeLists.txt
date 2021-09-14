@@ -47,7 +47,7 @@ if(IDF_VERSION_MAJOR GREATER_EQUAL 4)
             src/wifiman_msg.c
             src/wifiman_msg.h
             src/wifiman_md5.c
-            src/wifiman_md5.h
+            src/include/wifiman_md5.h
             src/wifiman_sha256.c
             src/wifiman_sha256.h
         REQUIRES

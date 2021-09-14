@@ -19,7 +19,7 @@ add_executable(${ProjectId}
         ../../src/http_server_handle_req_post_auth.c
         ../../src/http_server_handle_req_post_auth.h
         ../../src/wifiman_md5.c
-        ../../src/wifiman_md5.h
+        ../../src/include/wifiman_md5.h
         ../../src/wifiman_sha256.c
         ../../src/wifiman_sha256.h
         ../../src/http_server_resp.c
