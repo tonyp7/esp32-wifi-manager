@@ -44,6 +44,9 @@ bool
 wifiman_msg_send_cmd_connect_sta(const connection_request_made_by_code_e conn_req_code);
 
 bool
+wifiman_msg_send_cmd_task_watchdog_feed(void);
+
+bool
 wifiman_msg_send_cmd_start_ap(void);
 
 bool

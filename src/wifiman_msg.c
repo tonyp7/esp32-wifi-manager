@@ -97,6 +97,15 @@ wifiman_msg_send(const message_code_e code, const wifiman_msg_param_t msg_param)
 }
 
 bool
+wifiman_msg_send_cmd_task_watchdog_feed(void)
+{
+    const wifiman_msg_param_t msg_param = {
+        .ptr = NULL,
+    };
+    return wifiman_msg_send(ORDER_TASK_WATCHDOG_FEED, msg_param);
+}
+
+bool
 wifiman_msg_send_cmd_start_ap(void)
 {
     const wifiman_msg_param_t msg_param = {

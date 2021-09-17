@@ -40,6 +40,7 @@ function to process requests, decode URLs, serve files, etc. etc.
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
+#include <esp_task_wdt.h>
 #include "esp_wifi.h"
 #include "esp_event.h"
 #include "lwip/netbuf.h"
@@ -73,14 +74,16 @@ function to process requests, decode URLs, serve files, etc. etc.
 #include "wifiman_msg.h"
 #include "http_server_handle_req_get_auth.h"
 #include "http_server_handle_req.h"
+#include "os_timer_sig.h"
 
 #define LOG_LOCAL_LEVEL LOG_LEVEL_INFO
 #include "log.h"
 
 typedef enum http_server_sig_e
 {
-    HTTP_SERVER_SIG_STOP       = OS_SIGNAL_NUM_0,
-    HTTP_SERVER_SIG_USER_REQ_1 = OS_SIGNAL_NUM_1,
+    HTTP_SERVER_SIG_STOP               = OS_SIGNAL_NUM_0,
+    HTTP_SERVER_SIG_TASK_WATCHDOG_FEED = OS_SIGNAL_NUM_1,
+    HTTP_SERVER_SIG_USER_REQ_1         = OS_SIGNAL_NUM_2,
 } http_server_sig_e;
 
 #define HTTP_SERVER_SIG_FIRST (HTTP_SERVER_SIG_STOP)
@@ -120,12 +123,14 @@ static const char TAG[] = "http_server";
 static os_mutex_static_t  g_http_server_mutex_mem;
 static os_mutex_t         g_http_server_mutex;
 static os_signal_static_t g_http_server_signal_mem;
-static os_signal_t *      gp_http_server_sig;
+static os_signal_t *      g_p_http_server_sig;
 static os_delta_ticks_t   g_timestamp_last_http_status_request;
 static bool               g_is_ap_sta_ip_assigned;
 static bool               g_http_server_disable_ap_stopping_by_timeout;
 
-static http_header_extra_fields_t g_http_server_extra_header_fields;
+static http_header_extra_fields_t     g_http_server_extra_header_fields;
+static os_timer_sig_periodic_t *      g_p_http_server_timer_sig_watchdog_feed;
+static os_timer_sig_periodic_static_t g_http_server_timer_sig_watchdog_feed_mem;
 
 ATTR_PURE
 static os_signal_num_e
@@ -146,9 +151,10 @@ http_server_init(void)
 {
     assert(NULL == g_http_server_mutex);
     g_http_server_mutex = os_mutex_create_static(&g_http_server_mutex_mem);
-    gp_http_server_sig  = os_signal_create_static(&g_http_server_signal_mem);
-    os_signal_add(gp_http_server_sig, http_server_conv_to_sig_num(HTTP_SERVER_SIG_STOP));
-    os_signal_add(gp_http_server_sig, http_server_conv_to_sig_num(HTTP_SERVER_SIG_USER_REQ_1));
+    g_p_http_server_sig = os_signal_create_static(&g_http_server_signal_mem);
+    os_signal_add(g_p_http_server_sig, http_server_conv_to_sig_num(HTTP_SERVER_SIG_STOP));
+    os_signal_add(g_p_http_server_sig, http_server_conv_to_sig_num(HTTP_SERVER_SIG_TASK_WATCHDOG_FEED));
+    os_signal_add(g_p_http_server_sig, http_server_conv_to_sig_num(HTTP_SERVER_SIG_USER_REQ_1));
 }
 
 void
@@ -569,11 +575,12 @@ http_server_start(void)
     assert(NULL != g_http_server_mutex);
 
     os_mutex_lock(g_http_server_mutex);
-    if (os_signal_is_any_thread_registered(gp_http_server_sig))
+    if (os_signal_is_any_thread_registered(g_p_http_server_sig))
     {
         LOG_WARN("Another HTTP-Server is already working");
         os_mutex_unlock(g_http_server_mutex);
     }
+
     os_mutex_unlock(g_http_server_mutex);
 
     const uint32_t stack_depth = 20U * 1024U;
@@ -592,10 +599,10 @@ http_server_stop(void)
 {
     assert(NULL != g_http_server_mutex);
     os_mutex_lock(g_http_server_mutex);
-    if (os_signal_is_any_thread_registered(gp_http_server_sig))
+    if (os_signal_is_any_thread_registered(g_p_http_server_sig))
     {
         LOG_INFO("Send request to stop HTTP-Server");
-        if (!os_signal_send(gp_http_server_sig, http_server_conv_to_sig_num(HTTP_SERVER_SIG_STOP)))
+        if (!os_signal_send(g_p_http_server_sig, http_server_conv_to_sig_num(HTTP_SERVER_SIG_STOP)))
         {
             LOG_ERR("Failed to send HTTP-Server stop request");
         }
@@ -612,7 +619,7 @@ http_server_user_req(const http_server_user_req_code_e req_code)
 {
     assert(NULL != g_http_server_mutex);
     os_mutex_lock(g_http_server_mutex);
-    if (os_signal_is_any_thread_registered(gp_http_server_sig))
+    if (os_signal_is_any_thread_registered(g_p_http_server_sig))
     {
         http_server_sig_e sig_num = HTTP_SERVER_SIG_STOP;
         switch (req_code)
@@ -628,7 +635,7 @@ http_server_user_req(const http_server_user_req_code_e req_code)
         else
         {
             LOG_INFO("Send user request to HTTP-Server: sig_num=%d", (printf_int_t)sig_num);
-            if (!os_signal_send(gp_http_server_sig, http_server_conv_to_sig_num(sig_num)))
+            if (!os_signal_send(g_p_http_server_sig, http_server_conv_to_sig_num(sig_num)))
             {
                 LOG_ERR("Failed to send the user request to HTTP-Server");
             }
@@ -645,7 +652,7 @@ static bool
 http_server_sig_register_cur_thread(void)
 {
     os_mutex_lock(g_http_server_mutex);
-    if (!os_signal_register_cur_thread(gp_http_server_sig))
+    if (!os_signal_register_cur_thread(g_p_http_server_sig))
     {
         os_mutex_unlock(g_http_server_mutex);
         return false;
@@ -658,7 +665,7 @@ static void
 http_server_sig_unregister_cur_thread(void)
 {
     os_mutex_lock(g_http_server_mutex);
-    os_signal_unregister_cur_thread(gp_http_server_sig);
+    os_signal_unregister_cur_thread(g_p_http_server_sig);
     os_mutex_unlock(g_http_server_mutex);
 }
 
@@ -795,6 +802,19 @@ http_server_check_if_configuring_complete(const os_delta_ticks_t time_for_proces
 }
 
 static void
+http_server_wdt_add_and_start(void)
+{
+    LOG_INFO("TaskWatchdog: Register current thread");
+    const esp_err_t err = esp_task_wdt_add(xTaskGetCurrentTaskHandle());
+    if (ESP_OK != err)
+    {
+        LOG_ERR_ESP(err, "%s failed", "esp_task_wdt_add");
+    }
+    LOG_INFO("TaskWatchdog: Start timer");
+    os_timer_sig_periodic_start(g_p_http_server_timer_sig_watchdog_feed);
+}
+
+static void
 http_server_task(void)
 {
     LOG_INFO("HTTP-Server thread started");
@@ -804,17 +824,42 @@ http_server_task(void)
         return;
     }
 
-    struct netconn *p_conn    = netconn_new(NETCONN_TCP);
-    const u16_t     http_port = 80U;
+    struct netconn *p_conn = netconn_new(NETCONN_TCP);
+    if (NULL == p_conn)
+    {
+        LOG_ERR("Can't create netconn for HTTP Server");
+        return;
+    }
+    const u16_t http_port = 80U;
     netconn_bind(p_conn, IP_ADDR_ANY, http_port);
-    netconn_listen(p_conn);
+
+    {
+        const err_t err = netconn_listen(p_conn);
+        if (ERR_OK != err)
+        {
+            LOG_ERR("Can't open socket for HTTP Server, err=%d", (printf_int_t)err);
+            return;
+        }
+    }
+
     netconn_set_recvtimeout(p_conn, HTTP_SERVER_ACCEPT_TIMEOUT_MS);
     LOG_INFO("HTTP Server listening on 80/tcp");
+
+    LOG_INFO("TaskWatchdog: Create timer");
+    g_p_http_server_timer_sig_watchdog_feed = os_timer_sig_periodic_create_static(
+        &g_http_server_timer_sig_watchdog_feed_mem,
+        "http:wdog",
+        g_p_http_server_sig,
+        http_server_conv_to_sig_num(HTTP_SERVER_SIG_TASK_WATCHDOG_FEED),
+        pdMS_TO_TICKS(CONFIG_ESP_TASK_WDT_TIMEOUT_S * 1000U / 3U));
+
+    http_server_wdt_add_and_start();
+
     bool flag_stop = false;
     while (!flag_stop)
     {
         os_signal_events_t sig_events = { 0 };
-        if (os_signal_wait_with_timeout(gp_http_server_sig, OS_DELTA_TICKS_IMMEDIATE, &sig_events))
+        if (os_signal_wait_with_timeout(g_p_http_server_sig, OS_DELTA_TICKS_IMMEDIATE, &sig_events))
         {
             for (;;)
             {
@@ -830,6 +875,15 @@ http_server_task(void)
                         LOG_INFO("Got signal STOP");
                         flag_stop = true;
                         break;
+                    case HTTP_SERVER_SIG_TASK_WATCHDOG_FEED:
+                    {
+                        const esp_err_t err = esp_task_wdt_reset();
+                        if (ESP_OK != err)
+                        {
+                            LOG_ERR_ESP(err, "%s failed", "esp_task_wdt_reset");
+                        }
+                        break;
+                    }
                     case HTTP_SERVER_SIG_USER_REQ_1:
                         LOG_INFO("Got signal USER_REQ_1");
                         wifi_manager_cb_on_user_req(HTTP_SERVER_USER_REQ_CODE_1);
@@ -890,6 +944,13 @@ http_server_task(void)
         taskYIELD(); /* allows the freeRTOS scheduler to take over if needed. */
     }
     LOG_INFO("Stop HTTP-Server");
+    LOG_INFO("TaskWatchdog: Unregister current thread");
+    esp_task_wdt_delete(xTaskGetCurrentTaskHandle());
+    LOG_INFO("TaskWatchdog: Stop timer");
+    os_timer_sig_periodic_stop(g_p_http_server_timer_sig_watchdog_feed);
+    LOG_INFO("TaskWatchdog: Delete timer");
+    os_timer_sig_periodic_delete(&g_p_http_server_timer_sig_watchdog_feed);
+    LOG_INFO("Close socket");
     netconn_close(p_conn);
     netconn_delete(p_conn);
     http_server_sig_unregister_cur_thread();

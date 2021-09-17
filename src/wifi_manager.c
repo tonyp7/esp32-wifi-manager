@@ -36,6 +36,7 @@ Contains the freeRTOS task and all necessary support
 #include <string.h>
 #include <stdbool.h>
 #include "esp_system.h"
+#include <esp_task_wdt.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
@@ -49,7 +50,6 @@ Contains the freeRTOS task and all necessary support
 #include "lwip/err.h"
 #include "lwip/netdb.h"
 #include "lwip/ip4_addr.h"
-
 #include "json.h"
 #include "http_server.h"
 #include "tcpip_adapter.h"
@@ -64,6 +64,7 @@ Contains the freeRTOS task and all necessary support
 #include "http_req.h"
 #include "os_mutex.h"
 #include "os_sema.h"
+#include "os_timer.h"
 
 #define LOG_LOCAL_LEVEL LOG_LEVEL_INFO
 #include "log.h"
@@ -178,7 +179,14 @@ wifi_manager_scan_sync(void)
     }
     wifi_manager_unlock();
 
-    os_sema_wait_infinite(g_scan_sync_sema);
+    while (!os_sema_wait_with_timeout(g_scan_sync_sema, pdMS_TO_TICKS(CONFIG_ESP_TASK_WDT_TIMEOUT_S * 1000U / 3U)))
+    {
+        const esp_err_t err = esp_task_wdt_reset();
+        if (ESP_OK != err)
+        {
+            LOG_ERR_ESP(err, "%s failed", "esp_task_wdt_reset");
+        }
+    }
 
     wifi_manager_lock();
     os_sema_delete(&g_scan_sync_sema);
@@ -1163,6 +1171,15 @@ wifi_manager_recv_and_handle_msg(void)
         case EVENT_AP_STA_IP_ASSIGNED:
             wifi_handle_ev_ap_sta_ip_assigned();
             break;
+        case ORDER_TASK_WATCHDOG_FEED:
+        {
+            const esp_err_t err = esp_task_wdt_reset();
+            if (ESP_OK != err)
+            {
+                LOG_ERR_ESP(err, "%s failed", "esp_task_wdt_reset");
+            }
+            break;
+        }
         default:
             break;
     }
@@ -1185,13 +1202,52 @@ wifi_manager_main_loop(void)
     }
 }
 
+static os_timer_periodic_t *      g_p_wifi_manager_timer_task_watchdog;
+static os_timer_periodic_static_t g_wifi_manager_timer_task_watchdog_mem;
+
+static void
+wifi_manager_timer_cb_task_watchdog_feed(os_timer_periodic_t *p_timer, void *p_arg)
+{
+    wifiman_msg_send_cmd_task_watchdog_feed();
+}
+
+static void
+wifi_manager_wdt_add_and_start(void)
+{
+    LOG_INFO("TaskWatchdog: Register current thread");
+    const esp_err_t err = esp_task_wdt_add(xTaskGetCurrentTaskHandle());
+    if (ESP_OK != err)
+    {
+        LOG_ERR_ESP(err, "%s failed", "esp_task_wdt_add");
+    }
+    LOG_INFO("TaskWatchdog: Start timer");
+    os_timer_periodic_start(g_p_wifi_manager_timer_task_watchdog);
+}
+
 static void
 wifi_manager_task(void)
 {
+    LOG_INFO("TaskWatchdog: Create timer");
+    g_p_wifi_manager_timer_task_watchdog = os_timer_periodic_create_static(
+        &g_wifi_manager_timer_task_watchdog_mem,
+        "wifi:wdog",
+        pdMS_TO_TICKS(CONFIG_ESP_TASK_WDT_TIMEOUT_S * 1000U / 3U),
+        &wifi_manager_timer_cb_task_watchdog_feed,
+        NULL);
+
+    wifi_manager_wdt_add_and_start();
+
     wifi_manager_main_loop();
 
     LOG_INFO("Finish task");
     wifi_manager_lock();
+
+    LOG_INFO("TaskWatchdog: Unregister current thread");
+    esp_task_wdt_delete(xTaskGetCurrentTaskHandle());
+    LOG_INFO("TaskWatchdog: Stop timer");
+    os_timer_periodic_stop(g_p_wifi_manager_timer_task_watchdog);
+    LOG_INFO("TaskWatchdog: Delete timer");
+    os_timer_periodic_delete(&g_p_wifi_manager_timer_task_watchdog);
 
     // Do not delete gh_wifi_json_mutex
     // Do not delete g_wifi_manager_event_group

@@ -207,7 +207,8 @@ typedef enum message_code_e
     EVENT_AP_STA_CONNECTED    = 14,
     EVENT_AP_STA_DISCONNECTED = 15,
     EVENT_AP_STA_IP_ASSIGNED  = 16,
-    MESSAGE_CODE_COUNT        = 17 /* important for the callback array */
+    ORDER_TASK_WATCHDOG_FEED  = 17,
+    MESSAGE_CODE_COUNT        = 18 /* important for the callback array */
 } message_code_e;
 
 /**

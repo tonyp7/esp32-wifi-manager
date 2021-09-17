@@ -41,6 +41,7 @@ Contains the freeRTOS task for the DNS server that processes the requests.
 #include <esp_event.h>
 #include <esp_log.h>
 #include <esp_err.h>
+#include <esp_task_wdt.h>
 #include <nvs_flash.h>
 #include <lwip/err.h>
 #include <lwip/sockets.h>
@@ -56,15 +57,39 @@ Contains the freeRTOS task for the DNS server that processes the requests.
 #include "esp_type_wrapper.h"
 #include "os_signal.h"
 #include "os_mutex.h"
+#include "os_timer_sig.h"
 
-#define DNS_SERVER_SIG_STOP (OS_SIGNAL_NUM_0)
+typedef enum dns_server_sig_e
+{
+    DNS_SERVER_SIG_STOP               = OS_SIGNAL_NUM_0,
+    DNS_SERVER_SIG_TASK_WATCHDOG_FEED = OS_SIGNAL_NUM_1,
+} dns_server_sig_e;
+
+#define DNS_SERVER_SIG_FIRST (DNS_SERVER_SIG_STOP)
+#define DNS_SERVER_SIG_LAST  (DNS_SERVER_SIG_TASK_WATCHDOG_FEED)
 
 static const char TAG[] = "dns_server";
 
-static os_mutex_static_t  g_dns_server_mutex_mem;
-static os_mutex_t         g_dns_server_mutex;
-static os_signal_static_t g_dns_server_signal_mem;
-static os_signal_t *      gp_dns_server_sig;
+static os_mutex_static_t              g_dns_server_mutex_mem;
+static os_mutex_t                     g_dns_server_mutex;
+static os_signal_static_t             g_dns_server_signal_mem;
+static os_signal_t *                  g_p_dns_server_sig;
+static os_timer_sig_periodic_t *      g_p_dns_server_timer_sig_watchdog_feed;
+static os_timer_sig_periodic_static_t g_dns_server_timer_sig_watchdog_feed_mem;
+
+ATTR_PURE
+static os_signal_num_e
+dns_server_conv_to_sig_num(const dns_server_sig_e sig)
+{
+    return (os_signal_num_e)sig;
+}
+
+static dns_server_sig_e
+dns_server_conv_from_sig_num(const os_signal_num_e sig_num)
+{
+    assert(((os_signal_num_e)DNS_SERVER_SIG_FIRST <= sig_num) && (sig_num <= (os_signal_num_e)DNS_SERVER_SIG_LAST));
+    return (dns_server_sig_e)sig_num;
+}
 
 static void
 dns_server_task(void);
@@ -74,8 +99,9 @@ dns_server_init(void)
 {
     assert(NULL == g_dns_server_mutex);
     g_dns_server_mutex = os_mutex_create_static(&g_dns_server_mutex_mem);
-    gp_dns_server_sig  = os_signal_create_static(&g_dns_server_signal_mem);
-    os_signal_add(gp_dns_server_sig, DNS_SERVER_SIG_STOP);
+    g_p_dns_server_sig = os_signal_create_static(&g_dns_server_signal_mem);
+    os_signal_add(g_p_dns_server_sig, dns_server_conv_to_sig_num(DNS_SERVER_SIG_STOP));
+    os_signal_add(g_p_dns_server_sig, dns_server_conv_to_sig_num(DNS_SERVER_SIG_TASK_WATCHDOG_FEED));
 }
 
 bool
@@ -103,10 +129,10 @@ dns_server_stop(void)
     assert(NULL != g_dns_server_mutex);
 
     os_mutex_lock(g_dns_server_mutex);
-    if (os_signal_is_any_thread_registered(gp_dns_server_sig))
+    if (os_signal_is_any_thread_registered(g_p_dns_server_sig))
     {
         LOG_INFO("Send request to stop DNS-Server");
-        if (!os_signal_send(gp_dns_server_sig, DNS_SERVER_SIG_STOP))
+        if (!os_signal_send(g_p_dns_server_sig, DNS_SERVER_SIG_STOP))
         {
             LOG_ERR("Failed to send DNS-Server stop request");
         }
@@ -213,7 +239,7 @@ static bool
 dns_server_sig_register_cur_thread(void)
 {
     os_mutex_lock(g_dns_server_mutex);
-    if (!os_signal_register_cur_thread(gp_dns_server_sig))
+    if (!os_signal_register_cur_thread(g_p_dns_server_sig))
     {
         os_mutex_unlock(g_dns_server_mutex);
         return false;
@@ -226,8 +252,21 @@ static void
 dns_server_sig_unregister_cur_thread(void)
 {
     os_mutex_lock(g_dns_server_mutex);
-    os_signal_unregister_cur_thread(gp_dns_server_sig);
+    os_signal_unregister_cur_thread(g_p_dns_server_sig);
     os_mutex_unlock(g_dns_server_mutex);
+}
+
+static void
+dns_server_wdt_add_and_start(void)
+{
+    LOG_INFO("TaskWatchdog: Register current thread");
+    const esp_err_t err = esp_task_wdt_add(xTaskGetCurrentTaskHandle());
+    if (ESP_OK != err)
+    {
+        LOG_ERR_ESP(err, "%s failed", "esp_task_wdt_add");
+    }
+    LOG_INFO("TaskWatchdog: Start timer");
+    os_timer_sig_periodic_start(g_p_dns_server_timer_sig_watchdog_feed);
 }
 
 static void
@@ -277,14 +316,51 @@ dns_server_task(void)
 
     LOG_INFO("DNS Server listening on 53/udp");
 
+    g_p_dns_server_timer_sig_watchdog_feed = os_timer_sig_periodic_create_static(
+        &g_dns_server_timer_sig_watchdog_feed_mem,
+        "dns:wdog",
+        g_p_dns_server_sig,
+        dns_server_conv_to_sig_num(DNS_SERVER_SIG_TASK_WATCHDOG_FEED),
+        pdMS_TO_TICKS(CONFIG_ESP_TASK_WDT_TIMEOUT_S * 1000U / 3U));
+
+    dns_server_wdt_add_and_start();
+
     /* Start loop to process DNS requests */
     for (;;)
     {
         os_signal_events_t sig_events = { 0 };
-        if (os_signal_wait_with_timeout(gp_dns_server_sig, OS_DELTA_TICKS_IMMEDIATE, &sig_events))
+        if (os_signal_wait_with_timeout(g_p_dns_server_sig, OS_DELTA_TICKS_IMMEDIATE, &sig_events))
         {
-            LOG_INFO("Got signal STOP");
-            break;
+            bool flag_stop = false;
+            for (;;)
+            {
+                const os_signal_num_e sig_num = os_signal_num_get_next(&sig_events);
+                if (OS_SIGNAL_NUM_NONE == sig_num)
+                {
+                    break;
+                }
+                const dns_server_sig_e dns_server_sig = dns_server_conv_from_sig_num(sig_num);
+                switch (dns_server_sig)
+                {
+                    case DNS_SERVER_SIG_STOP:
+                        LOG_INFO("Got signal STOP");
+                        flag_stop = true;
+                        break;
+                    case DNS_SERVER_SIG_TASK_WATCHDOG_FEED:
+                    {
+                        const esp_err_t err = esp_task_wdt_reset();
+                        if (ESP_OK != err)
+                        {
+                            LOG_ERR_ESP(err, "%s failed", "esp_task_wdt_reset");
+                        }
+                        break;
+                    }
+                }
+            }
+            if (flag_stop)
+            {
+                break;
+            }
         }
         dns_server_handle_req(socket_fd, &ip_resolved);
 
@@ -292,6 +368,15 @@ dns_server_task(void)
                         system */
     }
     LOG_INFO("Stop DNS Server");
+
+    LOG_INFO("TaskWatchdog: Unregister current thread");
+    esp_task_wdt_delete(xTaskGetCurrentTaskHandle());
+    LOG_INFO("TaskWatchdog: Stop timer");
+    os_timer_sig_periodic_stop(g_p_dns_server_timer_sig_watchdog_feed);
+    LOG_INFO("TaskWatchdog: Delete timer");
+    os_timer_sig_periodic_delete(&g_p_dns_server_timer_sig_watchdog_feed);
+
+    LOG_INFO("Close socket");
     close(socket_fd);
     dns_server_sig_unregister_cur_thread();
 }
