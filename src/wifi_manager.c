@@ -101,6 +101,14 @@ static esp_netif_t* esp_netif_sta = NULL;
 /* @brief netif object for the ACCESS POINT */
 static esp_netif_t* esp_netif_ap = NULL;
 
+#ifdef CONFIG_USE_RANDOM_AP_PASSWORD
+/** Allowed characters in random AP password.
+ * Not using 0, 1, i, o, l as these are confusing. */
+static const char wifi_manager_ap_chars[] = "abcdefghjkmnpqrstuvwxyz23456789";
+/** Random password for AP. */
+static char wifi_manager_ap_password[AP_PASSWORD_LENGTH + 1];
+#endif // CONFIG_USE_RANDOM_AP_PASSWORD
+
 /**
  * The actual WiFi settings in use
  */
@@ -186,6 +194,28 @@ void wifi_manager_disconnect_async(){
 }
 
 
+#ifdef CONFIG_USE_RANDOM_AP_PASSWORD
+
+/* must not be called after wifi is initialized */
+static void wifi_manager_generate_ap_password(void){
+	unsigned int i;
+	unsigned int n;
+
+	/* Why not use the wifi module to seed the RNG? I'm not sure if it is
+	 * ready to seed just after calling esp_wifi_init() so to be on the safe
+	 * side, use the early RNG source. */
+	bootloader_random_enable();
+	n = strlen(wifi_manager_ap_chars);
+	for(i=0; i<AP_PASSWORD_LENGTH; i++){
+		wifi_manager_ap_password[i] = wifi_manager_ap_chars[esp_random() % n];
+	}
+	wifi_manager_ap_password[AP_PASSWORD_LENGTH] = 0;
+	bootloader_random_disable();
+}
+
+#endif // CONFIG_USE_RANDOM_AP_PASSWORD
+
+
 void wifi_manager_start(){
 
 	/* disable the default wifi logging */
@@ -194,6 +224,35 @@ void wifi_manager_start(){
 	/* initialize flash memory */
 	nvs_flash_init();
 	ESP_ERROR_CHECK(nvs_sync_create()); /* semaphore for thread synchronization on NVS memory */
+
+#ifdef CONFIG_USE_RANDOM_AP_PASSWORD
+	nvs_handle handle;
+
+	/* check for already-generated AP password */
+	if(nvs_sync_lock(portMAX_DELAY) && (nvs_open(wifi_manager_nvs_namespace, NVS_READWRITE, &handle) == ESP_OK)){
+		size_t length = sizeof(wifi_manager_ap_password);
+		if(nvs_get_str(handle, "appwd", wifi_manager_ap_password, &length) == ESP_OK){
+			/* ensure it's null-terminated */
+			wifi_manager_ap_password[AP_PASSWORD_LENGTH] = 0;
+		}
+		else{
+			/* can't get AP password from NVS, generate a new one and save
+			 * it to NVS */
+			wifi_manager_generate_ap_password();
+			nvs_set_str(handle, "appwd", wifi_manager_ap_password);
+			nvs_commit(handle);
+		}
+		nvs_close(handle);
+		nvs_sync_unlock();
+	}
+	else{
+		/* NVS error, generate a new temporary AP password because we must
+		 * have one */
+		wifi_manager_generate_ap_password();
+	}
+	strcpy((char *)wifi_settings.ap_pwd, wifi_manager_ap_password);
+#endif // CONFIG_USE_RANDOM_AP_PASSWORD
+	ESP_LOGI(TAG, "AP password: %s", wifi_settings.ap_pwd);
 
 	/* memory allocation */
 	wifi_manager_queue = xQueueCreate( 3, sizeof( queue_message) );

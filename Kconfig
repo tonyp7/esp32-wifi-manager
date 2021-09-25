@@ -40,8 +40,12 @@ config DEFAULT_AP_SSID
     help
 	SSID (network name) the the esp32 will broadcast.
 
+config USE_RANDOM_AP_PASSWORD
+	bool "Use a randomly-generated Access Point password"
+	default y
+
 config DEFAULT_AP_PASSWORD
-    string "Access Point Password"
+    string "Access Point Password" if !USE_RANDOM_AP_PASSWORD
     default "esp32pwd"
     help
 	Password used for the Access Point. Leave empty and set AUTH MODE to WIFI_AUTH_OPEN for no password.
