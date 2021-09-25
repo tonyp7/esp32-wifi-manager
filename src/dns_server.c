@@ -37,6 +37,7 @@ Contains the freeRTOS task for the DNS server that processes the requests.
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <freertos/event_groups.h>
+#include <freertos/semphr.h>
 #include <esp_system.h>
 #include <esp_wifi.h>
 #include <esp_event.h>
@@ -56,18 +57,29 @@ Contains the freeRTOS task for the DNS server that processes the requests.
 static const char TAG[] = "dns_server";
 static TaskHandle_t task_dns_server = NULL;
 int socket_fd;
+SemaphoreHandle_t socket_in_use_mutex = NULL;
 
 void dns_server_start() {
 	if(task_dns_server == NULL){
+		socket_in_use_mutex = xSemaphoreCreateMutex();
 		xTaskCreate(&dns_server, "dns_server", 3072, NULL, WIFI_MANAGER_TASK_PRIORITY-1, &task_dns_server);
 	}
 }
 
 void dns_server_stop(){
 	if(task_dns_server){
-		vTaskDelete(task_dns_server);
+		/* If the task is deleted while recvfrom() is waiting, the socket
+		 * will remain in use and will be in zombie state forever. Close the
+		 * socket to cause recvfrom() to abort. */
 		close(socket_fd);
+		/* Wait for recvfrom() to return, signified by the mutex being
+		 * released */
+		xSemaphoreTake(socket_in_use_mutex, pdMS_TO_TICKS(500));
+		/* Now it is safe to delete the task */
+		vTaskDelete(task_dns_server);
 		task_dns_server = NULL;
+		vSemaphoreDelete(socket_in_use_mutex);
+		socket_in_use_mutex = NULL;
 	}
 
 }
@@ -114,6 +126,8 @@ void dns_server(void *pvParameters) {
     char ip_address[INET_ADDRSTRLEN]; /* buffer to store IPs as text. This is only used for debug and serves no other purpose */
     char *domain; /* This is only used for debug and serves no other purpose */
     int err;
+    bool valid_request;
+    bool include_answer;
 
     ESP_LOGI(TAG, "DNS Server listening on 53/udp");
 
@@ -121,7 +135,9 @@ void dns_server(void *pvParameters) {
     for(;;) {
 
     	memset(data, 0x00,  sizeof(data)); /* reset buffer */
+		xSemaphoreTake(socket_in_use_mutex, portMAX_DELAY);
         length = recvfrom(socket_fd, data, sizeof(data), 0, (struct sockaddr *)&client, &client_len); /* read udp request */
+		xSemaphoreGive(socket_in_use_mutex);
 
         /*if the query is bigger than the buffer size we simply ignore it. This case should only happen in case of multiple
          * queries within the same DNS packet and is not supported by this simple DNS hijack. */
@@ -149,25 +165,58 @@ void dns_server(void *pvParameters) {
 
             /* extract domain name and request IP for debug */
             inet_ntop(AF_INET, &(client.sin_addr), ip_address, INET_ADDRSTRLEN);
-            domain = (char*) &data[sizeof(dns_header_t) + 1];
-            for(char* c=domain; *c != '\0'; c++){
-            	if(*c < ' ' || *c > 'z') *c = '.'; /* technically we should test if the first two bits are 00 (e.g. if( (*c & 0xC0) == 0x00) *c = '.') but this makes the code a lot more readable */
+            /* each label is preceded by a length octet, step over each label and replace
+             * the length octet with a '.' character to make the domain name easier to read */
+            valid_request = true;
+            include_answer = false;
+            uint8_t *current_octet = &(data[sizeof(dns_header_t)]);
+            uint8_t label_length = *current_octet;
+            while(label_length != 0){
+                current_octet += label_length + 1;
+                if((current_octet - data) >= length){
+                    /* uh oh, buffer overflow */
+                    valid_request = false;
+                    break;
+                }
+                label_length = *current_octet;
+                if(label_length != 0) *current_octet = '.';
             }
-            ESP_LOGI(TAG, "Replying to DNS request for %s from %s", domain, ip_address);
+            domain = (char*)&data[sizeof(dns_header_t) + 1];
 
+            /* check type of request */
+            current_octet++;
+            if((current_octet - data + 4) <= length){
+                uint16_t query_type = ((uint16_t)current_octet[0] << 8UL) | current_octet[1];
+                current_octet += 2;
+                uint16_t query_class = ((uint16_t)current_octet[0] << 8UL) | current_octet[1];
+                if((query_type == DNS_ANSWER_TYPE_A) && (query_class == DNS_ANSWER_CLASS_IN)){
+                    /* only answer requests for A records */
+                    include_answer = true;
+                    ESP_LOGI(TAG, "Replying to DNS request for %s from %s", domain, ip_address);
+                }
+            }else{
+                valid_request = false;
+            }
 
-            /* create DNS answer at the end of the query*/
-            dns_answer_t *dns_answer = (dns_answer_t*)&response[length];
-            dns_answer->NAME = __bswap_16(0xC00C); /* This is a pointer to the beginning of the question. As per DNS standard, first two bits must be set to 11 for some odd reason hence 0xC0 */
-            dns_answer->TYPE = __bswap_16(DNS_ANSWER_TYPE_A);
-            dns_answer->CLASS = __bswap_16(DNS_ANSWER_CLASS_IN);
-            dns_answer->TTL = (uint32_t)0x00000000; /* no caching. Avoids DNS poisoning since this is a DNS hijack */
-            dns_answer->RDLENGTH = __bswap_16(0x0004); /* 4 byte => size of an ipv4 address */
-            dns_answer->RDATA = ip_resolved.addr;
+            if(valid_request){
+                if(include_answer){
+                    /* create DNS answer at the end of the query*/
+                    dns_answer_t *dns_answer = (dns_answer_t*)&response[length];
+                    dns_answer->NAME = __bswap_16(0xC00C); /* This is a pointer to the beginning of the question. As per DNS standard, first two bits must be set to 11 for some odd reason hence 0xC0 */
+                    dns_answer->TYPE = __bswap_16(DNS_ANSWER_TYPE_A);
+                    dns_answer->CLASS = __bswap_16(DNS_ANSWER_CLASS_IN);
+                    dns_answer->TTL = __bswap_32(0x00000005); /* set TTL to something small but not 0 to placate windows */
+                    dns_answer->RDLENGTH = __bswap_16(0x0004); /* 4 byte => size of an ipv4 address */
+                    dns_answer->RDATA = ip_resolved.addr;
 
-            err = sendto(socket_fd, response, length+sizeof(dns_answer_t), 0, (struct sockaddr *)&client, client_len);
-            if (err < 0) {
-            	ESP_LOGE(TAG, "UDP sendto failed: %d", err);
+                    err = sendto(socket_fd, response, length+sizeof(dns_answer_t), 0, (struct sockaddr *)&client, client_len);
+                }else{
+                    dns_header->ANCount = 0x0000;
+                    err = sendto(socket_fd, response, length, 0, (struct sockaddr *)&client, client_len);
+                }
+                if (err < 0) {
+                    ESP_LOGE(TAG, "UDP sendto failed: %d", err);
+                }
             }
         }
 

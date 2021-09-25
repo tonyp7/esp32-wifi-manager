@@ -152,6 +152,12 @@ extern "C" {
 /** @brief Defines access point's beacon interval. 100ms is the recommended default. */
 #define DEFAULT_AP_BEACON_INTERVAL 			CONFIG_DEFAULT_AP_BEACON_INTERVAL
 
+/** @brief Defines hardcoded access point's name. Default value: "HardcodedSSID". Run 'make menuconfig' to setup your own value */
+#define HARDCODED_SSID 						CONFIG_HARDCODED_SSID
+
+/** @brief Defines hardcoded access point's password. Default value: "HardcodedPassword". Run 'make menuconfig' to setup your own value */
+#define HARDCODED_PASSWORD 					CONFIG_HARDCODED_PASSWORD
+
 /** @brief Defines if esp32 shall run both AP + STA when connected to another AP.
  *  Value: 0 will have the own AP always on (APSTA mode)
  *  Value: 1 will turn off own AP when connected to another AP (STA only mode when connected)
@@ -224,7 +230,8 @@ typedef enum message_code_t {
 	WM_EVENT_SCAN_DONE = 11,
 	WM_EVENT_STA_GOT_IP = 12,
 	WM_ORDER_STOP_AP = 13,
-	WM_MESSAGE_CODE_COUNT = 14 /* important for the callback array */
+	WM_ORDER_EXIT = 14,
+	WM_MESSAGE_CODE_COUNT = 15 /* important for the callback array */
 
 }message_code_t;
 
@@ -245,6 +252,7 @@ typedef enum connection_request_made_by_code_t{
 	CONNECTION_REQUEST_USER = 1,
 	CONNECTION_REQUEST_AUTO_RECONNECT = 2,
 	CONNECTION_REQUEST_RESTORE_CONNECTION = 3,
+	CONNECTION_REQUEST_USER_NO_SAVE = 4,
 	CONNECTION_REQUEST_MAX = 0x7fffffff /*force the creation of this enum as a 32 bit int */
 }connection_request_made_by_code_t;
 
@@ -284,6 +292,10 @@ esp_netif_t* wifi_manager_get_esp_netif_sta();
  */
 esp_netif_t* wifi_manager_get_esp_netif_ap();
 
+/**
+ * This must be called before wifi_manager_start() but it only needs to be called once
+ */
+void wifi_manager_init();
 
 /**
  * Allocate heap memory for the wifi manager and start the wifi_manager RTOS task
@@ -293,7 +305,7 @@ void wifi_manager_start();
 /**
  * Frees up all memory allocated by the wifi_manager and kill the task.
  */
-void wifi_manager_destroy();
+void wifi_manager_stop();
 
 /**
  * Filters the AP scan list to unique SSIDs
@@ -314,9 +326,20 @@ void wifi_manager_scan_async();
 
 
 /**
+ * @brief Erases the current STA wifi config in flash storage.
+ */
+esp_err_t wifi_manager_erase_sta_config();
+
+/**
  * @brief saves the current STA wifi config to flash ram storage.
  */
 esp_err_t wifi_manager_save_sta_config();
+
+/**
+ * @brief check if a STA wifi config is in the flash ram storage.
+ * @return true if a previously saved config was found, false otherwise.
+ */
+bool wifi_manager_wifi_sta_config_exists();
 
 /**
  * @brief fetch a previously STA wifi config in the flash ram storage.
@@ -330,7 +353,7 @@ wifi_config_t* wifi_manager_get_wifi_sta_config();
 /**
  * @brief requests a connection to an access point that will be process in the main task thread.
  */
-void wifi_manager_connect_async();
+void wifi_manager_connect_async(bool save_config);
 
 /**
  * @brief requests a wifi scan
@@ -416,6 +439,26 @@ void wifi_manager_set_callback(message_code_t message_code, void (*func_ptr)(voi
 
 BaseType_t wifi_manager_send_message(message_code_t code, void *param);
 BaseType_t wifi_manager_send_message_to_front(message_code_t code, void *param);
+
+/**
+ * @brief Start AP (if not already started).
+ */
+void wifi_manager_start_ap(void);
+
+/**
+ * @brief Get AP SSID.
+ */
+const char *wifi_manager_get_ap_ssid(void);
+
+/**
+ * @brief Get AP password.
+ */
+const char *wifi_manager_get_ap_password(void);
+
+/**
+ * @brief Check if STA is connected to the hardcoded AP.
+ */
+bool wifi_manager_get_sta_connected_to_hardcoded(void);
 
 #ifdef __cplusplus
 }

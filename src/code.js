@@ -105,6 +105,30 @@ docReady(async function () {
     false
   );
 
+  gel("togglepwd").addEventListener(
+    "click",
+    (e) => {
+      if (gel("pwd").type == "password") {
+        gel("pwd").type = "text";
+      } else {
+        gel("pwd").type = "password";
+      }
+    },
+    false
+  );
+
+  gel("manual_togglepwd").addEventListener(
+    "click",
+    (e) => {
+      if (gel("manual_pwd").type == "password") {
+        gel("manual_pwd").type = "text";
+      } else {
+        gel("manual_pwd").type = "password";
+      }
+    },
+    false
+  );
+
   gel("ok-details").addEventListener(
     "click",
     () => {

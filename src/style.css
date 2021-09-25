@@ -28,6 +28,11 @@ input[type="button"] {
     text-align: center;
     display: block;
 }
+input[type="button"].big-button {
+    width: 90%;
+    max-width: 300px;
+    margin: auto;
+}
 p {
     padding: 10px;
 }

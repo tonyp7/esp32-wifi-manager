@@ -20,13 +20,13 @@ config WIFI_MANAGER_MAX_RETRY_START_AP
 	int "Max Retry before starting the AP" if WIFI_MANAGER_AUTOSTART_AP
     default 3
     help
-	Defines the maximum number of failed retries allowed before the WiFi manager starts its own access point.  
-	
+	Defines the maximum number of failed retries allowed before the WiFi manager starts its own access point.
+
 config WIFI_MANAGER_SHUTDOWN_AP_TIMER
 	int "Time (in ms) to wait before shutting down the AP"
 	default 60000
 	help
-	Defines the time (in ms) to wait after a succesful connection before shutting down the access point.
+	Defines the time (in ms) to wait after a succesful connection before shutting down the access point. Use a negative number to never shut down the access point.
 
 config WEBAPP_LOCATION
     string "Defines the URL where the wifi manager is located"
@@ -91,5 +91,17 @@ config DEFAULT_AP_BEACON_INTERVAL
     default 100
     help
 	100ms is the recommended default.
+
+config HARDCODED_SSID
+  	string "Hardcoded SSID"
+  	default "HardcodedSSID"
+  	help
+  	For factory configuration, the device will attempt to connect an an AP with this SSID if there are no user configured APs.
+
+config HARDCODED_PASSWORD
+  	string "Hardcoded password"
+  	default "HardcodedPassword"
+  	help
+  	For factory configuration, the device will attempt to connect an an AP with this password if there are no user configured APs.
 
 endmenu
