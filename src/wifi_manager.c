@@ -1006,7 +1006,17 @@ void wifi_manager( void * pvParameters ){
 			.beacon_interval = DEFAULT_AP_BEACON_INTERVAL,
 		},
 	};
-	memcpy(ap_config.ap.ssid, wifi_settings.ap_ssid , sizeof(wifi_settings.ap_ssid));
+#ifdef CONFIG_WIFI_MANAGER_APPEND_MAC
+	/* Augment AP SSID with last bit of MAC address to make it more unique */
+	uint8_t mac_address[6];
+	if(((strlen((char *)wifi_settings.ap_ssid) + 6) < sizeof(wifi_settings.ap_ssid))
+		&& (esp_read_mac(mac_address, ESP_MAC_WIFI_STA) == ESP_OK)){
+		char buf[6];
+		sprintf(buf, " %02x%02x", (unsigned int)mac_address[4], (unsigned int)mac_address[5]);
+		strcat((char *)wifi_settings.ap_ssid, buf);
+	}
+#endif // CONFIG_WIFI_MANAGER_APPEND_MAC
+	memcpy(ap_config.ap.ssid, wifi_settings.ap_ssid, sizeof(wifi_settings.ap_ssid));
 
 	/* if the password lenght is under 8 char which is the minium for WPA2, the access point starts as open */
 	if(strlen( (char*)wifi_settings.ap_pwd) < WPA2_MINIMUM_PASSWORD_LENGTH){

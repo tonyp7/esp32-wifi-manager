@@ -40,6 +40,12 @@ config DEFAULT_AP_SSID
     help
 	SSID (network name) the the esp32 will broadcast.
 
+config WIFI_MANAGER_APPEND_MAC
+    bool "Append MAC address to access point SSID"
+    default n
+    help
+    The last two octets of the device's MAC address will be appended (with a preceding space) to the configured access point SSID. For example, "esp32" -> "esp32 ad7e". This helps make the SSID unique if you might have multiple devices on at once.
+
 config USE_RANDOM_AP_PASSWORD
 	bool "Use a randomly-generated Access Point password"
 	default y
