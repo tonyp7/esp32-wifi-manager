@@ -910,7 +910,9 @@ void wifi_manager( void * pvParameters ){
 	queue_message msg;
 	BaseType_t xStatus;
 	EventBits_t uxBits;
+#ifdef CONFIG_WIFI_MANAGER_AUTOSTART_AP
 	uint8_t	retries = 0;
+#endif // CONFIG_WIFI_MANAGER_AUTOSTART_AP
 
 
 	/* initialize the tcp stack */
@@ -1052,11 +1054,13 @@ void wifi_manager( void * pvParameters ){
 					ESP_LOGI(TAG, "Saved wifi found on startup. Will attempt to connect.");
 					wifi_manager_send_message(WM_ORDER_CONNECT_STA, (void*)CONNECTION_REQUEST_RESTORE_CONNECTION);
 				}
+#ifdef CONFIG_WIFI_MANAGER_AUTOSTART_AP
 				else{
 					/* no wifi saved: start soft AP! This is what should happen during a first run */
 					ESP_LOGI(TAG, "No saved wifi found on startup. Starting access point.");
 					wifi_manager_send_message(WM_ORDER_START_AP, NULL);
 				}
+#endif // CONFIG_WIFI_MANAGER_AUTOSTART_AP
 
 				/* callback */
 				if(cb_ptr_arr[msg.code]) (*cb_ptr_arr[msg.code])(NULL);
@@ -1189,8 +1193,10 @@ void wifi_manager( void * pvParameters ){
 					/* save NVS memory */
 					wifi_manager_save_sta_config();
 
+#ifdef CONFIG_WIFI_MANAGER_AUTOSTART_AP
 					/* start SoftAP */
 					wifi_manager_send_message(WM_ORDER_START_AP, NULL);
+#endif // CONFIG_WIFI_MANAGER_AUTOSTART_AP
 				}
 				else{
 					/* lost connection ? */
@@ -1205,6 +1211,7 @@ void wifi_manager( void * pvParameters ){
 					/* if it was a restore attempt connection, we clear the bit */
 					xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_RESTORE_STA_BIT);
 
+#ifdef CONFIG_WIFI_MANAGER_AUTOSTART_AP
 					/* if the AP is not started, we check if we have reached the threshold of failed attempt to start it */
 					if(! (uxBits & WIFI_MANAGER_AP_STARTED_BIT) ){
 
@@ -1221,6 +1228,7 @@ void wifi_manager( void * pvParameters ){
 							wifi_manager_send_message(WM_ORDER_START_AP, NULL);
 						}
 					}
+#endif // CONFIG_WIFI_MANAGER_AUTOSTART_AP
 				}
 
 				/* callback */
@@ -1292,8 +1300,10 @@ void wifi_manager( void * pvParameters ){
 					wifi_manager_save_sta_config();
 				}
 
+#ifdef CONFIG_WIFI_MANAGER_AUTOSTART_AP
 				/* reset number of retries */
 				retries = 0;
+#endif // CONFIG_WIFI_MANAGER_AUTOSTART_AP
 
 				/* refresh JSON with the new IP */
 				if(wifi_manager_lock_json_buffer( portMAX_DELAY )){

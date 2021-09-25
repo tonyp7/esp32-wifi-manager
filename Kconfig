@@ -12,8 +12,12 @@ config WIFI_MANAGER_RETRY_TIMER
 	help
 	Defines the time to wait before an attempt to re-connect to a saved wifi is made after connection is lost or another unsuccesful attempt is made.
 
+config WIFI_MANAGER_AUTOSTART_AP
+    bool "Automatically start the AP if the WiFi manager fails to connect to another AP"
+	default y
+
 config WIFI_MANAGER_MAX_RETRY_START_AP
-	int "Max Retry before starting the AP"
+	int "Max Retry before starting the AP" if WIFI_MANAGER_AUTOSTART_AP
     default 3
     help
 	Defines the maximum number of failed retries allowed before the WiFi manager starts its own access point.  
