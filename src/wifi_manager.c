@@ -50,6 +50,7 @@ Contains the freeRTOS task and all necessary support
 #include "lwip/err.h"
 #include "lwip/netdb.h"
 #include "lwip/ip4_addr.h"
+#include "lwip/dhcp.h"
 #include "json.h"
 #include "http_server.h"
 #include "tcpip_adapter.h"
@@ -482,12 +483,14 @@ void
 wifi_manager_update_network_connection_info(
     const update_reason_code_e           update_reason_code,
     const wifi_ssid_t *const             p_ssid,
-    const tcpip_adapter_ip_info_t *const p_ip_info)
+    const tcpip_adapter_ip_info_t *const p_ip_info,
+    const ip4_addr_t *const              p_dhcp_ip)
 {
     network_info_str_t ip_info_str = {
         .ip      = { "0" },
         .gw      = { "0" },
         .netmask = { "0" },
+        .dhcp    = { "" },
     };
     if (UPDATE_CONNECTION_OK == update_reason_code)
     {
@@ -507,6 +510,11 @@ wifi_manager_update_network_connection_info(
             snprintf(ip_info_str.ip, sizeof(ip_info_str.ip), "%s", ip4addr_ntoa(&p_ip_info->ip));
             snprintf(ip_info_str.netmask, sizeof(ip_info_str.netmask), "%s", ip4addr_ntoa(&p_ip_info->netmask));
             snprintf(ip_info_str.gw, sizeof(ip_info_str.gw), "%s", ip4addr_ntoa(&p_ip_info->gw));
+            if (NULL != p_dhcp_ip)
+            {
+                snprintf(ip_info_str.dhcp.buf, sizeof(ip_info_str.dhcp.buf), "%s", ip4addr_ntoa(p_dhcp_ip));
+                LOG_INFO("DHCP IP: %s", ip_info_str.dhcp.buf);
+            }
         }
         else
         {
@@ -972,7 +980,7 @@ wifi_handle_ev_sta_disconnected(const wifiman_msg_param_t *p_param)
         wifiman_msg_send_cmd_connect_sta(CONNECTION_REQUEST_AUTO_RECONNECT);
     }
     const wifi_ssid_t ssid = wifi_sta_config_get_ssid();
-    wifi_manager_update_network_connection_info(update_reason_code, &ssid, NULL);
+    wifi_manager_update_network_connection_info(update_reason_code, &ssid, NULL, NULL);
     if (!is_connected_to_wifi)
     {
         return false;
@@ -1024,7 +1032,23 @@ wifi_handle_ev_sta_got_ip(const wifiman_msg_param_t *p_param)
     {
         /* refresh JSON with the new IP */
         const wifi_ssid_t ssid = wifi_sta_config_get_ssid();
-        wifi_manager_update_network_connection_info(UPDATE_CONNECTION_OK, &ssid, &ip_info);
+
+        ip4_addr_t *    p_dhcp_ip = NULL;
+        struct netif *  p_netif   = NULL;
+        const esp_err_t err2      = tcpip_adapter_get_netif(TCPIP_ADAPTER_IF_STA, (void **)&p_netif);
+        if (ESP_OK != err2)
+        {
+            LOG_ERR_ESP(err2, "%s failed", "tcpip_adapter_get_netif");
+        }
+        else
+        {
+            struct dhcp *const p_dhcp = netif_dhcp_data(p_netif);
+            if (NULL != p_dhcp)
+            {
+                p_dhcp_ip = &p_dhcp->server_ip_addr.u_addr.ip4;
+            }
+        }
+        wifi_manager_update_network_connection_info(UPDATE_CONNECTION_OK, &ssid, &ip_info, p_dhcp_ip);
     }
     else
     {

@@ -249,18 +249,25 @@ typedef struct
     wifiman_msg_param_t msg_param;
 } queue_message;
 
+#define NETWORK_INFO_STRLEN_MAX 16
+
+typedef struct network_dhcp_str_t
+{
+    char buf[NETWORK_INFO_STRLEN_MAX];
+} network_dhcp_str_t;
+
 typedef struct network_info_str_t
 {
-#define NETWORK_INFO_STRLEN_MAX 16
 
 #if defined(IP4ADDR_STRLEN_MAX)
 #if NETWORK_INFO_STRLEN_MAX < IP4ADDR_STRLEN_MAX
 #error NETWORK_INFO_STRLEN_MAX < IP4ADDR_STRLEN_MAX
 #endif
 #endif
-    char ip[NETWORK_INFO_STRLEN_MAX];
-    char gw[NETWORK_INFO_STRLEN_MAX];
-    char netmask[NETWORK_INFO_STRLEN_MAX];
+    char               ip[NETWORK_INFO_STRLEN_MAX];
+    char               gw[NETWORK_INFO_STRLEN_MAX];
+    char               netmask[NETWORK_INFO_STRLEN_MAX];
+    network_dhcp_str_t dhcp;
 } network_info_str_t;
 
 typedef enum http_resp_code_e

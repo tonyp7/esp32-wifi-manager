@@ -120,12 +120,13 @@ static void
 json_network_info_do_clear(json_network_info_t *const p_info, void *const p_param)
 {
     (void)p_param;
-    p_info->is_ssid_null            = true;
-    p_info->ssid.ssid_buf[0]        = '\0';
-    p_info->network_info.ip[0]      = '\0';
-    p_info->network_info.netmask[0] = '\0';
-    p_info->network_info.gw[0]      = '\0';
-    p_info->update_reason_code      = UPDATE_CONNECTION_UNDEF;
+    p_info->is_ssid_null             = true;
+    p_info->ssid.ssid_buf[0]         = '\0';
+    p_info->network_info.ip[0]       = '\0';
+    p_info->network_info.netmask[0]  = '\0';
+    p_info->network_info.gw[0]       = '\0';
+    p_info->network_info.dhcp.buf[0] = '\0';
+    p_info->update_reason_code       = UPDATE_CONNECTION_UNDEF;
 }
 
 void
@@ -136,7 +137,7 @@ json_network_info_clear(void)
 
 void
 json_network_info_do_generate_internal(
-    json_network_info_t *const            p_info,
+    const json_network_info_t *const      p_info,
     http_server_resp_status_json_t *const p_resp_status_json,
     const bool                            flag_access_from_lan)
 {
@@ -162,10 +163,11 @@ json_network_info_do_generate_internal(
         }
         str_buf_printf(
             &str_buf,
-            ",\"ip\":\"%s\",\"netmask\":\"%s\",\"gw\":\"%s\",\"urc\":%d,\"lan\":%d",
+            ",\"ip\":\"%s\",\"netmask\":\"%s\",\"gw\":\"%s\",\"dhcp\":\"%s\",\"urc\":%d,\"lan\":%d",
             p_info->network_info.ip,
             p_info->network_info.netmask,
             p_info->network_info.gw,
+            p_info->network_info.dhcp.buf,
             (printf_int_t)p_info->update_reason_code,
             (printf_int_t)flag_access_from_lan);
 
@@ -214,9 +216,10 @@ json_network_info_do_update(json_network_info_t *const p_info, void *const p_par
     }
     if (NULL == p_update_info->p_network_info)
     {
-        p_info->network_info.ip[0]      = '\0';
-        p_info->network_info.netmask[0] = '\0';
-        p_info->network_info.gw[0]      = '\0';
+        p_info->network_info.ip[0]       = '\0';
+        p_info->network_info.netmask[0]  = '\0';
+        p_info->network_info.gw[0]       = '\0';
+        p_info->network_info.dhcp.buf[0] = '\0';
     }
     else
     {

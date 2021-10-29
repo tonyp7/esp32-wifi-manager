@@ -111,7 +111,7 @@ json_network_info_do_generate(json_network_info_t *const p_info, void *const p_p
  */
 void
 json_network_info_do_generate_internal(
-    json_network_info_t *const            p_info,
+    const json_network_info_t *const      p_info,
     http_server_resp_status_json_t *const p_resp_status_json,
     const bool                            flag_access_from_lan);
 

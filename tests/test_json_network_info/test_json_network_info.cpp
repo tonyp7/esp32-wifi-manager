@@ -184,12 +184,13 @@ TEST_F(TestJsonNetworkInfo, test_generate_ssid_null_lan_false) // NOLINT
         { "192.168.0.50" },
         { "192.168.0.1" },
         { "255.255.255.0" },
+        { "192.168.0.2" },
     };
     json_network_info_update(nullptr, &network_info, UPDATE_CONNECTION_OK);
     string json_str = json_network_info_get(false);
     ASSERT_EQ(
-        string("{\"ssid\":null,\"ip\":\"192.168.0.50\",\"netmask\":\"255.255.255.0\",\"gw\":\"192.168.0.1\",\"urc\":0,"
-               "\"lan\":0}\n"),
+        string("{\"ssid\":null,\"ip\":\"192.168.0.50\",\"netmask\":\"255.255.255.0\",\"gw\":\"192.168.0.1\",\"dhcp\":"
+               "\"192.168.0.2\",\"urc\":0,\"lan\":0}\n"),
         json_str);
 }
 
@@ -199,12 +200,13 @@ TEST_F(TestJsonNetworkInfo, test_generate_ssid_null_lan_true) // NOLINT
         { "192.168.0.50" },
         { "192.168.0.1" },
         { "255.255.255.0" },
+        { "192.168.0.2" },
     };
     json_network_info_update(nullptr, &network_info, UPDATE_CONNECTION_OK);
     string json_str = json_network_info_get(true);
     ASSERT_EQ(
-        string("{\"ssid\":null,\"ip\":\"192.168.0.50\",\"netmask\":\"255.255.255.0\",\"gw\":\"192.168.0.1\",\"urc\":0,"
-               "\"lan\":1}\n"),
+        string("{\"ssid\":null,\"ip\":\"192.168.0.50\",\"netmask\":\"255.255.255.0\",\"gw\":\"192.168.0.1\",\"dhcp\":"
+               "\"192.168.0.2\",\"urc\":0,\"lan\":1}\n"),
         json_str);
 }
 
@@ -214,13 +216,14 @@ TEST_F(TestJsonNetworkInfo, test_generate_ssid_empty) // NOLINT
         { "192.168.0.50" },
         { "192.168.0.1" },
         { "255.255.255.0" },
+        { "192.168.0.2" },
     };
     const wifi_ssid_t ssid = { "" };
     json_network_info_update(&ssid, &network_info, UPDATE_CONNECTION_OK);
     string json_str = json_network_info_get(false);
     ASSERT_EQ(
-        string("{\"ssid\":\"\",\"ip\":\"192.168.0.50\",\"netmask\":\"255.255.255.0\",\"gw\":\"192.168.0.1\",\"urc\":0,"
-               "\"lan\":0}\n"),
+        string("{\"ssid\":\"\",\"ip\":\"192.168.0.50\",\"netmask\":\"255.255.255.0\",\"gw\":\"192.168.0.1\",\"dhcp\":"
+               "\"192.168.0.2\",\"urc\":0,\"lan\":0}\n"),
         json_str);
 }
 
@@ -230,6 +233,7 @@ TEST_F(TestJsonNetworkInfo, test_generate_connection_ok) // NOLINT
         { "192.168.0.50" },
         { "192.168.0.1" },
         { "255.255.255.0" },
+        { "192.168.0.2" },
     };
 
     const wifi_ssid_t ssid = { "test_ssid" };
@@ -241,6 +245,7 @@ TEST_F(TestJsonNetworkInfo, test_generate_connection_ok) // NOLINT
                "\"ip\":\"192.168.0.50\","
                "\"netmask\":\"255.255.255.0\","
                "\"gw\":\"192.168.0.1\","
+               "\"dhcp\":\"192.168.0.2\","
                "\"urc\":0,"
                "\"lan\":0"
                "}\n"),
@@ -253,6 +258,7 @@ TEST_F(TestJsonNetworkInfo, test_generate_failed_attempt) // NOLINT
         { "0" },
         { "0" },
         { "0" },
+        { "" },
     };
     const wifi_ssid_t ssid = { "test_ssid" };
     json_network_info_update(&ssid, &network_info, UPDATE_FAILED_ATTEMPT);
@@ -263,6 +269,7 @@ TEST_F(TestJsonNetworkInfo, test_generate_failed_attempt) // NOLINT
                "\"ip\":\"0\","
                "\"netmask\":\"0\","
                "\"gw\":\"0\","
+               "\"dhcp\":\"\","
                "\"urc\":1,"
                "\"lan\":0"
                "}\n"),
@@ -275,6 +282,7 @@ TEST_F(TestJsonNetworkInfo, test_generate_failed_attempt_2) // NOLINT
         { "192.168.0.50" },
         { "192.168.0.1" },
         { "255.255.255.0" },
+        { "192.168.0.2" },
     };
     const wifi_ssid_t ssid = { "test_ssid" };
     json_network_info_update(&ssid, &network_info, UPDATE_FAILED_ATTEMPT);
@@ -285,6 +293,7 @@ TEST_F(TestJsonNetworkInfo, test_generate_failed_attempt_2) // NOLINT
                "\"ip\":\"192.168.0.50\","
                "\"netmask\":\"255.255.255.0\","
                "\"gw\":\"192.168.0.1\","
+               "\"dhcp\":\"192.168.0.2\","
                "\"urc\":1,"
                "\"lan\":0"
                "}\n"),
@@ -297,6 +306,7 @@ TEST_F(TestJsonNetworkInfo, test_generate_user_disconnect) // NOLINT
         { "0" },
         { "0" },
         { "0" },
+        { "" },
     };
     const wifi_ssid_t ssid = { "test_ssid" };
     json_network_info_update(&ssid, &network_info, UPDATE_USER_DISCONNECT);
@@ -307,6 +317,7 @@ TEST_F(TestJsonNetworkInfo, test_generate_user_disconnect) // NOLINT
                "\"ip\":\"0\","
                "\"netmask\":\"0\","
                "\"gw\":\"0\","
+               "\"dhcp\":\"\","
                "\"urc\":2,"
                "\"lan\":0"
                "}\n"),
@@ -319,6 +330,7 @@ TEST_F(TestJsonNetworkInfo, test_generate_lost_connection) // NOLINT
         { "0" },
         { "0" },
         { "0" },
+        { "" },
     };
     const wifi_ssid_t ssid = { "test_ssid" };
     json_network_info_update(&ssid, &network_info, UPDATE_LOST_CONNECTION);
@@ -329,6 +341,7 @@ TEST_F(TestJsonNetworkInfo, test_generate_lost_connection) // NOLINT
                "\"ip\":\"0\","
                "\"netmask\":\"0\","
                "\"gw\":\"0\","
+               "\"dhcp\":\"\","
                "\"urc\":3,"
                "\"lan\":0"
                "}\n"),
