@@ -87,7 +87,7 @@ static SemaphoreHandle_t gh_wifi_mutex;
 static StaticQueue_t     g_wifi_manager_mutex_mem;
 
 static uint16_t         g_wifi_ap_num = MAX_AP_NUM;
-static wifi_ap_record_t g_wifi_accessp_records[MAX_AP_NUM];
+static wifi_ap_record_t g_wifi_accessp_records[2 * MAX_AP_NUM];
 
 static wifi_manager_cb_ptr g_wifi_cb_ptr_arr[MESSAGE_CODE_COUNT];
 
@@ -683,9 +683,6 @@ wifi_manager_set_callback(const message_code_e message_code, wifi_manager_cb_ptr
 static void
 wifi_manger_notify_scan_done(wifi_manger_scan_info_t *const p_scan_info)
 {
-    /* Will remove the duplicate SSIDs from the list and update ap_num */
-    g_wifi_ap_num = ap_list_filter_unique(g_wifi_accessp_records, p_scan_info->num_access_points);
-
     xEventGroupClearBits(g_wifi_manager_event_group, WIFI_MANAGER_SCAN_BIT);
     if (NULL != g_scan_sync_sema)
     {
@@ -735,10 +732,8 @@ wifi_handle_ev_scan_done(void)
 
     wifi_manager_lock();
 
-    uint16_t        wifi_ap_num = MAX_AP_NUM - p_scan_info->num_access_points;
-    const esp_err_t err         = esp_wifi_scan_get_ap_records(
-        &wifi_ap_num,
-        &g_wifi_accessp_records[p_scan_info->num_access_points]);
+    uint16_t        wifi_ap_num = MAX_AP_NUM;
+    const esp_err_t err         = esp_wifi_scan_get_ap_records(&wifi_ap_num, &g_wifi_accessp_records[MAX_AP_NUM]);
     if (ESP_OK != err)
     {
         LOG_ERR_ESP(
@@ -749,17 +744,21 @@ wifi_handle_ev_scan_done(void)
         wifi_manager_unlock();
         return;
     }
+
     LOG_INFO(
         "EVENT_SCAN_DONE: found %u Wi-Fi APs on channel %u",
         (printf_uint_t)wifi_ap_num,
         (printf_int_t)p_scan_info->cur_chan);
-    p_scan_info->num_access_points += wifi_ap_num;
+
+    /* Will remove the duplicate SSIDs from the list and update ap_num */
+    p_scan_info->num_access_points = ap_list_filter_unique(g_wifi_accessp_records, MAX_AP_NUM * 2);
+
+    /* Put SSID's with the highest quality to the beginning of the list */
+    ap_list_sort_by_rssi(g_wifi_accessp_records, p_scan_info->num_access_points);
+
     if (p_scan_info->num_access_points >= MAX_AP_NUM)
     {
         p_scan_info->num_access_points = MAX_AP_NUM;
-        wifi_manger_notify_scan_done(p_scan_info);
-        wifi_manager_unlock();
-        return;
     }
     if (wifi_scan_next(&g_wifi_scan_info))
     {
