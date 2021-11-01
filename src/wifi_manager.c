@@ -755,6 +755,7 @@ wifi_handle_ev_scan_done(void)
 
     /* Put SSID's with the highest quality to the beginning of the list */
     ap_list_sort_by_rssi(g_wifi_accessp_records, p_scan_info->num_access_points);
+    g_wifi_ap_num = p_scan_info->num_access_points;
 
     if (p_scan_info->num_access_points >= MAX_AP_NUM)
     {
