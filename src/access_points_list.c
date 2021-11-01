@@ -22,7 +22,7 @@ ap_list_clear_identical_ap(wifi_ap_record_t *p_ap_src, wifi_ap_record_t *p_ap_ds
 {
     /* same SSID, different auth mode is skipped */
     if ((0 == strcmp((const char *)p_ap_src->ssid, (const char *)p_ap_dst->ssid))
-        && (p_ap_src->authmode == p_ap_dst->authmode))
+        && (!!p_ap_src->authmode == !!p_ap_dst->authmode))
     {
         /* save the rssi for the display */
         if (p_ap_src->rssi < p_ap_dst->rssi)

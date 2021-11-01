@@ -102,14 +102,10 @@ TEST_F(TestAccessPointsList, test_ap_list_clear_identical_ap_ssid_equals) // NOL
 
     const wifi_ap_record_t exp_ap1 = {
         .ssid     = { 'a', 'b', 'c', '\0' },
-        .rssi     = 10,
+        .rssi     = 20,
         .authmode = WIFI_AUTH_WPA2_PSK,
     };
-    const wifi_ap_record_t exp_ap2 = {
-        .ssid     = { 'a', 'b', 'c', '\0' },
-        .rssi     = 20,
-        .authmode = WIFI_AUTH_WPA3_PSK,
-    };
+    const wifi_ap_record_t exp_ap2 = {};
     ASSERT_EQ(exp_ap1, ap1);
     ASSERT_EQ(exp_ap2, ap2);
 }
@@ -266,16 +262,8 @@ TEST_F(TestAccessPointsList, ap_list_clear_identical_aps) // NOLINT
             .authmode = WIFI_AUTH_WPA2_PSK,
         },
         { 0 },
-        {
-            .ssid     = { 'a', 'b', 'c', '\0' },
-            .rssi     = -42,
-            .authmode = WIFI_AUTH_WPA3_PSK,
-        },
-        {
-            .ssid     = { 'q', 'w', 'e', '\0' },
-            .rssi     = -43,
-            .authmode = WIFI_AUTH_WPA3_PSK,
-        },
+        { 0 },
+        { 0 },
         { 0 },
         { 0 },
     };
@@ -555,7 +543,7 @@ TEST_F(TestAccessPointsList, ap_list_filter_unique_complex) // NOLINT
             .authmode = WIFI_AUTH_WPA2_PSK,
         },
     };
-    ASSERT_EQ(3, ap_list_filter_unique(arr_of_aps, sizeof(arr_of_aps) / sizeof(arr_of_aps[0])));
+    ASSERT_EQ(2, ap_list_filter_unique(arr_of_aps, sizeof(arr_of_aps) / sizeof(arr_of_aps[0])));
 
     const wifi_ap_record_t exp_arr_of_aps[] = {
         {
@@ -568,13 +556,7 @@ TEST_F(TestAccessPointsList, ap_list_filter_unique_complex) // NOLINT
             .rssi     = -20,
             .authmode = WIFI_AUTH_WPA2_PSK,
         },
-        {
-            .ssid     = { 'a', 'b', 'c', '\0' },
-            .rssi     = -10,
-            .authmode = WIFI_AUTH_WPA3_PSK,
-        },
     };
     ASSERT_EQ(exp_arr_of_aps[0], arr_of_aps[0]);
     ASSERT_EQ(exp_arr_of_aps[1], arr_of_aps[1]);
-    ASSERT_EQ(exp_arr_of_aps[2], arr_of_aps[2]);
 }
