@@ -20,7 +20,8 @@
 #include "http_server_handle_req_post_auth.h"
 #include "http_server_handle_req_delete_auth.h"
 
-#define LOG_LOCAL_LEVEL LOG_LEVEL_DEBUG
+// Warning: Debug log level prints out the passwords as a "plaintext" so accidents won't happen.
+#define LOG_LOCAL_LEVEL LOG_LEVEL_INFO
 #include "log.h"
 
 static const char TAG[] = "http_server";
@@ -39,7 +40,7 @@ http_server_gen_resp_status_json(json_network_info_t *const p_info, void *const 
     http_server_gen_resp_status_json_param_t *p_params = p_param;
     if (NULL == p_info)
     {
-        LOG_DBG("http_server_netconn_serve: GET /status.json failed to obtain mutex");
+        LOG_ERR("http_server_netconn_serve: GET /status.json failed to obtain mutex");
         LOG_INFO("status.json: 503");
         *p_params->p_http_resp = http_server_resp_503();
     }
@@ -200,7 +201,7 @@ http_server_handle_req_delete(
     }
     else if (0 == strcmp(p_file_name, "connect.json"))
     {
-        LOG_DBG("http_server_netconn_serve: DELETE /connect.json");
+        LOG_INFO("http_server_netconn_serve: DELETE /connect.json");
         if (wifi_manager_is_connected_to_ethernet())
         {
             wifi_manager_disconnect_eth();
@@ -218,7 +219,7 @@ http_server_handle_req_delete(
 static http_server_resp_t
 http_server_handle_req_post_connect_json(const http_req_header_t http_header)
 {
-    LOG_DBG("http_server_netconn_serve: POST /connect.json");
+    LOG_INFO("http_server_netconn_serve: POST /connect.json");
     uint32_t    len_ssid     = 0;
     uint32_t    len_password = 0;
     const char *p_ssid       = http_req_header_get_field(http_header, "X-Custom-ssid:", &len_ssid);
