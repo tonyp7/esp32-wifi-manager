@@ -321,7 +321,7 @@ http_server_handle_req_post(
     {
         return http_server_handle_req_post_connect_json(http_header);
     }
-    return wifi_manager_cb_on_http_post(p_file_name, http_body);
+    return wifi_manager_cb_on_http_post(p_file_name, http_body, flag_access_from_lan);
 }
 
 http_server_resp_t

@@ -53,7 +53,7 @@ wifi_manager_cb_on_http_get(
     const http_server_resp_t *const p_resp_auth);
 
 http_server_resp_t
-wifi_manager_cb_on_http_post(const char *p_path, const http_req_body_t http_body);
+wifi_manager_cb_on_http_post(const char *p_path, const http_req_body_t http_body, const bool flag_access_from_lan);
 
 http_server_resp_t
 wifi_manager_cb_on_http_delete(

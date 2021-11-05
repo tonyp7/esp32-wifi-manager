@@ -452,13 +452,13 @@ wifi_manager_cb_on_http_get(
 }
 
 http_server_resp_t
-wifi_manager_cb_on_http_post(const char *p_path, const http_req_body_t http_body)
+wifi_manager_cb_on_http_post(const char *p_path, const http_req_body_t http_body, const bool flag_access_from_lan)
 {
     if (NULL == g_wifi_callbacks.cb_on_http_post)
     {
         return http_server_resp_404();
     }
-    return g_wifi_callbacks.cb_on_http_post(p_path, http_body.ptr);
+    return g_wifi_callbacks.cb_on_http_post(p_path, http_body.ptr, flag_access_from_lan);
 }
 
 http_server_resp_t

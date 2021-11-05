@@ -1147,7 +1147,15 @@ http_server_netconn_serve(struct netconn *const p_conn)
         && ((HTTP_CONTENT_LOCATION_STATIC_MEM == resp.content_location)
             || (HTTP_CONTENT_LOCATION_HEAP == resp.content_location)))
     {
-        LOG_INFO("Json resp: code=%u, content:\n%s", resp.http_resp_code, resp.select_location.memory.p_buf);
+        const size_t content_len = strlen((const char *)resp.select_location.memory.p_buf);
+        if (content_len < 256)
+        {
+            LOG_INFO("Json resp: code=%u, content:\n%s", resp.http_resp_code, resp.select_location.memory.p_buf);
+        }
+        else
+        {
+            LOG_INFO("Json resp: code=%u, content_len=%lu", resp.http_resp_code, (printf_ulong_t)content_len);
+        }
     }
     switch (resp.http_resp_code)
     {
