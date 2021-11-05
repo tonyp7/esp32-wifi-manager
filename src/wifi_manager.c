@@ -862,7 +862,7 @@ wifi_handle_cmd_connect_sta(const wifiman_msg_param_t *p_param)
     if (0 != (uxBits & WIFI_MANAGER_WIFI_CONNECTED_BIT))
     {
         wifiman_msg_send_cmd_disconnect_sta();
-        /* todo: reconnect */
+        wifiman_msg_send_cmd_connect_sta(CONNECTION_REQUEST_AUTO_RECONNECT);
     }
     else
     {

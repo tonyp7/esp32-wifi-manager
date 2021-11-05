@@ -397,7 +397,7 @@ wifi_sta_config_fetch(void)
     LOG_INFO(
         "wifi_sta_config_fetch: ssid:%s password:%s",
         cfg.wifi_config_sta.sta.ssid,
-        ((LOG_LOCAL_LEVEL >= LOG_LEVEL_DEBUG) ? (char*)cfg.wifi_config_sta.sta.password : "********"));
+        ((LOG_LOCAL_LEVEL >= LOG_LEVEL_DEBUG) ? (char *)cfg.wifi_config_sta.sta.password : "********"));
     LOG_INFO("wifi_sta_config_fetch: SoftAP_ssid:%s", cfg.wifi_settings.ap_ssid);
     LOG_INFO("wifi_sta_config_fetch: SoftAP_pwd:%s", cfg.wifi_settings.ap_pwd);
     LOG_INFO("wifi_sta_config_fetch: SoftAP_channel:%i", cfg.wifi_settings.ap_channel);
