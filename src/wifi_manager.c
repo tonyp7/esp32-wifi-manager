@@ -365,7 +365,8 @@ wifi_manager_init(
 
     if (flag_start_wifi)
     {
-        if (!flag_start_ap_only && wifi_sta_config_fetch())
+        const bool is_ssid_configured = wifi_sta_config_fetch();
+        if (is_ssid_configured && !flag_start_ap_only)
         {
             LOG_INFO("Saved wifi found on startup. Will attempt to connect.");
             wifiman_msg_send_cmd_connect_sta(CONNECTION_REQUEST_RESTORE_CONNECTION);
@@ -373,7 +374,14 @@ wifi_manager_init(
         else
         {
             /* no wifi saved: start soft AP! This is what should happen during a first run */
-            LOG_INFO("No saved wifi found on startup. Starting access point.");
+            if (flag_start_ap_only)
+            {
+                LOG_INFO("Force start WiFi hotspot on startup.");
+            }
+            else
+            {
+                LOG_INFO("No saved wifi found on startup. Starting access point.");
+            }
             wifiman_msg_send_cmd_start_ap();
         }
     }
