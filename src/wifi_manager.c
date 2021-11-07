@@ -133,6 +133,11 @@ static bool sta_was_connected;
 /** Whether STA is connected to the hardcoded AP. */
 static bool sta_connected_to_hardcoded;
 
+/** SSID of connection  requested using wifi_manager_connect_async(). */
+static char connect_request_ssid[MAX_SSID_SIZE + 1];
+/** Password of connection  requested using wifi_manager_connect_async(). */
+static char connect_request_password[MAX_PASSWORD_SIZE + 1];
+
 /**
  * The actual WiFi settings in use
  */
@@ -179,6 +184,12 @@ const int WIFI_MANAGER_SCAN_BIT = BIT7;
 
 /* @brief When set, means user requested for a disconnect */
 const int WIFI_MANAGER_REQUEST_DISCONNECT_BIT = BIT8;
+
+/* @brief When set, means a connection attempt is in progress */
+const int WIFI_MANAGER_CONNECT_IN_PROGRESS = BIT9;
+
+/* @brief When set, means a deferred connect has been requested */
+const int WIFI_MANAGER_REQUEST_DEFERRED_CONNECT = BIT10;
 
 
 /* Prototypes */
@@ -797,6 +808,8 @@ static void wifi_manager_event_handler(void* arg, esp_event_base_t event_base, i
 		 * the application is LwIP-based, then you need to wait until the got ip event comes in. */
 		case WIFI_EVENT_STA_CONNECTED:
 			ESP_LOGI(TAG, "WIFI_EVENT_STA_CONNECTED");
+			/* this current connection attempt has ended in success */
+			xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_CONNECT_IN_PROGRESS);
 			/* Check whether this is the hardcoded AP. */
 			wifi_config_t* config = wifi_manager_get_wifi_sta_config();
 			if ((strcmp((char *)config->sta.ssid, HARDCODED_SSID) == 0)
@@ -959,7 +972,9 @@ wifi_config_t* wifi_manager_get_wifi_sta_config(){
 }
 
 
-void wifi_manager_connect_async(bool save_config){
+void wifi_manager_connect_async(bool save_config, const char *ssid, const char *password){
+	size_t len;
+
 	/* in order to avoid a false positive on the front end app we need to quickly flush the ip json
 	 * There'se a risk the front end sees an IP or a password error when in fact
 	 * it's a remnant from a previous connection
@@ -968,6 +983,22 @@ void wifi_manager_connect_async(bool save_config){
 		wifi_manager_clear_ip_info_json();
 		wifi_manager_unlock_json_buffer();
 	}
+	/* Save requested SSID as the connection request might possibly be deferred */
+	memset(connect_request_ssid, 0, sizeof(connect_request_ssid));
+	len = strlen(ssid);
+	if (len > MAX_SSID_SIZE){
+		len = MAX_SSID_SIZE;
+	}
+	memcpy(connect_request_ssid, ssid, len);
+	connect_request_ssid[len] = 0; // null-terminate
+	/* Save requested password */
+	memset(connect_request_password, 0, sizeof(connect_request_password));
+	len = strlen(password);
+	if (len > MAX_PASSWORD_SIZE){
+		len = MAX_PASSWORD_SIZE;
+	}
+	memcpy(connect_request_password, password, len);
+	connect_request_password[len] = 0; // null-terminate
 	if(save_config){
 		wifi_manager_send_message(WM_ORDER_CONNECT_STA, (void *)CONNECTION_REQUEST_USER);
 	}
@@ -1176,11 +1207,7 @@ static void possibly_do_hardcoded_connect(){
 		free(sta_list);
 	}
 
-	wifi_config_t* config = wifi_manager_get_wifi_sta_config();
-	memset(config, 0x00, sizeof(wifi_config_t));
-	memcpy(config->sta.ssid, HARDCODED_SSID, strlen(HARDCODED_SSID));
-	memcpy(config->sta.password, HARDCODED_PASSWORD, strlen(HARDCODED_PASSWORD));
-	wifi_manager_connect_async(false);
+	wifi_manager_connect_async(false, HARDCODED_SSID, HARDCODED_PASSWORD);
 }
 
 void wifi_manager( void * pvParameters ){
@@ -1372,6 +1399,14 @@ void wifi_manager( void * pvParameters ){
 						 * not saved if the user connection attempt is successful. */
 						xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_DONT_SAVE_CONNECTION_INFO_BIT);
 					}
+					if( ! (xEventGroupGetBits(wifi_manager_event_group) & WIFI_MANAGER_CONNECT_IN_PROGRESS) ){
+						/* Copy saved SSID/password and into the STA config.
+						 * This is only safe to do if there isn't a connection is progress. */
+						wifi_config_t *config = wifi_manager_get_wifi_sta_config();
+						memset(config, 0x00, sizeof(wifi_config_t));
+						memcpy(config->sta.ssid, connect_request_ssid, MAX_SSID_SIZE);
+						memcpy(config->sta.password, connect_request_password, MAX_PASSWORD_SIZE);
+					}
 				}
 				else if((BaseType_t)msg.param == CONNECTION_REQUEST_RESTORE_CONNECTION) {
 					xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_DONT_SAVE_CONNECTION_INFO_BIT);
@@ -1387,7 +1422,17 @@ void wifi_manager( void * pvParameters ){
 					if(uxBits & WIFI_MANAGER_SCAN_BIT){
 						esp_wifi_scan_stop();
 					}
-					ESP_ERROR_CHECK(esp_wifi_connect());
+					/* if there is an existing connection attempt in progress,
+					 * defer the call to esp_wifi_connect(), otherwise a crash
+					 * will happen. */
+					if(uxBits & WIFI_MANAGER_CONNECT_IN_PROGRESS){
+						ESP_LOGI(TAG, "Connect in progress, deferring call to esp_wifi_connect()");
+						xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_DEFERRED_CONNECT);
+					}
+					else{
+						ESP_ERROR_CHECK(esp_wifi_connect());
+						xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_CONNECT_IN_PROGRESS);
+					}
 				}
 
 				/* callback */
@@ -1451,6 +1496,9 @@ void wifi_manager( void * pvParameters ){
 				 *
 				 * */
 
+				/* this current connection attempt has ended in failure */
+				xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_CONNECT_IN_PROGRESS);
+
 				/* reset saved sta IP */
 				wifi_manager_safe_update_sta_ip_string((uint32_t)0);
 
@@ -1460,7 +1508,23 @@ void wifi_manager( void * pvParameters ){
 				}
 
 				uxBits = xEventGroupGetBits(wifi_manager_event_group);
-				if( uxBits & WIFI_MANAGER_REQUEST_STA_CONNECT_BIT ){
+				if( uxBits & WIFI_MANAGER_REQUEST_DEFERRED_CONNECT ){
+					ESP_LOGI(TAG, "Doing deferred connect");
+					xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_DEFERRED_CONNECT);
+					/* Copy saved SSID/password and into the STA config. */
+					wifi_config_t *config = wifi_manager_get_wifi_sta_config();
+					memset(config, 0x00, sizeof(wifi_config_t));
+					memcpy(config->sta.ssid, connect_request_ssid, MAX_SSID_SIZE);
+					memcpy(config->sta.password, connect_request_password, MAX_PASSWORD_SIZE);
+					/* esp_wifi_set_config() must be called before doing the deferred connect, otherwise
+					 * if the previous (failed) connection attempt was to the same AP, then the
+					 * deferred connect will fail with reason 205 (WIFI_REASON_CONNECTION_FAIL) due
+					 * to that AP being on the blacklist. */
+					ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, wifi_manager_get_wifi_sta_config()));
+					ESP_ERROR_CHECK(esp_wifi_connect());
+					xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_CONNECT_IN_PROGRESS);
+				}
+				else if( uxBits & WIFI_MANAGER_REQUEST_STA_CONNECT_BIT ){
 					/* there are no retries when it's a user requested connection by design. This avoids a user hanging too much
 					 * in case they typed a wrong password for instance. Here we simply clear the request bit and move on */
 					xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_STA_CONNECT_BIT);
