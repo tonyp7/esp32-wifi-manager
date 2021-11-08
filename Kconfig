@@ -12,17 +12,21 @@ config WIFI_MANAGER_RETRY_TIMER
 	help
 	Defines the time to wait before an attempt to re-connect to a saved wifi is made after connection is lost or another unsuccesful attempt is made.
 
+config WIFI_MANAGER_AUTOSTART_AP
+    bool "Automatically start the AP if the WiFi manager fails to connect to another AP"
+	default y
+
 config WIFI_MANAGER_MAX_RETRY_START_AP
-	int "Max Retry before starting the AP"
+	int "Max Retry before starting the AP" if WIFI_MANAGER_AUTOSTART_AP
     default 3
     help
-	Defines the maximum number of failed retries allowed before the WiFi manager starts its own access point.  
-	
+	Defines the maximum number of failed retries allowed before the WiFi manager starts its own access point.
+
 config WIFI_MANAGER_SHUTDOWN_AP_TIMER
 	int "Time (in ms) to wait before shutting down the AP"
 	default 60000
 	help
-	Defines the time (in ms) to wait after a succesful connection before shutting down the access point.
+	Defines the time (in ms) to wait after a succesful connection before shutting down the access point. Use a negative number to never shut down the access point.
 
 config WEBAPP_LOCATION
     string "Defines the URL where the wifi manager is located"
@@ -36,8 +40,18 @@ config DEFAULT_AP_SSID
     help
 	SSID (network name) the the esp32 will broadcast.
 
+config WIFI_MANAGER_APPEND_MAC
+    bool "Append MAC address to access point SSID"
+    default n
+    help
+    The last two octets of the device's MAC address will be appended (with a preceding space) to the configured access point SSID. For example, "esp32" -> "esp32 ad7e". This helps make the SSID unique if you might have multiple devices on at once.
+
+config USE_RANDOM_AP_PASSWORD
+	bool "Use a randomly-generated Access Point password"
+	default y
+
 config DEFAULT_AP_PASSWORD
-    string "Access Point Password"
+    string "Access Point Password" if !USE_RANDOM_AP_PASSWORD
     default "esp32pwd"
     help
 	Password used for the Access Point. Leave empty and set AUTH MODE to WIFI_AUTH_OPEN for no password.
@@ -77,5 +91,17 @@ config DEFAULT_AP_BEACON_INTERVAL
     default 100
     help
 	100ms is the recommended default.
+
+config HARDCODED_SSID
+  	string "Hardcoded SSID"
+  	default "HardcodedSSID"
+  	help
+  	For factory configuration, the device will attempt to connect an an AP with this SSID if there are no user configured APs.
+
+config HARDCODED_PASSWORD
+  	string "Hardcoded password"
+  	default "HardcodedPassword"
+  	help
+  	For factory configuration, the device will attempt to connect an an AP with this password if there are no user configured APs.
 
 endmenu
