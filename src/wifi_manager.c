@@ -1382,6 +1382,7 @@ void wifi_manager( void * pvParameters ){
 			case WM_ORDER_CONNECT_STA:
 				ESP_LOGI(TAG, "MESSAGE: ORDER_CONNECT_STA");
 
+				bool skip_request = false;
 				/* very important: precise that this connection attempt is specifically requested.
 				 * Param in that case is a boolean indicating if the request was made automatically
 				 * by the wifi_manager.
@@ -1409,11 +1410,31 @@ void wifi_manager( void * pvParameters ){
 					}
 				}
 				else if((BaseType_t)msg.param == CONNECTION_REQUEST_RESTORE_CONNECTION) {
-					xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_DONT_SAVE_CONNECTION_INFO_BIT);
+					if( ! (xEventGroupGetBits(wifi_manager_event_group) & WIFI_MANAGER_CONNECT_IN_PROGRESS) ){
+						xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_DONT_SAVE_CONNECTION_INFO_BIT);
+					}
+					else {
+						/* Attempting to restore a connection while another connection attempt is
+						 * in progress, just skip the restore attempt - the only time this happens
+						 * is if the user is trying to connect to a new wifi AP. In that case
+						 * we want to stop trying to restore a connection to the old one. */
+						skip_request = true;
+					}
+				}
+				else if((BaseType_t)msg.param == CONNECTION_REQUEST_AUTO_RECONNECT) {
+					if( xEventGroupGetBits(wifi_manager_event_group) & WIFI_MANAGER_CONNECT_IN_PROGRESS ){
+						/* Attempting to restore a connection while another connection attempt is
+						 * in progress, just skip the restore attempt. */
+						skip_request = true;
+					}
+				}
+
+				if (skip_request) {
+					ESP_LOGI(TAG, "Connection request skipped");
 				}
 
 				uxBits = xEventGroupGetBits(wifi_manager_event_group);
-				if( ! (uxBits & WIFI_MANAGER_WIFI_CONNECTED_BIT) ){
+				if( ! skip_request && ! (uxBits & WIFI_MANAGER_WIFI_CONNECTED_BIT) ){
 					/* update config to latest and attempt connection */
 					ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, wifi_manager_get_wifi_sta_config()));
 
