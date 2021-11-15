@@ -41,13 +41,13 @@ http_server_gen_resp_status_json(json_network_info_t *const p_info, void *const 
     if (NULL == p_info)
     {
         LOG_ERR("http_server_netconn_serve: GET /status.json failed to obtain mutex");
-        LOG_INFO("status.json: 503");
+        LOG_DBG("status.json: 503");
         *p_params->p_http_resp = http_server_resp_503();
     }
     else
     {
         json_network_info_do_generate_internal(p_info, &g_resp_status_json, p_params->flag_access_from_lan);
-        LOG_INFO("status.json: %s", g_resp_status_json.buf);
+        LOG_DBG("status.json: %s", g_resp_status_json.buf);
         *p_params->p_http_resp = http_server_resp_200_json(g_resp_status_json.buf);
     }
 }
@@ -61,7 +61,7 @@ http_server_handle_req_get(
     const http_server_auth_info_t *const p_auth_info,
     http_header_extra_fields_t *const    p_extra_header_fields)
 {
-    LOG_INFO("http_server_handle_req_get /%s", p_file_name_unchecked);
+    LOG_DBG("http_server_handle_req_get /%s", p_file_name_unchecked);
 
     const char *const p_file_name = (0 == strcmp(p_file_name_unchecked, "")) ? "index.html" : p_file_name_unchecked;
 
@@ -119,7 +119,7 @@ http_server_handle_req_get(
                 LOG_ERR("GET /ap.json: failed to get json, return HTTP error 503");
                 return http_server_resp_503();
             }
-            LOG_INFO("ap.json: %s", p_buff);
+            LOG_INFO("ap.json: %s", ((NULL != p_buff) ? p_buff : "NULL"));
             const http_server_resp_t resp = http_server_resp_200_json(p_buff);
             return resp;
         }

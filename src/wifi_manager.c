@@ -192,7 +192,7 @@ wifi_manager_scan_sync(void)
     wifi_manager_lock();
     os_sema_delete(&g_scan_sync_sema);
     const char *const p_buf = wifi_manager_generate_json_access_points();
-    LOG_INFO("wifi_manager_scan_sync: p_buf: %s", p_buf ? p_buf : "NULL");
+    LOG_DBG("wifi_manager_scan_sync: p_buf: %s", p_buf ? p_buf : "NULL");
     wifi_manager_unlock();
 
     return p_buf;
