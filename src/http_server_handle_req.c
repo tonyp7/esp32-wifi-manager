@@ -245,10 +245,9 @@ http_server_handle_req_post_connect_json(const http_req_header_t http_header)
             else
             {
                 LOG_WARN(
-                    "POST /connect.json: SSID:%.*s, PWD: NULL - try to reconnect to saved WiFi, but previous SSID=%s",
+                    "POST /connect.json: SSID:%.*s, PWD: NULL - try to connect to WiFi without authentication",
                     (printf_int_t)len_ssid,
-                    p_ssid,
-                    saved_ssid.ssid_buf);
+                    p_ssid);
                 wifi_sta_config_set_ssid_and_password(p_ssid, len_ssid, "", 0);
             }
             LOG_DBG("http_server_netconn_serve: wifi_manager_connect_async() call");
