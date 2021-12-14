@@ -59,11 +59,6 @@ typedef struct wifi_ssid_t
  */
 #define MAX_PASSWORD_SIZE 64
 
-typedef struct wifi_password_t
-{
-    char password_buf[MAX_PASSWORD_SIZE];
-} wifi_password_t;
-
 /**
  * @brief Defines the maximum number of access points that can be scanned.
  *
@@ -71,12 +66,6 @@ typedef struct wifi_password_t
  * we can limit the number of APs detected in a wifi scan.
  */
 #define MAX_AP_NUM 15
-
-/**
- * @brief Defines when a connection is lost/attempt to connect is made, how many retries should be made before giving
- * up. Setting it to 2 for instance means there will be 3 attempts in total (original request + 2 retries)
- */
-#define WIFI_MANAGER_MAX_RETRY CONFIG_WIFI_MANAGER_MAX_RETRY
 
 /** @brief Defines the task priority of the wifi_manager.
  *
@@ -86,13 +75,6 @@ typedef struct wifi_password_t
  * of freeRTOS' idle task.
  */
 #define WIFI_MANAGER_TASK_PRIORITY CONFIG_WIFI_MANAGER_TASK_PRIORITY
-
-/** @brief Defines the auth mode as an access point
- *  Value must be of type wifi_auth_mode_t
- *  @see esp_wifi_types.h
- *  @warning if set to WIFI_AUTH_OPEN, passowrd me be empty. See DEFAULT_AP_PASSWORD.
- */
-#define AP_AUTHMODE WIFI_AUTH_WPA2_PSK
 
 /** @brief Defines visibility of the access point. 0: visible AP. 1: hidden */
 #define DEFAULT_AP_SSID_HIDDEN 0
@@ -106,9 +88,6 @@ typedef struct wifi_password_t
  *verbose but waste one byte. In addition, the AP_AUTHMODE must be WIFI_AUTH_OPEN
  */
 #define DEFAULT_AP_PASSWORD CONFIG_DEFAULT_AP_PASSWORD
-
-/** @brief Defines the hostname broadcasted by mDNS */
-#define DEFAULT_HOSTNAME "esp32"
 
 /** @brief Defines access point's bandwidth.
  *  Value: WIFI_BW_HT20 for 20 MHz  or  WIFI_BW_HT40 for 40 MHz
@@ -191,7 +170,7 @@ typedef struct wifi_password_t
  */
 typedef enum message_code_e
 {
-    NONE                      = 0,
+    WIFI_MAN_MSG_CODE_NONE    = 0,
     ORDER_STOP_AND_DESTROY    = 1,
     ORDER_START_WIFI_SCAN     = 2,
     ORDER_CONNECT_ETH         = 4,
@@ -210,6 +189,8 @@ typedef enum message_code_e
     ORDER_TASK_WATCHDOG_FEED  = 17,
     MESSAGE_CODE_COUNT        = 18 /* important for the callback array */
 } message_code_e;
+
+typedef void (*wifi_manager_cb_ptr)(void *);
 
 /**
  * @brief simplified reason codes for a lost connection.
@@ -335,18 +316,33 @@ typedef struct http_server_resp_t
 typedef void (*wifi_manager_http_cb_on_user_req_t)(const http_server_user_req_code_e req_code);
 
 typedef http_server_resp_t (*wifi_manager_http_callback_t)(
-    const char *                    path,
+    const char *const               p_path,
     const bool                      flag_access_from_lan,
     const http_server_resp_t *const p_resp_auth);
 
-typedef http_server_resp_t (
-    *wifi_manager_http_cb_on_post_t)(const char *path, const char *body, const bool flag_access_from_lan);
+typedef http_server_resp_t (*wifi_manager_http_cb_on_post_t)(
+    const char *const p_path,
+    const char *const p_body,
+    const bool        flag_access_from_lan);
 
 typedef void (*wifi_manager_callback_on_cmd_connect_eth_t)(void);
 typedef void (*wifi_manager_callback_on_cmd_disconnect_eth_t)(void);
 typedef void (*wifi_manager_callback_on_cmd_disconnect_sta_t)(void);
 typedef void (*wifi_manager_callback_on_ap_sta_connected_t)(void);
 typedef void (*wifi_manager_callback_on_ap_sta_disconnected_t)(void);
+
+typedef struct wifi_manager_callbacks_t
+{
+    wifi_manager_http_cb_on_user_req_t             cb_on_http_user_req;
+    wifi_manager_http_callback_t                   cb_on_http_get;
+    wifi_manager_http_cb_on_post_t                 cb_on_http_post;
+    wifi_manager_http_callback_t                   cb_on_http_delete;
+    wifi_manager_callback_on_cmd_connect_eth_t     cb_on_connect_eth_cmd;
+    wifi_manager_callback_on_cmd_disconnect_eth_t  cb_on_disconnect_eth_cmd;
+    wifi_manager_callback_on_cmd_disconnect_sta_t  cb_on_disconnect_sta_cmd;
+    wifi_manager_callback_on_ap_sta_connected_t    cb_on_ap_sta_connected;
+    wifi_manager_callback_on_ap_sta_disconnected_t cb_on_ap_sta_disconnected;
+} wifi_manager_callbacks_t;
 
 #ifdef __cplusplus
 }

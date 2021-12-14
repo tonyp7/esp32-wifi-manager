@@ -21,6 +21,8 @@ if(IDF_VERSION_MAJOR GREATER_EQUAL 4)
             src/http_req.c
             src/http_req.h
             src/http_server.c
+            src/http_server_accept_and_handle_conn.c
+            src/http_server_accept_and_handle_conn.h
             src/http_server_auth.c
             src/http_server_auth.h
             src/http_server_auth_common.h
@@ -42,6 +44,9 @@ if(IDF_VERSION_MAJOR GREATER_EQUAL 4)
             src/sta_ip_unsafe.c
             src/sta_ip_unsafe.h
             src/wifi_manager.c
+            src/wifi_manager_handle_msg.c
+            src/wifi_manager_internal.c
+            src/wifi_manager_internal.h
             src/wifi_sta_config.c
             src/wifi_sta_config.h
             src/wifiman_msg.c

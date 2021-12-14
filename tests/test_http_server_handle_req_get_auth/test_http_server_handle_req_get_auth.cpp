@@ -728,15 +728,13 @@ TEST_F(TestHttpServerHandleReqGetAuth, test_auth_ruuvi_success) // NOLINT
     {
         const string            http_header_str = string(R"(Cookie: RUUVISESSION=EVMDULCTKBSJARIZ)") + string("\r\n");
         const http_req_header_t http_header     = { http_header_str.c_str() };
-        http_header_extra_fields_t extra_header_fields = { .buf = { '\0' } };
-        const sta_ip_string_t      remote_ip           = { "192.168.1.10" };
+        const sta_ip_string_t   remote_ip       = { "192.168.1.10" };
 
         const http_server_resp_t resp = http_server_handle_req_delete_auth(
             http_header,
             &remote_ip,
             &auth_info,
-            &ap_ssid,
-            &extra_header_fields);
+            &ap_ssid);
         const string exp_json_resp = R"({})";
         ASSERT_EQ(HTTP_RESP_CODE_200, resp.http_resp_code);
         ASSERT_EQ(HTTP_CONTENT_LOCATION_STATIC_MEM, resp.content_location);
@@ -747,7 +745,6 @@ TEST_F(TestHttpServerHandleReqGetAuth, test_auth_ruuvi_success) // NOLINT
         ASSERT_EQ(HTTP_CONENT_ENCODING_NONE, resp.content_encoding);
         ASSERT_EQ(exp_json_resp, string(reinterpret_cast<const char *>(resp.select_location.memory.p_buf)));
         ASSERT_EQ(exp_json_resp.length(), resp.content_len);
-        ASSERT_EQ(string(""), string(extra_header_fields.buf));
     }
 
     // ------ GET /auth -------------------------------------------------------------

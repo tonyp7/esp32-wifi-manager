@@ -84,6 +84,16 @@ json_network_info_unlock(json_network_info_t **pp_info)
     }
 }
 
+static void
+json_network_info_unlock_const(const json_network_info_t **pp_info)
+{
+    if (NULL != *pp_info)
+    {
+        *pp_info = NULL;
+        os_mutex_unlock(g_json_network_mutex);
+    }
+}
+
 void
 json_network_info_do_action_with_timeout(
     json_network_info_do_action_callback_t cb_func,
@@ -96,9 +106,80 @@ json_network_info_do_action_with_timeout(
 }
 
 void
+json_network_info_do_action_with_timeout_with_const_param(
+    json_network_info_do_action_callback_with_const_param_t cb_func,
+    const void *const                                       p_param,
+    const os_delta_ticks_t                                  ticks_to_wait)
+{
+    json_network_info_t *p_info = json_network_info_lock_with_timeout(ticks_to_wait);
+    cb_func(p_info, p_param);
+    json_network_info_unlock(&p_info);
+}
+
+void
+json_network_info_do_action_with_timeout_without_param(
+    json_network_info_do_action_callback_without_param_t cb_func,
+    const os_delta_ticks_t                               ticks_to_wait)
+{
+    json_network_info_t *p_info = json_network_info_lock_with_timeout(ticks_to_wait);
+    cb_func(p_info);
+    json_network_info_unlock(&p_info);
+}
+
+void
+json_network_info_do_const_action_with_timeout(
+    json_network_info_do_const_action_callback_t cb_func,
+    void *const                                  p_param,
+    const os_delta_ticks_t                       ticks_to_wait)
+{
+    const json_network_info_t *p_info = json_network_info_lock_with_timeout(ticks_to_wait);
+    cb_func(p_info, p_param);
+    json_network_info_unlock_const(&p_info);
+}
+
+void
+json_network_info_do_const_action_with_timeout_with_const_param(
+    json_network_info_do_const_action_callback_with_const_param_t cb_func,
+    const void *const                                             p_param,
+    const os_delta_ticks_t                                        ticks_to_wait)
+{
+    const json_network_info_t *p_info = json_network_info_lock_with_timeout(ticks_to_wait);
+    cb_func(p_info, p_param);
+    json_network_info_unlock_const(&p_info);
+}
+
+void
 json_network_info_do_action(json_network_info_do_action_callback_t cb_func, void *const p_param)
 {
     json_network_info_do_action_with_timeout(cb_func, p_param, OS_DELTA_TICKS_INFINITE);
+}
+
+void
+json_network_info_do_action_with_const_param(
+    json_network_info_do_action_callback_with_const_param_t cb_func,
+    const void *const                                       p_param)
+{
+    json_network_info_do_action_with_timeout_with_const_param(cb_func, p_param, OS_DELTA_TICKS_INFINITE);
+}
+
+void
+json_network_info_do_action_without_param(json_network_info_do_action_callback_without_param_t cb_func)
+{
+    json_network_info_do_action_with_timeout_without_param(cb_func, OS_DELTA_TICKS_INFINITE);
+}
+
+void
+json_network_info_do_const_action(json_network_info_do_const_action_callback_t cb_func, void *const p_param)
+{
+    json_network_info_do_const_action_with_timeout(cb_func, p_param, OS_DELTA_TICKS_INFINITE);
+}
+
+void
+json_network_info_do_const_action_with_const_param(
+    json_network_info_do_const_action_callback_with_const_param_t cb_func,
+    const void *const                                             p_param)
+{
+    json_network_info_do_const_action_with_timeout_with_const_param(cb_func, p_param, OS_DELTA_TICKS_INFINITE);
 }
 
 void
@@ -117,9 +198,8 @@ json_network_info_deinit(void)
 }
 
 static void
-json_network_info_do_clear(json_network_info_t *const p_info, void *const p_param)
+json_network_info_do_clear(json_network_info_t *const p_info)
 {
-    (void)p_param;
     p_info->is_ssid_null             = true;
     p_info->ssid.ssid_buf[0]         = '\0';
     p_info->network_info.ip[0]       = '\0';
@@ -132,7 +212,7 @@ json_network_info_do_clear(json_network_info_t *const p_info, void *const p_para
 void
 json_network_info_clear(void)
 {
-    json_network_info_do_action(&json_network_info_do_clear, NULL);
+    json_network_info_do_action_without_param(&json_network_info_do_clear);
 }
 
 void
@@ -183,25 +263,25 @@ json_network_info_do_generate_internal(
     str_buf_printf(&str_buf, "}\n");
 }
 
-void
-json_network_info_do_generate(json_network_info_t *const p_info, void *const p_param)
+static void
+json_network_info_do_generate(const json_network_info_t *const p_info, const void *const p_param)
 {
-    json_network_info_do_generate_param_t *const p_params = p_param;
+    const json_network_info_do_generate_param_t *const p_params = p_param;
     json_network_info_do_generate_internal(p_info, p_params->p_resp_status_json, p_params->flag_access_from_lan);
 }
 
 void
 json_network_info_generate(http_server_resp_status_json_t *const p_resp_status_json, const bool flag_access_from_lan)
 {
-    json_network_info_do_generate_param_t param = {
+    const json_network_info_do_generate_param_t param = {
         .p_resp_status_json   = p_resp_status_json,
         .flag_access_from_lan = flag_access_from_lan,
     };
-    json_network_info_do_action(&json_network_info_do_generate, &param);
+    json_network_info_do_const_action_with_const_param(&json_network_info_do_generate, &param);
 }
 
 static void
-json_network_info_do_update(json_network_info_t *const p_info, void *const p_param)
+json_network_info_do_update(json_network_info_t *const p_info, const void *const p_param)
 {
     const json_network_info_update_t *const p_update_info = p_param;
     if (NULL == p_update_info->p_ssid)
@@ -234,16 +314,16 @@ json_network_info_update(
     const network_info_str_t *const p_network_info,
     const update_reason_code_e      update_reason_code)
 {
-    json_network_info_update_t update_info = {
+    const json_network_info_update_t update_info = {
         .p_ssid             = p_ssid,
         .p_network_info     = p_network_info,
         .update_reason_code = update_reason_code,
     };
-    json_network_info_do_action(&json_network_info_do_update, &update_info);
+    json_network_info_do_action_with_const_param(&json_network_info_do_update, &update_info);
 }
 
 static void
-json_network_info_do_set_extra_info(json_network_info_t *const p_info, void *const p_param)
+json_network_info_do_set_extra_info(json_network_info_t *const p_info, const void *const p_param)
 {
     const json_network_info_set_extra_t *const p_extra_info = p_param;
     snprintf(
@@ -256,8 +336,8 @@ json_network_info_do_set_extra_info(json_network_info_t *const p_info, void *con
 void
 json_network_set_extra_info(const char *const p_extra)
 {
-    json_network_info_set_extra_t extra_info = {
+    const json_network_info_set_extra_t extra_info = {
         .p_extra = p_extra,
     };
-    json_network_info_do_action(&json_network_info_do_set_extra_info, &extra_info);
+    json_network_info_do_action_with_const_param(&json_network_info_do_set_extra_info, &extra_info);
 }

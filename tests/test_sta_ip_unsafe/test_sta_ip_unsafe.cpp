@@ -13,6 +13,10 @@ using namespace std;
 
 /*** Google-test class implementation *********************************************************************************/
 
+class TestStaIpUnsafe;
+
+static TestStaIpUnsafe *g_pTestClass;
+
 class TestStaIpUnsafe : public ::testing::Test
 {
 private:
@@ -20,11 +24,13 @@ protected:
     void
     SetUp() override
     {
+        g_pTestClass = this;
     }
 
     void
     TearDown() override
     {
+        g_pTestClass = nullptr;
     }
 
 public:
@@ -45,6 +51,33 @@ TestStaIpUnsafe::~TestStaIpUnsafe() = default;
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+void
+tdd_assert_trap(void)
+{
+    printf("assert\n");
+}
+
+static volatile int32_t g_flagDisableCheckIsThreadFreeRTOS;
+
+void
+disableCheckingIfCurThreadIsFreeRTOS(void)
+{
+    ++g_flagDisableCheckIsThreadFreeRTOS;
+}
+
+void
+enableCheckingIfCurThreadIsFreeRTOS(void)
+{
+    --g_flagDisableCheckIsThreadFreeRTOS;
+    assert(g_flagDisableCheckIsThreadFreeRTOS >= 0);
+}
+
+int
+checkIfCurThreadIsFreeRTOS(void)
+{
+    return false;
+}
 
 unsigned int
 lwip_port_rand(void)

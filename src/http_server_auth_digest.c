@@ -25,10 +25,9 @@ http_server_parse_token(
         return false;
     }
     p_idx1 += strlen(p_prefix);
-    const char *const p_idx2 = http_server_strnstr(
-        p_idx1,
-        p_suffix,
-        (size_t)(len - (uint32_t)(ptrdiff_t)(p_idx1 - p_str)));
+    const ptrdiff_t   ptr_diff = (ptrdiff_t)(p_idx1 - p_str);
+    const size_t      len_diff = len - ptr_diff;
+    const char *const p_idx2   = http_server_strnstr(p_idx1, p_suffix, len_diff);
     if (NULL == p_idx2)
     {
         return false;

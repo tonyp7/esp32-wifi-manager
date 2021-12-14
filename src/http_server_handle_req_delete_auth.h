@@ -21,8 +21,7 @@ http_server_handle_req_delete_auth(
     const http_req_header_t              http_header,
     const sta_ip_string_t *const         p_remote_ip,
     const http_server_auth_info_t *const p_auth_info,
-    const wifi_ssid_t *const             p_ap_ssid,
-    http_header_extra_fields_t *const    p_extra_header_fields);
+    const wifi_ssid_t *const             p_ap_ssid);
 
 #ifdef __cplusplus
 }

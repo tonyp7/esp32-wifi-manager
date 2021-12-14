@@ -35,7 +35,7 @@ typedef struct http_server_gen_resp_status_json_param_t
 static http_server_resp_status_json_t g_resp_status_json;
 
 static void
-http_server_gen_resp_status_json(json_network_info_t *const p_info, void *const p_param)
+http_server_gen_resp_status_json(const json_network_info_t *const p_info, void *const p_param)
 {
     http_server_gen_resp_status_json_param_t *p_params = p_param;
     if (NULL == p_info)
@@ -95,7 +95,7 @@ http_server_handle_req_get(
         if ((HTTP_RESP_CODE_200 != resp_auth_check.http_resp_code) && (0 != strcmp(p_file_name, "auth.html")))
         {
             if ((HTTP_SERVER_AUTH_TYPE_RUUVI == p_auth_info->auth_type)
-                || ((HTTP_SERVER_AUTH_TYPE_DENY == p_auth_info->auth_type)))
+                || (HTTP_SERVER_AUTH_TYPE_DENY == p_auth_info->auth_type))
             {
                 snprintf(
                     p_extra_header_fields->buf,
@@ -105,10 +105,7 @@ http_server_handle_req_get(
                     p_file_name);
                 return http_server_resp_302();
             }
-            else
-            {
-                return resp_auth_check;
-            }
+            return resp_auth_check;
         }
 
         if (0 == strcmp(p_file_name, "ap.json"))
@@ -123,7 +120,7 @@ http_server_handle_req_get(
             const http_server_resp_t resp = http_server_resp_200_json(p_buff);
             return resp;
         }
-        else if (0 == strcmp(p_file_name, "status.json"))
+        if (0 == strcmp(p_file_name, "status.json"))
         {
             http_server_update_last_http_status_request();
 
@@ -133,7 +130,7 @@ http_server_handle_req_get(
                 .flag_access_from_lan = flag_access_from_lan,
             };
             const os_delta_ticks_t ticks_to_wait = 10U;
-            json_network_info_do_action_with_timeout(&http_server_gen_resp_status_json, &params, ticks_to_wait);
+            json_network_info_do_const_action_with_timeout(&http_server_gen_resp_status_json, &params, ticks_to_wait);
             return http_resp;
         }
     }
@@ -149,20 +146,14 @@ http_server_handle_req_get(
                 p_file_name);
             return http_server_resp_302();
         }
-        else
-        {
-            return resp_auth_check;
-        }
+        return resp_auth_check;
     }
 
     if (0 == strcmp(p_file_name, "auth.html"))
     {
         return wifi_manager_cb_on_http_get(p_file_name, flag_access_from_lan, &resp_auth_check);
     }
-    else
-    {
-        return wifi_manager_cb_on_http_get(p_file_name, flag_access_from_lan, NULL);
-    }
+    return wifi_manager_cb_on_http_get(p_file_name, flag_access_from_lan, NULL);
 }
 
 static http_server_resp_t
@@ -192,14 +183,9 @@ http_server_handle_req_delete(
 
     if (0 == strcmp(p_file_name, "auth"))
     {
-        return http_server_handle_req_delete_auth(
-            http_header,
-            p_remote_ip,
-            p_auth_info,
-            &ap_ssid,
-            p_extra_header_fields);
+        return http_server_handle_req_delete_auth(http_header, p_remote_ip, p_auth_info, &ap_ssid);
     }
-    else if (0 == strcmp(p_file_name, "connect.json"))
+    if (0 == strcmp(p_file_name, "connect.json"))
     {
         LOG_INFO("http_server_netconn_serve: DELETE /connect.json");
         if (wifi_manager_is_connected_to_ethernet())
@@ -208,7 +194,7 @@ http_server_handle_req_delete(
         }
         else
         {
-            /* request a disconnection from wifi and forget about it */
+            /* request a disconnection from Wi-Fi and forget about it */
             wifi_manager_disconnect_wifi();
         }
         return http_server_resp_200_json("{}");
@@ -254,23 +240,20 @@ http_server_handle_req_post_connect_json(const http_req_header_t http_header)
             wifi_manager_connect_async();
             return http_server_resp_200_json("{}");
         }
-        else
+        LOG_DBG(
+            "POST /connect.json: SSID:%.*s, PWD: %.*s - connect to WiFi",
+            (printf_int_t)len_ssid,
+            p_ssid,
+            (printf_int_t)len_password,
+            p_password);
+        LOG_INFO("POST /connect.json: SSID:%.*s, PWD: ******** - connect to WiFi", (printf_int_t)len_ssid, p_ssid);
+        if (len_password <= MAX_PASSWORD_SIZE)
         {
-            LOG_DBG(
-                "POST /connect.json: SSID:%.*s, PWD: %.*s - connect to WiFi",
-                (printf_int_t)len_ssid,
-                p_ssid,
-                (printf_int_t)len_password,
-                p_password);
-            LOG_INFO("POST /connect.json: SSID:%.*s, PWD: ******** - connect to WiFi", (printf_int_t)len_ssid, p_ssid);
-            if ((len_password <= MAX_PASSWORD_SIZE))
-            {
-                wifi_sta_config_set_ssid_and_password(p_ssid, len_ssid, p_password, len_password);
+            wifi_sta_config_set_ssid_and_password(p_ssid, len_ssid, p_password, len_password);
 
-                LOG_DBG("http_server_netconn_serve: wifi_manager_connect_async() call");
-                wifi_manager_connect_async();
-                return http_server_resp_200_json("{}");
-            }
+            LOG_DBG("http_server_netconn_serve: wifi_manager_connect_async() call");
+            wifi_manager_connect_async();
+            return http_server_resp_200_json("{}");
         }
     }
     /* bad request the authentication header is not complete/not the correct format */
@@ -350,7 +333,7 @@ http_server_handle_req(
             p_auth_info,
             p_extra_header_fields);
     }
-    else if (0 == strcmp("DELETE", p_req_info->http_cmd.ptr))
+    if (0 == strcmp("DELETE", p_req_info->http_cmd.ptr))
     {
         return http_server_handle_req_delete(
             path,
@@ -360,7 +343,7 @@ http_server_handle_req(
             p_auth_info,
             p_extra_header_fields);
     }
-    else if (0 == strcmp("POST", p_req_info->http_cmd.ptr))
+    if (0 == strcmp("POST", p_req_info->http_cmd.ptr))
     {
         return http_server_handle_req_post(
             path,
@@ -371,8 +354,5 @@ http_server_handle_req(
             p_req_info->http_body,
             p_extra_header_fields);
     }
-    else
-    {
-        return http_server_resp_400();
-    }
+    return http_server_resp_400();
 }

@@ -61,7 +61,7 @@ json_access_points_clear(void)
     snprintf(g_json_access_points_buf, sizeof(g_json_access_points_buf), "[]\n");
 }
 
-void
+const char *
 json_access_points_generate(const wifi_ap_record_t *p_access_points, const uint32_t num_access_points)
 {
     str_buf_t str_buf = STR_BUF_INIT_WITH_ARR(g_json_access_points_buf);
@@ -84,6 +84,7 @@ json_access_points_generate(const wifi_ap_record_t *p_access_points, const uint3
             (i < (num_ap_checked - 1)) ? "," : "");
     }
     str_buf_printf(&str_buf, "]\n");
+    return json_access_points_get();
 }
 
 const char *

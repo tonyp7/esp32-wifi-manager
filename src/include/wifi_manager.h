@@ -32,45 +32,33 @@ Contains the freeRTOS task and all necessary support
 #ifndef WIFI_MANAGER_H_INCLUDED
 #define WIFI_MANAGER_H_INCLUDED
 
-#include "esp_wifi.h"
 #include "wifi_manager_defs.h"
+#include "esp_wifi_types.h"
+#include "lwip/ip4_addr.h"
+#include "tcpip_adapter.h"
 #include "http_server_resp.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-typedef void (*wifi_manager_cb_ptr)(void *);
-
-typedef struct
+typedef struct wifi_manager_antenna_config_t wifi_manager_antenna_config_t;
+struct wifi_manager_antenna_config_t
 {
     wifi_ant_gpio_config_t wifi_ant_gpio_config;
     wifi_ant_config_t      wifi_ant_config;
-} WiFiAntConfig_t;
-
-typedef struct wifi_manager_callbacks_t
-{
-    wifi_manager_http_cb_on_user_req_t             cb_on_http_user_req;
-    wifi_manager_http_callback_t                   cb_on_http_get;
-    wifi_manager_http_cb_on_post_t                 cb_on_http_post;
-    wifi_manager_http_callback_t                   cb_on_http_delete;
-    wifi_manager_callback_on_cmd_connect_eth_t     cb_on_connect_eth_cmd;
-    wifi_manager_callback_on_cmd_disconnect_eth_t  cb_on_disconnect_eth_cmd;
-    wifi_manager_callback_on_cmd_disconnect_sta_t  cb_on_disconnect_sta_cmd;
-    wifi_manager_callback_on_ap_sta_connected_t    cb_on_ap_sta_connected;
-    wifi_manager_callback_on_ap_sta_disconnected_t cb_on_ap_sta_disconnected;
-} wifi_manager_callbacks_t;
+};
 
 /**
  * @brief Allocate heap memory for the wifi manager and start the wifi_manager RTOS task.
  */
 bool
 wifi_manager_start(
-    const bool                            flag_start_wifi,
-    const bool                            flag_start_ap_only,
-    const wifi_ssid_t *const              p_gw_wifi_ssid,
-    const WiFiAntConfig_t *               p_wifi_ant_config,
-    const wifi_manager_callbacks_t *const p_callbacks);
+    const bool                                 flag_start_wifi,
+    const bool                                 flag_start_ap_only,
+    const wifi_ssid_t *const                   p_gw_wifi_ssid,
+    const wifi_manager_antenna_config_t *const p_wifi_ant_config,
+    const wifi_manager_callbacks_t *const      p_callbacks);
 
 /**
  * @brief Stop WiFi access-point
@@ -103,12 +91,6 @@ void
 wifi_manager_connect_async(void);
 
 /**
- * @brief requests a wifi scan
- */
-void
-wifi_manager_scan_async(void);
-
-/**
  * @brief scan WiFi APs and return json
  */
 const char *
@@ -130,7 +112,7 @@ wifi_manager_disconnect_wifi(void);
  * @brief Register a callback to a custom function when specific event message_code happens.
  */
 void
-wifi_manager_set_callback(const message_code_e message_code, wifi_manager_cb_ptr func_ptr);
+wifi_manager_set_callback(const message_code_e message_code, wifi_manager_cb_ptr p_callback);
 
 bool
 wifi_manager_is_working(void);
@@ -169,9 +151,6 @@ wifi_manager_update_network_connection_info(
 
 void
 wifi_manager_set_extra_info_for_status_json(const char *const p_extra);
-
-const char *
-wifi_manager_generate_json_access_points(void);
 
 #ifdef __cplusplus
 }

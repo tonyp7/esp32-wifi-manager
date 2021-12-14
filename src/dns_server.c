@@ -35,18 +35,11 @@ Contains the freeRTOS task for the DNS server that processes the requests.
 #include <string.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
-#include <freertos/event_groups.h>
-#include <esp_system.h>
-#include <esp_wifi.h>
 #include <esp_event.h>
 #include <esp_log.h>
 #include <esp_err.h>
 #include <esp_task_wdt.h>
-#include <nvs_flash.h>
 #include <lwip/err.h>
-#include <lwip/sockets.h>
-#include <lwip/sys.h>
-#include <lwip/netdb.h>
 #include <lwip/dns.h>
 #include <byteswap.h>
 #include "wifi_manager.h"
@@ -132,7 +125,7 @@ dns_server_stop(void)
     if (os_signal_is_any_thread_registered(g_p_dns_server_sig))
     {
         LOG_INFO("Send request to stop DNS-Server");
-        if (!os_signal_send(g_p_dns_server_sig, DNS_SERVER_SIG_STOP))
+        if (!os_signal_send(g_p_dns_server_sig, dns_server_conv_to_sig_num(DNS_SERVER_SIG_STOP)))
         {
             LOG_ERR("Failed to send DNS-Server stop request");
         }
@@ -270,6 +263,53 @@ dns_server_wdt_add_and_start(void)
 }
 
 static void
+dns_server_task_wdt_reset(void)
+{
+    const esp_err_t err = esp_task_wdt_reset();
+    if (ESP_OK != err)
+    {
+        LOG_ERR_ESP(err, "%s failed", "esp_task_wdt_reset");
+    }
+}
+
+static bool
+dns_server_handle_sig(const dns_server_sig_e dns_server_sig)
+{
+    bool flag_stop = false;
+    switch (dns_server_sig)
+    {
+        case DNS_SERVER_SIG_STOP:
+            LOG_INFO("Got signal STOP");
+            flag_stop = true;
+            break;
+        case DNS_SERVER_SIG_TASK_WATCHDOG_FEED:
+            dns_server_task_wdt_reset();
+            break;
+    }
+    return flag_stop;
+}
+
+static bool
+dns_server_handle_sig_events(os_signal_events_t *const p_sig_events)
+{
+    bool flag_stop = false;
+    for (;;)
+    {
+        const os_signal_num_e sig_num = os_signal_num_get_next(p_sig_events);
+        if (OS_SIGNAL_NUM_NONE == sig_num)
+        {
+            break;
+        }
+        const dns_server_sig_e dns_server_sig = dns_server_conv_from_sig_num(sig_num);
+        if (dns_server_handle_sig(dns_server_sig))
+        {
+            flag_stop = true;
+        }
+    }
+    return flag_stop;
+}
+
+static void
 dns_server_task(void)
 {
     LOG_INFO("DNS-Server thread started");
@@ -331,32 +371,7 @@ dns_server_task(void)
         os_signal_events_t sig_events = { 0 };
         if (os_signal_wait_with_timeout(g_p_dns_server_sig, OS_DELTA_TICKS_IMMEDIATE, &sig_events))
         {
-            bool flag_stop = false;
-            for (;;)
-            {
-                const os_signal_num_e sig_num = os_signal_num_get_next(&sig_events);
-                if (OS_SIGNAL_NUM_NONE == sig_num)
-                {
-                    break;
-                }
-                const dns_server_sig_e dns_server_sig = dns_server_conv_from_sig_num(sig_num);
-                switch (dns_server_sig)
-                {
-                    case DNS_SERVER_SIG_STOP:
-                        LOG_INFO("Got signal STOP");
-                        flag_stop = true;
-                        break;
-                    case DNS_SERVER_SIG_TASK_WATCHDOG_FEED:
-                    {
-                        const esp_err_t err = esp_task_wdt_reset();
-                        if (ESP_OK != err)
-                        {
-                            LOG_ERR_ESP(err, "%s failed", "esp_task_wdt_reset");
-                        }
-                        break;
-                    }
-                }
-            }
+            const bool flag_stop = dns_server_handle_sig_events(&sig_events);
             if (flag_stop)
             {
                 break;

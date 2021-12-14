@@ -12,7 +12,6 @@
 #include "wifiman_sha256.h"
 #include "wifiman_md5.h"
 #include "str_buf.h"
-#include "wifi_manager_internal.h"
 
 static http_server_resp_t
 http_server_handle_req_get_auth_allow(const wifi_ssid_t *const p_ap_ssid)
@@ -150,7 +149,7 @@ http_server_handle_req_get_auth_ruuvi(
     {
         if (flag_check)
         {
-            return http_server_resp_401_auth_ruuvi(p_remote_ip, p_ap_ssid, p_extra_header_fields);
+            return http_server_resp_401_auth_ruuvi(p_ap_ssid);
         }
         else
         {
@@ -164,7 +163,7 @@ http_server_handle_req_get_auth_ruuvi(
     {
         if (flag_check)
         {
-            return http_server_resp_401_auth_ruuvi(p_remote_ip, p_ap_ssid, p_extra_header_fields);
+            return http_server_resp_401_auth_ruuvi(p_ap_ssid);
         }
         else
         {
