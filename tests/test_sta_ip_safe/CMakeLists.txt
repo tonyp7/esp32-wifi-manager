@@ -6,6 +6,7 @@ set(ProjectId ruuvi_esp32-wifi-manager-test-sta_ip_safe)
 add_executable(
         ${ProjectId}
         test_sta_ip_safe.cpp
+        esp_netif_lwip.c
         ../../src/include/sta_ip.h
         ../../src/sta_ip_safe.c
         ../../src/sta_ip_safe.h

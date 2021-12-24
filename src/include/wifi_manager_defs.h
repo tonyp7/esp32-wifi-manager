@@ -53,6 +53,13 @@ typedef struct wifi_ssid_t
     char ssid_buf[MAX_SSID_SIZE];
 } wifi_ssid_t;
 
+#define WIFI_IP4_ADDR_STR_SIZE (3 + 1 + 3 + 1 + 3 + 1 + 3 + 1)
+
+typedef struct wifi_ip4_addr_str_t
+{
+    char buf[WIFI_IP4_ADDR_STR_SIZE];
+} wifi_ip4_addr_str_t;
+
 /**
  * @brief Defines the maximum size of a WPA2 passkey. 64 is IEEE standard.
  * @warning limit is also hard coded in wifi_config_t. Never extend this value.

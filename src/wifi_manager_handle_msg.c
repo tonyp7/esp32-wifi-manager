@@ -12,6 +12,8 @@
 #include "esp_task_wdt.h"
 #include "lwip/sockets.h"
 #include "lwip/dhcp.h"
+#include "esp_netif.h"
+#include "esp_netif_net_stack.h"
 #include "os_sema.h"
 #include "wifi_manager.h"
 #include "wifiman_msg.h"
@@ -279,34 +281,30 @@ wifi_handle_ev_sta_got_ip(const wifiman_msg_param_t *const p_param)
         wifi_sta_config_save();
     }
 
-    tcpip_adapter_ip_info_t ip_info = { 0 };
+    esp_netif_ip_info_t ip_info = { 0 };
 
-    const esp_err_t err = tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_STA, &ip_info);
+    esp_netif_t *const p_netif_sta = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+    const esp_err_t    err         = esp_netif_get_ip_info(p_netif_sta, &ip_info);
     if (ESP_OK == err)
     {
         /* refresh JSON with the new IP */
         const wifi_ssid_t ssid = wifi_sta_config_get_ssid();
 
-        const ip4_addr_t *p_dhcp_ip = NULL;
-        struct netif *    p_netif   = NULL;
-        const esp_err_t   err2      = tcpip_adapter_get_netif(TCPIP_ADAPTER_IF_STA, (void **)&p_netif);
-        if (ESP_OK != err2)
+        esp_ip4_addr_t           dhcp_ip = { 0 };
+        const struct dhcp *const p_dhcp  = netif_dhcp_data((struct netif *)esp_netif_get_netif_impl(p_netif_sta));
+        if (NULL != p_dhcp)
         {
-            LOG_ERR_ESP(err2, "%s failed", "tcpip_adapter_get_netif");
+            dhcp_ip.addr = p_dhcp->server_ip_addr.u_addr.ip4.addr;
         }
-        else
-        {
-            const struct dhcp *const p_dhcp = netif_dhcp_data(p_netif);
-            if (NULL != p_dhcp)
-            {
-                p_dhcp_ip = &p_dhcp->server_ip_addr.u_addr.ip4;
-            }
-        }
-        wifi_manager_update_network_connection_info(UPDATE_CONNECTION_OK, &ssid, &ip_info, p_dhcp_ip);
+        wifi_manager_update_network_connection_info(
+            UPDATE_CONNECTION_OK,
+            &ssid,
+            &ip_info,
+            (NULL != p_dhcp) ? &dhcp_ip : NULL);
     }
     else
     {
-        LOG_ERR_ESP(err, "%s failed", "tcpip_adapter_get_ip_info");
+        LOG_ERR_ESP(err, "%s failed", "esp_netif_get_ip_info");
     }
 }
 

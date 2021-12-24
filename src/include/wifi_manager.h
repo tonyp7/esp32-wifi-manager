@@ -35,7 +35,7 @@ Contains the freeRTOS task and all necessary support
 #include "wifi_manager_defs.h"
 #include "esp_wifi_types.h"
 #include "lwip/ip4_addr.h"
-#include "tcpip_adapter.h"
+#include "esp_netif.h"
 #include "http_server_resp.h"
 
 #ifdef __cplusplus
@@ -139,15 +139,15 @@ wifi_manager_is_sta_configured(void);
  * @brief Generates the connection status json: ssid and IP addresses.
  * @param update_reason_code - connection status, see update_reason_code_e
  * @param p_ssid - pointer to wifi_ssid_t (WiFi SSID)
- * @param p_ip_info - pointer to tcpip_adapter_ip_info_t
- * @param p_dhcp_ip - pointer to ip4_addr_t with the DHCP server IP address or NULL
+ * @param p_ip_info - pointer to esp_netif_ip_info_t
+ * @param p_dhcp_ip - pointer to esp_ip4_addr_t with the DHCP server IP address or NULL
  */
 void
 wifi_manager_update_network_connection_info(
-    const update_reason_code_e           update_reason_code,
-    const wifi_ssid_t *const             p_ssid,
-    const tcpip_adapter_ip_info_t *const p_ip_info,
-    const ip4_addr_t *const              p_dhcp_ip);
+    const update_reason_code_e       update_reason_code,
+    const wifi_ssid_t *const         p_ssid,
+    const esp_netif_ip_info_t *const p_ip_info,
+    const esp_ip4_addr_t *const      p_dhcp_ip);
 
 void
 wifi_manager_set_extra_info_for_status_json(const char *const p_extra);

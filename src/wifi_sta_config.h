@@ -11,7 +11,7 @@
 #include <stdbool.h>
 #include "esp_wifi_types.h"
 #include "wifi_manager_defs.h"
-#include "tcpip_adapter.h"
+#include "esp_netif.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -22,15 +22,15 @@ extern "C" {
  */
 typedef struct wifi_settings_t
 {
-    uint8_t                 ap_ssid[MAX_SSID_SIZE];
-    uint8_t                 ap_pwd[MAX_PASSWORD_SIZE];
-    uint8_t                 ap_channel;
-    uint8_t                 ap_ssid_hidden;
-    wifi_bandwidth_t        ap_bandwidth;
-    bool                    sta_only;
-    wifi_ps_type_t          sta_power_save;
-    bool                    sta_static_ip;
-    tcpip_adapter_ip_info_t sta_static_ip_config;
+    uint8_t             ap_ssid[MAX_SSID_SIZE];
+    uint8_t             ap_pwd[MAX_PASSWORD_SIZE];
+    uint8_t             ap_channel;
+    uint8_t             ap_ssid_hidden;
+    wifi_bandwidth_t    ap_bandwidth;
+    bool                sta_only;
+    wifi_ps_type_t      sta_power_save;
+    bool                sta_static_ip;
+    esp_netif_ip_info_t sta_static_ip_config;
 } wifi_settings_t;
 
 /**

@@ -142,7 +142,7 @@ wifiman_sta_config_do_clear(wifiman_sta_config_t *const p_cfg)
 
     p_cfg->wifi_settings = g_wifi_settings_default;
     snprintf((char *)p_cfg->wifi_settings.ap_ssid, sizeof(p_cfg->wifi_settings.ap_ssid), "%s", g_wifi_ap_ssid.ssid_buf);
-    memset(&p_cfg->wifi_settings.sta_static_ip_config, 0x00, sizeof(tcpip_adapter_ip_info_t));
+    memset(&p_cfg->wifi_settings.sta_static_ip_config, 0x00, sizeof(esp_netif_ip_info_t));
 }
 
 static void
@@ -327,12 +327,13 @@ wifi_sta_config_log(const wifiman_sta_config_t *const p_cfg, const char *const p
     LOG_INFO("%s: sta_only (0 = APSTA, 1 = STA when connected): %i", p_prefix, p_cfg->wifi_settings.sta_only);
     LOG_INFO("%s: sta_power_save (1 = yes): %i", p_prefix, p_cfg->wifi_settings.sta_power_save);
     LOG_INFO("%s: sta_static_ip (0 = dhcp client, 1 = static ip): %i", p_prefix, p_cfg->wifi_settings.sta_static_ip);
-    LOG_INFO(
-        "%s: sta_static_ip_config: IP: %s , GW: %s , Mask: %s",
-        p_prefix,
-        ip4addr_ntoa(&p_cfg->wifi_settings.sta_static_ip_config.ip),
-        ip4addr_ntoa(&p_cfg->wifi_settings.sta_static_ip_config.gw),
-        ip4addr_ntoa(&p_cfg->wifi_settings.sta_static_ip_config.netmask));
+    wifi_ip4_addr_str_t ip_str;
+    wifi_ip4_addr_str_t gw_str;
+    wifi_ip4_addr_str_t netmask_str;
+    esp_ip4addr_ntoa(&p_cfg->wifi_settings.sta_static_ip_config.ip, ip_str.buf, sizeof(ip_str.buf));
+    esp_ip4addr_ntoa(&p_cfg->wifi_settings.sta_static_ip_config.gw, gw_str.buf, sizeof(gw_str.buf));
+    esp_ip4addr_ntoa(&p_cfg->wifi_settings.sta_static_ip_config.netmask, netmask_str.buf, sizeof(netmask_str.buf));
+    LOG_INFO("%s: sta_static_ip_config: IP: %s , GW: %s , Mask: %s", p_prefix, ip_str.buf, gw_str.buf, netmask_str.buf);
 }
 
 bool

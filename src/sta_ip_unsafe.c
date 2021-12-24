@@ -8,6 +8,8 @@
 #include "sta_ip_unsafe.h"
 #include <stdint.h>
 #include "lwip/sockets.h"
+#include "esp_err.h"
+#include "esp_netif.h"
 
 static char g_sta_ip_str_buf[IP4ADDR_STRLEN_MAX + 1];
 
@@ -36,12 +38,12 @@ sta_ip_unsafe_get_copy(void)
 }
 
 void
-sta_ip_unsafe_set(const sta_ip_address_t ip)
+sta_ip_unsafe_set(const sta_ip_address_t ip_addr)
 {
-    const ip4_addr_t addr_ip4 = {
-        .addr = ip,
+    const esp_ip4_addr_t addr_ip4 = {
+        .addr = ip_addr,
     };
-    inet_ntop(AF_INET, &addr_ip4, g_sta_ip_str_buf, sizeof(g_sta_ip_str_buf));
+    esp_ip4addr_ntoa(&addr_ip4, g_sta_ip_str_buf, sizeof(g_sta_ip_str_buf));
 }
 
 void
@@ -51,9 +53,9 @@ sta_ip_unsafe_reset(void)
 }
 
 uint32_t
-sta_ip_unsafe_conv_str_to_ip(const char *p_ip_addr_str)
+sta_ip_unsafe_conv_str_to_ip(const char *const p_ip_addr_str)
 {
-    ip4_addr_t addr_ip4 = { 0 };
-    inet_aton(p_ip_addr_str, &addr_ip4);
+    esp_ip4_addr_t addr_ip4 = { 0 };
+    addr_ip4.addr           = esp_ip4addr_aton(p_ip_addr_str);
     return addr_ip4.addr;
 }

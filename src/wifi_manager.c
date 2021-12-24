@@ -43,7 +43,7 @@ Contains the freeRTOS task and all necessary support
 #include "esp_wifi_types.h"
 #include "nvs.h"
 #include "lwip/ip4_addr.h"
-#include "tcpip_adapter.h"
+#include "esp_netif.h"
 #include "json_network_info.h"
 #include "json_access_points.h"
 #include "sta_ip_safe.h"
@@ -125,10 +125,10 @@ wifi_manager_clear_sta_config(const wifi_ssid_t *const p_gw_wifi_ssid)
 
 void
 wifi_manager_update_network_connection_info(
-    const update_reason_code_e           update_reason_code,
-    const wifi_ssid_t *const             p_ssid,
-    const tcpip_adapter_ip_info_t *const p_ip_info,
-    const ip4_addr_t *const              p_dhcp_ip)
+    const update_reason_code_e       update_reason_code,
+    const wifi_ssid_t *const         p_ssid,
+    const esp_netif_ip_info_t *const p_ip_info,
+    const esp_ip4_addr_t *const      p_dhcp_ip)
 {
     network_info_str_t ip_info_str = {
         .ip      = { "0" },
@@ -151,12 +151,12 @@ wifi_manager_update_network_connection_info(
             /* save IP as a string for the HTTP server host */
             sta_ip_safe_set(p_ip_info->ip.addr);
 
-            snprintf(ip_info_str.ip, sizeof(ip_info_str.ip), "%s", ip4addr_ntoa(&p_ip_info->ip));
-            snprintf(ip_info_str.netmask, sizeof(ip_info_str.netmask), "%s", ip4addr_ntoa(&p_ip_info->netmask));
-            snprintf(ip_info_str.gw, sizeof(ip_info_str.gw), "%s", ip4addr_ntoa(&p_ip_info->gw));
+            esp_ip4addr_ntoa(&p_ip_info->ip, ip_info_str.ip, sizeof(ip_info_str.ip));
+            esp_ip4addr_ntoa(&p_ip_info->netmask, ip_info_str.netmask, sizeof(ip_info_str.netmask));
+            esp_ip4addr_ntoa(&p_ip_info->gw, ip_info_str.gw, sizeof(ip_info_str.gw));
             if (NULL != p_dhcp_ip)
             {
-                snprintf(ip_info_str.dhcp.buf, sizeof(ip_info_str.dhcp.buf), "%s", ip4addr_ntoa(p_dhcp_ip));
+                esp_ip4addr_ntoa(p_dhcp_ip, ip_info_str.dhcp.buf, sizeof(ip_info_str.dhcp.buf));
                 LOG_INFO("DHCP IP: %s", ip_info_str.dhcp.buf);
             }
         }
@@ -276,8 +276,11 @@ wifi_manager_task(void)
 
     wifiman_msg_deinit();
 
-    tcpip_adapter_stop(TCPIP_ADAPTER_IF_STA);
-    tcpip_adapter_stop(TCPIP_ADAPTER_IF_AP);
+    esp_netif_t *const p_netif_sta = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+    esp_netif_action_stop(p_netif_sta, NULL, 0, NULL);
+
+    esp_netif_t *const p_netif_ap = esp_netif_get_handle_from_ifkey("WIFI_AP_DEF");
+    esp_netif_action_stop(p_netif_ap, NULL, 0, NULL);
 
     wifi_manager_unlock();
 }

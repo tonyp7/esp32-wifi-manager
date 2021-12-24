@@ -182,55 +182,61 @@ wifi_manager_esp_wifi_configure(const struct wifi_settings_t *const p_wifi_setti
 }
 
 static void
-wifi_manager_tcpip_adapter_set_default_ip(void)
+wifi_manager_netif_set_default_ip(void)
 {
-    tcpip_adapter_ip_info_t info = { 0 };
-    inet_pton(AF_INET, DEFAULT_AP_IP, &info.ip); /* access point is on a static IP */
-    inet_pton(AF_INET, DEFAULT_AP_GATEWAY, &info.gw);
-    inet_pton(AF_INET, DEFAULT_AP_NETMASK, &info.netmask);
-    esp_err_t err = tcpip_adapter_dhcps_stop(TCPIP_ADAPTER_IF_AP); /* stop AP DHCP server */
+    LOG_INFO("Set default IP for WiFi AP: %s", DEFAULT_AP_IP);
+    esp_netif_t *const  p_netif_ap = esp_netif_get_handle_from_ifkey("WIFI_AP_DEF");
+    esp_netif_ip_info_t info       = { 0 };
+    info.ip.addr                   = esp_ip4addr_aton(DEFAULT_AP_IP); /* access point is on a static IP */
+    info.gw.addr                   = esp_ip4addr_aton(DEFAULT_AP_GATEWAY);
+    info.netmask.addr              = esp_ip4addr_aton(DEFAULT_AP_NETMASK);
+    esp_err_t err                  = esp_netif_dhcps_stop(p_netif_ap);
     if (ESP_OK != err)
     {
-        LOG_ERR_ESP(err, "%s failed", "tcpip_adapter_dhcps_stop");
+        LOG_ERR_ESP(err, "%s failed", "esp_netif_dhcps_stop");
         return;
     }
-    err = tcpip_adapter_set_ip_info(TCPIP_ADAPTER_IF_AP, &info);
+    err = esp_netif_set_ip_info(p_netif_ap, &info);
     if (ESP_OK != err)
     {
-        LOG_ERR_ESP(err, "%s failed", "tcpip_adapter_set_ip_info");
+        LOG_ERR_ESP(err, "%s failed", "esp_netif_set_ip_info");
         return;
     }
-    err = tcpip_adapter_dhcps_start(TCPIP_ADAPTER_IF_AP); /* start AP DHCP server */
+    err = esp_netif_dhcps_start(p_netif_ap);
     if (ESP_OK != err)
     {
-        LOG_ERR_ESP(err, "%s failed", "tcpip_adapter_dhcps_start");
+        LOG_ERR_ESP(err, "%s failed", "esp_netif_dhcps_start");
         return;
     }
 }
 
 static void
-wifi_manager_tcpip_adapter_configure(const struct wifi_settings_t *const p_wifi_settings)
+wifi_manager_netif_configure(const struct wifi_settings_t *const p_wifi_settings)
 {
+    esp_netif_t *const p_netif_sta = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
     if (p_wifi_settings->sta_static_ip)
     {
+        wifi_ip4_addr_str_t buf_ip;
+        wifi_ip4_addr_str_t buf_gw;
+        wifi_ip4_addr_str_t buf_netmask;
         LOG_INFO(
             "Assigning static ip to STA interface. IP: %s , GW: %s , Mask: %s",
-            ip4addr_ntoa(&p_wifi_settings->sta_static_ip_config.ip),
-            ip4addr_ntoa(&p_wifi_settings->sta_static_ip_config.gw),
-            ip4addr_ntoa(&p_wifi_settings->sta_static_ip_config.netmask));
+            esp_ip4addr_ntoa(&p_wifi_settings->sta_static_ip_config.ip, buf_ip.buf, sizeof(buf_ip.buf)),
+            esp_ip4addr_ntoa(&p_wifi_settings->sta_static_ip_config.gw, buf_gw.buf, sizeof(buf_gw.buf)),
+            esp_ip4addr_ntoa(&p_wifi_settings->sta_static_ip_config.netmask, buf_netmask.buf, sizeof(buf_netmask.buf)));
 
         /* stop DHCP client*/
-        esp_err_t err = tcpip_adapter_dhcpc_stop(TCPIP_ADAPTER_IF_STA);
+        esp_err_t err = esp_netif_dhcpc_stop(p_netif_sta);
         if (ESP_OK != err)
         {
-            LOG_ERR_ESP(err, "%s failed", "tcpip_adapter_dhcpc_stop");
+            LOG_ERR_ESP(err, "%s failed", "esp_netif_dhcpc_stop");
             return;
         }
         /* assign a static IP to the STA network interface */
-        err = tcpip_adapter_set_ip_info(TCPIP_ADAPTER_IF_STA, &p_wifi_settings->sta_static_ip_config);
+        err = esp_netif_set_ip_info(p_netif_sta, &p_wifi_settings->sta_static_ip_config);
         if (ESP_OK != err)
         {
-            LOG_ERR_ESP(err, "%s failed", "tcpip_adapter_set_ip_info");
+            LOG_ERR_ESP(err, "%s failed", "esp_netif_set_ip_info");
             return;
         }
     }
@@ -238,20 +244,20 @@ wifi_manager_tcpip_adapter_configure(const struct wifi_settings_t *const p_wifi_
     {
         /* start DHCP client if not started*/
         LOG_INFO("wifi_manager: Start DHCP client for STA interface. If not already running");
-        tcpip_adapter_dhcp_status_t status = 0;
+        esp_netif_dhcp_status_t status = 0;
 
-        esp_err_t err = tcpip_adapter_dhcpc_get_status(TCPIP_ADAPTER_IF_STA, &status);
+        esp_err_t err = esp_netif_dhcpc_get_status(p_netif_sta, &status);
         if (ESP_OK != err)
         {
-            LOG_ERR_ESP(err, "%s failed", "tcpip_adapter_dhcpc_get_status");
+            LOG_ERR_ESP(err, "%s failed", "esp_netif_dhcpc_get_status");
             return;
         }
-        if (status != TCPIP_ADAPTER_DHCP_STARTED)
+        if (status != ESP_NETIF_DHCP_STARTED)
         {
-            err = tcpip_adapter_dhcpc_start(TCPIP_ADAPTER_IF_STA);
+            err = esp_netif_dhcpc_start(p_netif_sta);
             if (ESP_OK != err)
             {
-                LOG_ERR_ESP(err, "%s failed", "tcpip_adapter_dhcpc_start");
+                LOG_ERR_ESP(err, "%s failed", "esp_netif_dhcpc_start");
                 return;
             }
         }
@@ -418,12 +424,12 @@ wifi_manager_init_start_wifi(
 
     wifi_manager_set_ant_config(p_wifi_ant_config);
     /* SoftAP - Wi-Fi Access Point configuration setup */
-    wifi_manager_tcpip_adapter_set_default_ip();
+    wifi_manager_netif_set_default_ip();
     const wifi_settings_t wifi_settings = wifi_sta_config_get_wifi_settings();
     wifi_manager_esp_wifi_configure(&wifi_settings);
 
     /* STA - Wifi Station configuration setup */
-    wifi_manager_tcpip_adapter_configure(&wifi_settings);
+    wifi_manager_netif_configure(&wifi_settings);
 
     /* by default the mode is STA because wifi_manager will not start the access point unless it has to! */
     err = esp_wifi_set_mode(WIFI_MODE_STA);
@@ -441,11 +447,13 @@ wifi_manager_init_start_wifi(
         return false;
     }
 
+    esp_netif_t *const p_netif_sta = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+
     LOG_INFO("Set hostname for WiFi interface: %s", p_gw_wifi_ssid->ssid_buf);
-    err = tcpip_adapter_set_hostname(TCPIP_ADAPTER_IF_STA, p_gw_wifi_ssid->ssid_buf);
+    err = esp_netif_set_hostname(p_netif_sta, p_gw_wifi_ssid->ssid_buf);
     if (ESP_OK != err)
     {
-        LOG_ERR_ESP(err, "%s failed", "tcpip_adapter_set_hostname");
+        LOG_ERR_ESP(err, "%s failed", "esp_netif_set_hostname");
         return false;
     }
 
@@ -488,20 +496,32 @@ wifi_manager_init(
     json_network_info_init();
     sta_ip_safe_init();
 
-    /* initialize the tcp stack */
-    tcpip_adapter_init();
-
-    dns_server_init();
-
-    http_server_init();
-    http_server_start();
-
     esp_err_t err = esp_event_loop_create_default();
     if (ESP_OK != err)
     {
         LOG_ERR("%s failed", "esp_event_loop_create_default");
         return false;
     }
+
+    /* initialize the tcp stack */
+    esp_netif_init();
+    esp_netif_t *const p_netif_ap = esp_netif_create_default_wifi_ap();
+    if (NULL == p_netif_ap)
+    {
+        LOG_ERR("%s failed", "esp_netif_create_default_wifi_ap");
+        return false;
+    }
+    esp_netif_t *const p_netif_sta = esp_netif_create_default_wifi_sta();
+    if (NULL == p_netif_sta)
+    {
+        LOG_ERR("%s failed", "esp_netif_create_default_wifi_sta");
+        return false;
+    }
+
+    dns_server_init();
+
+    http_server_init();
+    http_server_start();
 
     LOG_INFO("WiFi manager init: start WiFi");
     wifi_manager_init_start_wifi(p_wifi_ant_config, p_gw_wifi_ssid);

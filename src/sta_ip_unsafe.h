@@ -22,7 +22,7 @@ void
 sta_ip_unsafe_deinit(void);
 
 void
-sta_ip_unsafe_set(const sta_ip_address_t ip);
+sta_ip_unsafe_set(const sta_ip_address_t ip_addr);
 
 void
 sta_ip_unsafe_reset(void);
@@ -31,7 +31,7 @@ sta_ip_string_t
 sta_ip_unsafe_get_copy(void);
 
 sta_ip_address_t
-sta_ip_unsafe_conv_str_to_ip(const char *p_ip_addr_str);
+sta_ip_unsafe_conv_str_to_ip(const char *const p_ip_addr_str);
 
 #ifdef __cplusplus
 }

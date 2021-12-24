@@ -152,7 +152,7 @@ replace_non_ascii_with_dots(char *p_domain)
 }
 
 static void
-dns_server_handle_req(socket_t socket_fd, const ip4_addr_t *p_ip_resolved)
+dns_server_handle_req(socket_t socket_fd, const esp_ip4_addr_t *const p_ip_resolved)
 {
     struct sockaddr_in client     = { 0 };
     socklen_t          client_len = sizeof(client);
@@ -328,21 +328,22 @@ dns_server_task(void)
         return;
     }
 
-    struct timeval tv = { .tv_sec = 1, .tv_usec = 0 };
-    if (setsockopt(socket_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0)
+    struct timeval recv_timeout = { .tv_sec = 1, .tv_usec = 0 };
+    if (setsockopt(socket_fd, SOL_SOCKET, SO_RCVTIMEO, &recv_timeout, sizeof(recv_timeout)) < 0)
     {
         LOG_ERR("setsockopt(SO_RCVTIMEO) failed");
         dns_server_sig_unregister_cur_thread();
         return;
     }
-    struct sockaddr_in ra = { 0 };
+    struct sockaddr_in bind_addr = { 0 };
     /* Bind to port 53 (typical DNS Server port) */
-    tcpip_adapter_ip_info_t ip = { 0 };
-    tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_STA, &ip);
-    ra.sin_family      = AF_INET;
-    ra.sin_addr.s_addr = ip.ip.addr;
-    ra.sin_port        = htons(53);
-    if (SOCKET_BIND_ERROR == bind(socket_fd, (struct sockaddr *)&ra, sizeof(struct sockaddr_in)))
+    esp_netif_ip_info_t ip_info     = { 0 };
+    esp_netif_t *       p_netif_sta = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+    esp_netif_get_ip_info(p_netif_sta, &ip_info);
+    bind_addr.sin_family      = AF_INET;
+    bind_addr.sin_addr.s_addr = ip_info.ip.addr;
+    bind_addr.sin_port        = htons(53);
+    if (SOCKET_BIND_ERROR == bind(socket_fd, (struct sockaddr *)&bind_addr, sizeof(struct sockaddr_in)))
     {
         LOG_ERR("Failed to bind to 53/udp");
         close(socket_fd);
@@ -351,8 +352,8 @@ dns_server_task(void)
     }
 
     /* Set redirection DNS hijack to the access point IP */
-    ip4_addr_t ip_resolved = { 0 };
-    inet_pton(AF_INET, DEFAULT_AP_IP, &ip_resolved);
+    esp_ip4_addr_t ip_resolved = { 0 };
+    ip_resolved.addr           = esp_ip4addr_aton(DEFAULT_AP_IP);
 
     LOG_INFO("DNS Server listening on 53/udp");
 
