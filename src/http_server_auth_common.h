@@ -15,6 +15,8 @@ extern "C" {
 #define HTTP_SERVER_MAX_AUTH_USER_LEN (64U + 1U)
 #define HTTP_SERVER_MAX_AUTH_PASS_LEN (64U + 1U)
 
+#define HTTP_SERVER_MAX_AUTH_API_KEY_LEN (64U + 1U)
+
 #ifdef __cplusplus
 }
 #endif

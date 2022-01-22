@@ -22,6 +22,7 @@ typedef struct http_server_auth_info_t
     http_server_auth_type_e auth_type;
     char                    auth_user[HTTP_SERVER_MAX_AUTH_USER_LEN];
     char                    auth_pass[HTTP_SERVER_MAX_AUTH_PASS_LEN];
+    char                    auth_api_key[HTTP_SERVER_MAX_AUTH_API_KEY_LEN];
 } http_server_auth_info_t;
 
 typedef union http_server_auth_t
@@ -31,7 +32,7 @@ typedef union http_server_auth_t
 } http_server_auth_t;
 
 void
-http_server_auth_clear_info(void);
+http_server_auth_clear_authorized_sessions(void);
 
 http_server_auth_digest_req_t *
 http_server_auth_digest_get_info(void);

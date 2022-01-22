@@ -28,7 +28,11 @@ typedef enum http_server_auth_type_e
 } http_server_auth_type_e;
 
 bool
-http_server_set_auth(const char *const p_auth_type, const char *const p_auth_user, const char *const p_auth_pass);
+http_server_set_auth(
+    const char *const p_auth_type,
+    const char *const p_auth_user,
+    const char *const p_auth_pass,
+    const char *const p_auth_api_key);
 
 #ifdef __cplusplus
 }

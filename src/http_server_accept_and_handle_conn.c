@@ -177,7 +177,7 @@ http_server_netconn_printf(struct netconn *const p_conn, const bool flag_more, c
         LOG_ERR("Can't allocate memory for buffer");
         return false;
     }
-    LOG_DBG("Respond: %s", str_buf.buf);
+    LOG_DBG("Response: %s", str_buf.buf);
     uint8_t netconn_flags = (uint8_t)NETCONN_COPY;
     if (flag_more)
     {
@@ -372,11 +372,15 @@ http_server_netconn_resp_with_content(
 {
     if (HTTP_RESP_CODE_200 == resp_code)
     {
-        LOG_INFO("Respond: %s", p_status_msg);
+        LOG_INFO("Response: %s", p_status_msg);
     }
     else
     {
-        LOG_WARN("Respond: %s", p_status_msg);
+        LOG_WARN(
+            "Response: status %u (%s), extra header fields:\n%s",
+            (printf_uint_t)resp_code,
+            p_status_msg,
+            (NULL != p_extra_header_fields) ? p_extra_header_fields->buf : "");
     }
     const bool use_extra_content_type_param = (NULL != p_resp->p_content_type_param)
                                               && ('\0' != p_resp->p_content_type_param[0]);
@@ -417,7 +421,7 @@ http_server_netconn_resp_without_content(
     const http_resp_code_e resp_code,
     const char *const      p_status_msg)
 {
-    LOG_WARN("Respond: %s", p_status_msg);
+    LOG_WARN("Response: status %u (%s)", (printf_uint_t)resp_code, p_status_msg);
     if (!http_server_netconn_printf(
             p_conn,
             false,
@@ -445,7 +449,7 @@ http_server_netconn_resp_200(
 static void
 http_server_netconn_resp_302(struct netconn *const p_conn)
 {
-    LOG_INFO("Respond: 302 Found");
+    LOG_INFO("Response: status 302 (Found), URL=http://%s/", DEFAULT_AP_IP);
     if (!http_server_netconn_printf(
             p_conn,
             false,
@@ -466,7 +470,7 @@ http_server_netconn_resp_302_auth_html(
     const sta_ip_string_t *const            p_ip_str,
     const http_header_extra_fields_t *const p_extra_header_fields)
 {
-    LOG_INFO("Respond: 302 Found");
+    LOG_INFO("Response: status 302 (Found), URL=http://%s/auth.html", p_ip_str->buf);
     if (!http_server_netconn_printf(
             p_conn,
             false,

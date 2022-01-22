@@ -265,6 +265,18 @@ http_server_fill_auth_json(
     return &g_auth_json;
 }
 
+const http_server_resp_auth_json_t *
+http_server_fill_auth_json_bearer_failed(const wifi_ssid_t *const p_ap_ssid)
+{
+    snprintf(
+        g_auth_json.buf,
+        sizeof(g_auth_json.buf),
+        "{\"success\": %s, \"gateway_name\": \"%s\"}",
+        "false",
+        p_ap_ssid->ssid_buf);
+    return &g_auth_json;
+}
+
 http_server_resp_t
 http_server_resp_401_auth_digest(
     const wifi_ssid_t *const          p_ap_ssid,

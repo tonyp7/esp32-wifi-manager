@@ -142,6 +142,8 @@ wifi_manager_generate_ap_config(const struct wifi_settings_t *const p_wifi_setti
             .ssid_hidden     = p_wifi_settings->ap_ssid_hidden,
             .max_connection  = DEFAULT_AP_MAX_CONNECTIONS,
             .beacon_interval = DEFAULT_AP_BEACON_INTERVAL,
+            .pairwise_cipher = WIFI_CIPHER_TYPE_TKIP_CCMP,
+            .ftm_responder   = false,
         },
     };
 
@@ -505,14 +507,12 @@ wifi_manager_init(
 
     /* initialize the tcp stack */
     esp_netif_init();
-    esp_netif_t *const p_netif_ap = esp_netif_create_default_wifi_ap();
-    if (NULL == p_netif_ap)
+    if (NULL == esp_netif_create_default_wifi_ap())
     {
         LOG_ERR("%s failed", "esp_netif_create_default_wifi_ap");
         return false;
     }
-    esp_netif_t *const p_netif_sta = esp_netif_create_default_wifi_sta();
-    if (NULL == p_netif_sta)
+    if (NULL == esp_netif_create_default_wifi_sta())
     {
         LOG_ERR("%s failed", "esp_netif_create_default_wifi_sta");
         return false;
