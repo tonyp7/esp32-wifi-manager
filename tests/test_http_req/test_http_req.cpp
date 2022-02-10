@@ -61,7 +61,8 @@ TEST_F(TestHttpReq, test_lf) // NOLINT
 
     ASSERT_TRUE(req_info.is_success);
     ASSERT_EQ(string("GET"), req_info.http_cmd.ptr);
-    ASSERT_EQ(string("/connecttest.txt?n=1605859162338"), req_info.http_uri.ptr);
+    ASSERT_EQ(string("/connecttest.txt"), req_info.http_uri.ptr);
+    ASSERT_EQ(string("n=1605859162338"), req_info.http_uri_params.ptr);
     ASSERT_EQ(string("HTTP/1.1"), req_info.http_ver.ptr);
     ASSERT_EQ(
         string("Host: www.msftconnecttest.com\n"
@@ -94,7 +95,8 @@ TEST_F(TestHttpReq, test_crlf) // NOLINT
 
     ASSERT_TRUE(req_info.is_success);
     ASSERT_EQ(string("GET"), req_info.http_cmd.ptr);
-    ASSERT_EQ(string("/connecttest.txt?n=1605859162338"), req_info.http_uri.ptr);
+    ASSERT_EQ(string("/connecttest.txt"), req_info.http_uri.ptr);
+    ASSERT_EQ(string("n=1605859162338"), req_info.http_uri_params.ptr);
     ASSERT_EQ(string("HTTP/1.1"), req_info.http_ver.ptr);
     ASSERT_EQ(
         string("Host: www.msftconnecttest.com\r\n"
@@ -119,7 +121,8 @@ TEST_F(TestHttpReq, test_lf_without_header) // NOLINT
 
     ASSERT_TRUE(req_info.is_success);
     ASSERT_EQ(string("GET"), req_info.http_cmd.ptr);
-    ASSERT_EQ(string("/connecttest.txt?n=1605859162338"), req_info.http_uri.ptr);
+    ASSERT_EQ(string("/connecttest.txt"), req_info.http_uri.ptr);
+    ASSERT_EQ(string("n=1605859162338"), req_info.http_uri_params.ptr);
     ASSERT_EQ(string("HTTP/1.1"), req_info.http_ver.ptr);
     ASSERT_EQ(string(""), req_info.http_header.ptr);
     ASSERT_EQ(string("body"), req_info.http_body.ptr);
@@ -135,7 +138,8 @@ TEST_F(TestHttpReq, test_crlf_without_header) // NOLINT
 
     ASSERT_TRUE(req_info.is_success);
     ASSERT_EQ(string("GET"), req_info.http_cmd.ptr);
-    ASSERT_EQ(string("/connecttest.txt?n=1605859162338"), req_info.http_uri.ptr);
+    ASSERT_EQ(string("/connecttest.txt"), req_info.http_uri.ptr);
+    ASSERT_EQ(string("n=1605859162338"), req_info.http_uri_params.ptr);
     ASSERT_EQ(string("HTTP/1.1"), req_info.http_ver.ptr);
     ASSERT_EQ(string(""), req_info.http_header.ptr);
     ASSERT_EQ(string("body"), req_info.http_body.ptr);

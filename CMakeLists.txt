@@ -30,6 +30,8 @@ if(IDF_VERSION_MAJOR GREATER_EQUAL 4)
             src/http_server_auth_digest.h
             src/http_server_auth_ruuvi.c
             src/http_server_auth_ruuvi.h
+            src/http_server_ecdh.c
+            src/http_server_ecdh.h
             src/http_server_handle_req.c
             src/http_server_handle_req.h
             src/http_server_handle_req_delete_auth.c

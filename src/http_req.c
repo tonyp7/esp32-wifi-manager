@@ -98,30 +98,52 @@ http_req_parse(char *p_req_buf)
 
     req_info.http_ver.ptr = p2 + 1;
 
+    p2 = strchr(req_info.http_uri.ptr, '?');
+    if (NULL != p2)
+    {
+        *p2                          = '\0';
+        req_info.http_uri_params.ptr = p2 + 1;
+    }
+
     req_info.is_success = true;
 
     return req_info;
 }
 
 const char *
-http_req_header_get_field(const http_req_header_t req_header, const char *field_name, uint32_t *p_len)
+http_req_header_get_field(const http_req_header_t req_header, const char *const p_field_name, uint32_t *const p_len)
 {
     *p_len = 0;
 
-    const char *ptr = strstr(req_header.ptr, field_name);
-    if (NULL == ptr)
+    const char *p_start = strstr(req_header.ptr, p_field_name);
+    if (NULL == p_start)
     {
         return NULL;
     }
-    const char *p_val = ptr + strlen(field_name);
+    const char *p_val = p_start + strlen(p_field_name);
     while (' ' == *p_val)
     {
         p_val += 1;
     }
+    bool flag_quotes = false;
+    if ('"' == *p_val)
+    {
+        flag_quotes = true;
+        p_val += 1;
+    }
+
     const char *p_end = strpbrk(p_val, "\r\n");
     if (NULL == p_end)
     {
         return NULL;
+    }
+    if (flag_quotes)
+    {
+        p_end -= 1;
+        if ('"' != *p_end)
+        {
+            return NULL;
+        }
     }
     *p_len = (uint32_t)(ptrdiff_t)(p_end - p_val);
     return p_val;

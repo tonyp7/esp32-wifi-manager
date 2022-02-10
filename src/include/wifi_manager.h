@@ -58,7 +58,9 @@ wifi_manager_start(
     const bool                                 flag_start_ap_only,
     const wifi_ssid_t *const                   p_gw_wifi_ssid,
     const wifi_manager_antenna_config_t *const p_wifi_ant_config,
-    const wifi_manager_callbacks_t *const      p_callbacks);
+    const wifi_manager_callbacks_t *const      p_callbacks,
+    int (*f_rng)(void *, unsigned char *, size_t),
+    void *p_rng);
 
 /**
  * @brief Stop WiFi access-point

@@ -34,6 +34,9 @@ http_server_resp_t
 http_server_resp_200_json(const char *p_json_content);
 
 http_server_resp_t
+http_server_resp_200_json_in_heap(const char *const p_json_content);
+
+http_server_resp_t
 http_server_resp_302(void);
 
 http_server_resp_t

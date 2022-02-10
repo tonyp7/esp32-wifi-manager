@@ -52,6 +52,7 @@ Contains the freeRTOS task and all necessary support
 #include "wifi_sta_config.h"
 #include "http_req.h"
 #include "os_timer.h"
+#include "http_server_ecdh.h"
 
 #define LOG_LOCAL_LEVEL LOG_LEVEL_INFO
 #include "log.h"
@@ -82,7 +83,9 @@ wifi_manager_start(
     const bool                                 flag_start_ap_only,
     const wifi_ssid_t *const                   p_gw_wifi_ssid,
     const wifi_manager_antenna_config_t *const p_wifi_ant_config,
-    const wifi_manager_callbacks_t *const      p_callbacks)
+    const wifi_manager_callbacks_t *const      p_callbacks,
+    int (*f_rng)(void *, unsigned char *, size_t),
+    void *p_rng)
 {
     wifi_manager_init_mutex();
     wifi_manager_lock();
@@ -95,19 +98,22 @@ wifi_manager_start(
         g_p_wifi_manager_event_group = xEventGroupCreateStatic(&g_wifi_manager_event_group_mem);
     }
 
-    const bool res = wifi_manager_init(
-        flag_start_wifi,
-        flag_start_ap_only,
-        p_gw_wifi_ssid,
-        p_wifi_ant_config,
-        p_callbacks);
-    if (!res)
+    if (!http_server_ecdh_init(f_rng, p_rng))
     {
         xEventGroupClearBits(g_p_wifi_manager_event_group, WIFI_MANAGER_IS_WORKING);
+        wifi_manager_unlock();
+        return false;
+    }
+
+    if (!wifi_manager_init(flag_start_wifi, flag_start_ap_only, p_gw_wifi_ssid, p_wifi_ant_config, p_callbacks))
+    {
+        xEventGroupClearBits(g_p_wifi_manager_event_group, WIFI_MANAGER_IS_WORKING);
+        wifi_manager_unlock();
+        return false;
     }
 
     wifi_manager_unlock();
-    return res;
+    return true;
 }
 
 bool

@@ -27,6 +27,21 @@ http_server_resp_200_json(const char *p_json_content)
         flag_add_header_date);
 }
 
+http_server_resp_t
+http_server_resp_200_json_in_heap(const char *const p_json_content)
+{
+    const bool flag_no_cache        = true;
+    const bool flag_add_header_date = true;
+    return http_server_resp_data_in_heap(
+        HTTP_CONENT_TYPE_APPLICATION_JSON,
+        NULL,
+        strlen(p_json_content),
+        HTTP_CONENT_ENCODING_NONE,
+        (const uint8_t *)p_json_content,
+        flag_no_cache,
+        flag_add_header_date);
+}
+
 static http_server_resp_t
 http_server_resp_err(const http_resp_code_e http_resp_code)
 {
