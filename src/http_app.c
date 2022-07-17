@@ -428,6 +428,10 @@ void http_app_start(bool lru_purge_enable){
 		config.uri_match_fn = httpd_uri_match_wildcard;
 		config.lru_purge_enable = lru_purge_enable;
 
+		/* set webserver listening tcp port */
+		config.server_port = WEBAPP_HTTP_PORT;
+		ESP_LOGI(TAG, "Setting webserver listening port to: %d", WEBAPP_HTTP_PORT);
+
 		/* generate the URLs */
 		if(http_root_url == NULL){
 			int root_len = strlen(WEBAPP_LOCATION);

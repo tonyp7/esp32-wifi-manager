@@ -48,6 +48,11 @@ extern "C" {
  */
 #define WEBAPP_LOCATION 					CONFIG_WEBAPP_LOCATION
 
+/** @brief Defines the TCP port on which the webserver is listening
+ *  By default it is set to 80 (standard HTTP port). If you wish to have other webservers
+ *  coexist with WM webapp, you may want to relocate the wifi manager port, for instance 8080
+ */
+#define WEBAPP_HTTP_PORT 					CONFIG_WEBAPP_HTTP_PORT
 
 /** 
  * @brief spawns the http server 
