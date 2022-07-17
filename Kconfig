@@ -30,6 +30,12 @@ config WEBAPP_LOCATION
     help
     This parameter helps you relocate the wifimanager to another URL, for instance /wifimanager/ The trailing slash is important and should be included
 
+config WEBAPP_HTTP_PORT
+    int "Defines the TCP port on which the wifi manager HTTP webserver is listening"
+    default 80
+    help
+    This parameter helps you relocate the wifimanager webserver from default 80 to another TCP port, for instance 8080 
+
 config DEFAULT_AP_SSID
     string "Access Point SSID"
     default "esp32"
