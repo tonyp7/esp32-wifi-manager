@@ -123,6 +123,12 @@ EXTRA_COMPONENT_DIRS := components/
 include $(IDF_PATH)/make/project.mk
 ```
 
+Update your `sdkconfig.defaults` to allow for larger HTTP Request URL lengths.  This is required by some operating systems in order to use its captive portal UI to configure wifi.
+
+```config
+CONFIG_HTTPD_MAX_URI_LEN=1024
+```
+
 Once this is done, you can now in your user code add the header:
 
 ```c
