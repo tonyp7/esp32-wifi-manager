@@ -53,6 +53,7 @@ Contains the freeRTOS task and all necessary support
 #include "lwip/err.h"
 #include "lwip/netdb.h"
 #include "lwip/ip4_addr.h"
+#include "esp_mac.h"
 
 
 #include "json.h"
@@ -604,6 +605,16 @@ static void wifi_manager_event_handler(void* arg, esp_event_base_t event_base, i
 		 * the application is LwIP-based, then you need to wait until the got ip event comes in. */
 		case WIFI_EVENT_STA_CONNECTED:
 			ESP_LOGI(TAG, "WIFI_EVENT_STA_CONNECTED");
+
+			uint8_t mac_address[8];
+			char hostname[16];
+
+			esp_base_mac_addr_get(&mac_address);
+			sprintf(hostname, "tn-%02x%02x%02x%02x%02x%02x", mac_address[0], mac_address[1], mac_address[2], mac_address[3], mac_address[4], mac_address[5]);
+
+			ESP_LOGI(TAG, "Setting hostname to %s", hostname);
+			esp_netif_set_hostname(esp_netif_sta, hostname);
+
 			break;
 
 		/* This event can be generated in the following scenarios:
