@@ -323,6 +323,16 @@ bool wifi_manager_fetch_wifi_sta_config(){
 
 		esp_err = nvs_open(wifi_manager_nvs_namespace, NVS_READONLY, &handle);
 
+        if (esp_err == ESP_ERR_NVS_NOT_FOUND && CONFIG_DEFAULT_STA_SSID[0] != '\0' && CONFIG_DEFAULT_STA_PASSWORD[0] != '\0') { // Initial use
+            ESP_LOGE(TAG, "Using defaults");
+            if(wifi_manager_config_sta == NULL) wifi_manager_config_sta = (wifi_config_t*)malloc(sizeof(wifi_config_t));
+            memset(wifi_manager_config_sta, 0x00, sizeof(wifi_config_t));
+            strncpy((char*) wifi_manager_config_sta->sta.ssid, CONFIG_DEFAULT_STA_SSID, 32);
+            strncpy((char*) wifi_manager_config_sta->sta.password, CONFIG_DEFAULT_STA_PASSWORD, 64);
+            nvs_sync_unlock();
+            return true;
+        }
+
 		if(esp_err != ESP_OK){
 			nvs_sync_unlock();
 			return false;
