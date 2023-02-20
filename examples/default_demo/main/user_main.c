@@ -30,10 +30,10 @@ SOFTWARE.
 #include <string.h>
 #include <esp_wifi.h>
 #include <esp_netif.h>
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "esp_system.h"
-#include "esp_log.h"
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#include <esp_system.h>
+#include <esp_log.h>
 #include <lwip/ip4_addr.h>
 
 #include "wifi_manager.h"
