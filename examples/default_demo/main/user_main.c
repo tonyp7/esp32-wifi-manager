@@ -34,6 +34,7 @@ SOFTWARE.
 #include "freertos/task.h"
 #include "esp_system.h"
 #include "esp_log.h"
+#include <lwip/ip4_addr.h>
 
 #include "wifi_manager.h"
 
@@ -47,7 +48,7 @@ static const char TAG[] = "main";
 void monitoring_task(void *pvParameter)
 {
 	for(;;){
-		ESP_LOGI(TAG, "free heap: %d",esp_get_free_heap_size());
+		ESP_LOGI(TAG, "free heap: %"PRIu32, esp_get_free_heap_size());
 		vTaskDelay( pdMS_TO_TICKS(10000) );
 	}
 }
