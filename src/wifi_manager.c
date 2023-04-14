@@ -97,6 +97,8 @@ static esp_netif_t* esp_netif_sta = NULL;
 /* @brief netif object for the ACCESS POINT */
 static esp_netif_t* esp_netif_ap = NULL;
 
+static char* wifi_manager_hostname = NULL;
+
 /**
  * The actual WiFi settings in use
  */
@@ -141,7 +143,9 @@ const int WIFI_MANAGER_SCAN_BIT = BIT7;
 /* @brief When set, means user requested for a disconnect */
 const int WIFI_MANAGER_REQUEST_DISCONNECT_BIT = BIT8;
 
-
+void wifi_manager_set_hostname(char* hostname) {
+    wifi_manager_hostname = hostname;
+}
 
 void wifi_manager_timer_retry_cb( TimerHandle_t xTimer ){
 
@@ -318,6 +322,16 @@ bool wifi_manager_fetch_wifi_sta_config(){
 	if(nvs_sync_lock( portMAX_DELAY )){
 
 		esp_err = nvs_open(wifi_manager_nvs_namespace, NVS_READONLY, &handle);
+
+        if (esp_err == ESP_ERR_NVS_NOT_FOUND && CONFIG_DEFAULT_STA_SSID[0] != '\0' && CONFIG_DEFAULT_STA_PASSWORD[0] != '\0') { // Initial use
+            ESP_LOGE(TAG, "Using defaults");
+            if(wifi_manager_config_sta == NULL) wifi_manager_config_sta = (wifi_config_t*)malloc(sizeof(wifi_config_t));
+            memset(wifi_manager_config_sta, 0x00, sizeof(wifi_config_t));
+            strncpy((char*) wifi_manager_config_sta->sta.ssid, CONFIG_DEFAULT_STA_SSID, 32);
+            strncpy((char*) wifi_manager_config_sta->sta.password, CONFIG_DEFAULT_STA_PASSWORD, 64);
+            nvs_sync_unlock();
+            return true;
+        }
 
 		if(esp_err != ESP_OK){
 			nvs_sync_unlock();
@@ -960,6 +974,7 @@ void wifi_manager( void * pvParameters ){
 
 	/* by default the mode is STA because wifi_manager will not start the access point unless it has to! */
 	ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+    if (wifi_manager_hostname != NULL) ESP_ERROR_CHECK(esp_netif_set_hostname(esp_netif_sta, wifi_manager_hostname));
 	ESP_ERROR_CHECK(esp_wifi_start());
 
 	/* start http server */

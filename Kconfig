@@ -78,4 +78,16 @@ config DEFAULT_AP_BEACON_INTERVAL
     help
 	100ms is the recommended default.
 
+config DEFAULT_STA_SSID
+    string "Station SSID"
+    default ""
+    help
+        SSID (network name) the esp32 will connect to by default (leave empty for AP mode first).
+
+config DEFAULT_STA_PASSWORD
+    string "Station Password"
+    default ""
+    help
+        Password used for the WiFi connection (leave empty for AP mode first).
+
 endmenu

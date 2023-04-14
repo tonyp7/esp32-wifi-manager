@@ -278,6 +278,8 @@ esp_netif_t* wifi_manager_get_esp_netif_sta();
 esp_netif_t* wifi_manager_get_esp_netif_ap();
 
 
+void wifi_manager_set_hostname(char* hostname);
+
 /**
  * Allocate heap memory for the wifi manager and start the wifi_manager RTOS task
  */
