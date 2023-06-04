@@ -51,6 +51,13 @@ Module.symvers
 Mkfile.old
 dkms.conf
 
+#esp idf
+sdkconfig
+sdkconfig.old
+managed_components/
+dependencies.lock
+**/build/
+
 # Eclipse
 .metadata/
 RemoteSystemsTempFiles/.project
@@ -60,9 +67,7 @@ RemoteSystemsTempFiles/.project
 *.d
 wifi_manager/.cproject
 wifi_manager/.project
-sdkconfig
-sdkconfig.old
-**/build/
+
 #doxygen
 Doxyfile
 wifi_manager/doc/
