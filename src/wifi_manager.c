@@ -96,6 +96,8 @@ static esp_netif_t* esp_netif_sta = NULL;
 /* @brief netif object for the ACCESS POINT */
 static esp_netif_t* esp_netif_ap = NULL;
 
+static char* wifi_manager_hostname = NULL;
+
 /**
  * The actual WiFi settings in use
  */
@@ -138,7 +140,9 @@ const int WIFI_MANAGER_SCAN_BIT = BIT7;
 /* @brief When set, means user requested for a disconnect */
 const int WIFI_MANAGER_REQUEST_DISCONNECT_BIT = BIT8;
 
-
+void wifi_manager_set_hostname(char* hostname) {
+    wifi_manager_hostname = hostname;
+}
 
 void wifi_manager_timer_retry_cb( TimerHandle_t xTimer ){
 
@@ -780,6 +784,7 @@ void wifi_manager( void * pvParameters ){
 
 	/* by default the mode is STA because wifi_manager will not start the access point unless it has to! */
 	ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+    if (wifi_manager_hostname != NULL) ESP_ERROR_CHECK(esp_netif_set_hostname(esp_netif_sta, wifi_manager_hostname));
 	ESP_ERROR_CHECK(esp_wifi_start());
 
 	/* start http server */
